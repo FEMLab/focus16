@@ -21,17 +21,17 @@ def get_args():
     return(parser.parse_args())
 
 
-def main(args):
+def main(args, output_dir):
     # download the file from github
-    if os.path.exists(args.output_dir):
+    if os.path.exists(output_dir):
         print("Output folder already exists; exiting...")
         sys.exit(1)
     else:
-        os.makedirs(args.output_dir)
+        os.makedirs(output_dir)
     sraFind_results = "https://raw.githubusercontent.com/nickp60/sraFind/master/results/sraFind-CompleteGenome-biosample-with-SRA-hits.txt"
     # gets just the file name
     sraFind_results_path = os.path.join(
-        args.output_dir, os.path.basename(sraFind_results))
+        output_dir, os.path.basename(sraFind_results))
     if not os.path.exists(sraFind_results_path):
         print("Downloading sraFind Dump")
         download_sraFind_cmd = str("wget " + sraFind_results + " -O " + sraFind_results_path)
@@ -47,4 +47,4 @@ def main(args):
 
 if __name__ == "__main__":
     args = get_args()
-    main(args)
+    main(args, output_dir=args.output_dir)

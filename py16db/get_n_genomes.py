@@ -46,7 +46,7 @@ def get_args():  # pragma nocover
 def main(args=None):
     if args is None:
         args = get_args()
-    try: 
+    try:
         os.makedirs(args.genomes_dir)
     except:
         print("genomes output directory already  exists!")
@@ -112,3 +112,4 @@ def main(args=None):
 
 if __name__ ==  "__main__":
     args = get_args()
+    main(args)
