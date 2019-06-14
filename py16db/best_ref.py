@@ -22,7 +22,7 @@ def get_args():
     parser.add_argument(
         "-g",
         "--genomes_dir",
-        help="path to output"
+        help="path to output",
         required=True)
     #parser.add_argument(
         "-r",

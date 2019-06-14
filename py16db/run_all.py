@@ -72,15 +72,19 @@ def download_SRA(SRA, destination):
     return()
 
 
-def pob(genomes_dir, readsf):
-    suboutput_dir = os.path.join(output_dir, "plentyofbugs")
-    os.makedirs(suboutput_dir)
-    pobcmd = "plentyofbugs -g" + genomes_dir +  "-f" + readsf
+def pob(genomes_dir, readsf, output_dir):
+    pobcmd = "plentyofbugs -g " + genomes_dir +  " -f " + readsf + " -o " + output_dir
     subprocess.run(pobcmd,
                    shell=sys.platform !="win32",
                    stdout=subprocess.PIPE,
-                   sterr=subprocess.PIPE,
+                   stderr=subprocess.PIPE,
                    check=True)
+    best_ref = os.path.join(output_dir, "best_reference")
+    with open(best_ref, "r") as infile:
+        for line in infile:
+            print(line)
+            sraacc = line.strip().split('\t')
+    return(sraacc)
 
 
 if __name__ == '__main__':
@@ -101,4 +105,5 @@ if __name__ == '__main__':
         print("Downloading " + accession)
         download_SRA(SRA=accession, destination=this_output)
         readsf = os.path.join(this_output, "/downsampled/reads1.fq")
-        pob(genomes_dir=genomes_dir, readsf=readsf)
+        pob_dir = os.path.join(output_dir, "plentyofbugs")
+        pob(genomes_dir=genomes_dir, readsf=readsf, output_dir=pob_dir)
