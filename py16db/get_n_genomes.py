@@ -42,9 +42,11 @@ def get_args():  # pragma nocover
     return(parser.parse_args())
 
 
-if __name__ ==  "__main__":
-    args = get_args()
-    try:
+
+def main(args=None):
+    if args is None:
+        args = get_args()
+    try: 
         os.makedirs(args.genomes_dir)
     except:
         print("genomes output directory already  exists!")
@@ -107,3 +109,6 @@ if __name__ ==  "__main__":
         unzip_cmd,
         shell=sys.platform != "win32",
         check=True)
+
+if __name__ ==  "__main__":
+    args = get_args()

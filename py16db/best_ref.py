@@ -3,76 +3,75 @@
 import argparse
 import os
 import sys
+import subprocess
 
 #argument function
 def get_args():
     parser = argparse.ArgumentParser()
+    description = "Finds the best reference genome for a SRA with Mash"
     parser.add_argument(
-        "-v",
-        "--working_directory",
-        help="current working directory",
+        "-f",
+        "--forward_reads",
+        help="forward reads file",
         required=True)
-    parser.add_argument(
-    "-r",
-    "--input_reads",
-    help="input file for downsampled forward reads for draft genomes",
-    required=True)   
     parser.add_argument(
         "-o",
-        "--organism_name",
-        help="bug of interest",
-        required=True)
+        "--output",
+        help="output directory",
+        required=False)
     parser.add_argument(
+        "-g",
+        "--genomes_dir",
+        help="path to output"
+        required=True)
+    #parser.add_argument(
+        "-r",
+        "--reverse_reads",
+        help="reverse reads file",
+        required=True)
+   #parser.add_argument(
         "-n",
-        "--number of strains",
+        "--nstrains",
         help="number of genomes that will be compared as the reference",
         required=True)
-    parser.add_argument(
-        "-e",
-        "--experiment_name",
-        help="name of experiment",
+    #parser.add_argument(
+        "--genus_species",
+        help="organism name",
         required=True)
-    parser.add_argument(
-        "-d",
-        "--output",
-        help="output folder",
+    #parser.add_argument(
+        "--assembler",
+        help="skesa or spades",
         required=True)
+    #parser.add_argument("-m",
+                        "--pyani_mash",
+                        help="pyani or mash for genome selection",
+                        required=True)
+    
+                                     
     return(parser.parse_args())
 
-#function to form command to use docker container plentyofbugs
-def pob(wd, readfile, organism, strains, experiment, output):
-    pobcmd =
-    "docker run --rm -t -v "
-    + wd +
-    ":/data/ nickp60/plentyofbugs:0.87  -f"
-    + readfile +
-    " -o "
-    + organism +
-    " -n "
-    + strains +
-    "-e "
-    + experiment +
-    " -d "
-    +  output 
+#function to form command to use mash
+def pob(genomes_dir, readsf)  
+    suboutput_dir = os.path.join(output, "mash")
+    os.makedirs(suboutput_dir)
+    pobcmd = "plentyofbugs -g" + genomes_dir +  "-f" + readsf 
+    subprocess.run(mashcmd,
+                   shell=sys.platform !="win32",
+                   stdout=subprocess.PIPE,
+                   sterr=subprocess.PIPE,
+                   check=True)
     return()
 
-#function to form command to use get_genomes.py. Downloads genomes, in this case, the sra chosen by pob
-def get_genomes(ref, output):
-    ggcmd = "get_genomes.py -q " + ref + " -o" + output 
-    return()
- 
-#calling the above functions to obtain best reference genome and download it 
+#calling the above function 
 if __name__ == '__main__':
  args=get_args()
- inputreads = args.input_reads
- for read in inputreads: 
-     best_ref = pob(wd=args.directory, readfile=read, organism=args.organism, strains=args.maxstrain, experiment=name, output=poboutput)
- for sra in best_ref(poboutput):
-     os.mkdir(ggoutput)
-     get_genomes(ref=sra, output=ggoutput)
+ for genome in inputreads: 
+     pob(genomes_dir=args.genomes_dir, readsf=forward_reads)
+     
  
- #download the sra using get_genomes():
+     
  
+  
  
  
     
