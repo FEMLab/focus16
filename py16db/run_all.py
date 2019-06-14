@@ -7,6 +7,8 @@ import subprocess
 import random
 import shutil
 
+from Bio import SeqIO
+
 import get_n_genomes as gng
 import fetch_sraFind_data as fsd
 
@@ -33,8 +35,10 @@ def get_args():
         required=False)
     parser.add_argument("-S", "--nstrains", help="number of strains",
                         type=int, required=True)
-    parser.add_argument("--get_all", help="number of strains",
+    parser.add_argument("--get_all", help="get both sras if organism has two",
                         actions="store_true",
+                        required=True)
+    parser.add_argument("--cores", help="number of cores for riboSeed",
                         required=True)
     return(parser.parse_args())
 
@@ -77,11 +81,11 @@ def download_SRA(SRA, destination):
                    stdout=subprocess.PIPE,
                    stderr=subprocess.PIPE,
                    check=True)
-    downcmd = "seqtk sample -s100 " + suboutput_dir_raw + "/" + SRA + "_1.fastq 1000000 > " + suboutput_dir_down + "reads" + SRA + ".fq"
+    downcmd = "seqtk sample -s100 " + suboutput_dir_raw + "/" + SRA + "_1.fastq 1000000 > " + suboutput_dir_downsampled + "reads" + SRA + ".fq"
     subprocess.run(downcmd,
                   shell=sys.platform !="win32",
                   stdout=subprocess.PIPE,
-                  sterr=subprocess.PIPE,
+                  stderr=subprocess.PIPE,
                    check=True)
     return()
 
@@ -99,6 +103,39 @@ def pob(genomes_dir, readsf, output_dir):
             print(line)
             sraacc = line.strip().split('\t')
     return(sraacc)
+
+#taken from github.com/nickp60/riboSeed/riboSeed/classes.py
+def get_ave_read_len_from_fastq(fastq1, N=50):
+    """from LP; return average read length in fastq1 file from first N reads
+    """
+    count, tot = 0, 0
+    if os.path.splitext(fastq1)[-1] in ['.gz', '.gzip']:
+        open_fun = gzip.open
+    else:
+        open_fun = open
+    with open_fun(fastq1, "rt") as file_handle:
+        data = SeqIO.parse(file_handle, "fastq")
+        for read in data:
+            count += 1
+            tot += len(read)
+            if count >= N:
+                break 
+    ave_read_len = float(tot / count)  
+    if ave_read_len < 20:
+        print('Exiting: read length is too low :', ave_read_len, 'bp')
+        sys.exit()
+    else:
+        print('read length is OK :', ave_read_len, 'bp')
+    return()
+
+def riboseed(sra, readsf, readsr, cores, threads, v, output):
+    cmd = "ribo run -r" + sra + "-F" + readsf + "-R" + readsr + "--cores" + cores + "--threads" + threads + "-v" + v + "--serialize -o" + suboutput_dir
+    subprocess.run(cmd,
+                   shell=sys.platform !="win32",
+                   stdout=subprocess.PIPE,
+                   stderr=subprocess.PIPE,
+                   check=True)
+    return()
 
 
 if __name__ == '__main__':
@@ -130,5 +167,10 @@ if __name__ == '__main__':
         print("Downloading " + accession)
         download_SRA(SRA=accession, destination=this_output)
         readsf = os.path.join(this_output, "/downsampled/reads1.fq")
+        readsr = os.path.join(this_output, "/downsampled/reads2.fq")
         pob_dir = os.path.join(output_dir, "plentyofbugs")
+        ribo_dir = os.path.join(output_dir, "riboSeed")
+        get_ave_read_len_from_fastq(fastq1=readsf, N=50)
         pob(genomes_dir=genomes_dir, readsf=readsf, output_dir=pob_dir)
+        riboseed(sra=best_reference, readsf=readsf, readsr=readsr, cores=args.cores,
+                 threads=1, v=1, output=ribo_dir)
