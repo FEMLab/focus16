@@ -7,15 +7,15 @@ import subprocess
 import random
 
 import get_n_genomes as gng
-
+import fetch_sraFind_data as fsd
 
 def get_args():
     parser = argparse.ArgumentParser(
-    description = "given a genus species, downloads the raw reads for each SRA using " + 
+    description = "given a genus species, downloads the raw reads for each SRA using " +
     "fastq-dump. Also downloads downsampled [1000000 reads] version of each SRA")
     parser.add_argument("-o", "--output_dir", help="path to output", required=True)
     parser.add_argument("-n", "--organism_name", help="genus species in quotes", required=True)
-    parser.add_argument("-s", "--sra_path", help="path to sra file with accession and genus/species", required=True)
+    parser.add_argument("-s", "--sraFind_path", help="path to sraFind file with accession and genus/species", required=False)
     parser.add_argument(
         "-g",
         "--genomes_dir",
@@ -32,7 +32,7 @@ def get_args():
                         type=int, required=True)
     return(parser.parse_args())
 
-   
+
 #srapure = file containing only [0]accession and [1]genuspecies for 16S sequences
 #remove " and ' from the lines
 
@@ -82,15 +82,17 @@ def pob(genomes_dir, readsf):
                    sterr=subprocess.PIPE,
                    check=True)
 
-    
+
 if __name__ == '__main__':
     # main()
     #calling the previously made functions
     args=get_args()
     os.makedirs(args.output_dir)
+    if not os.path.exists(args.sra_path):
+        args.sra_path = fsd.main(args)
     filtered_sras = filter_srapure(
-        path=args.sra_path, 
-        organism_name=args.organism_name, 
+        path=args.sra_path,
+        organism_name=args.organism_name,
         strains=args.nstrains)
     gng.main(args)
     for i, accession in enumerate(filtered_sras):
@@ -100,11 +102,3 @@ if __name__ == '__main__':
         download_SRA(SRA=accession, destination=this_output)
         readsf = os.path.join(this_output, "/downsampled/reads1.fq")
         pob(genomes_dir=genomes_dir, readsf=readsf)
-     
-
-
-
-
-
-
-
