@@ -1,11 +1,13 @@
-from get_sra_for_organism import download_SRA, filter_srapure
+from run_all import download_SRA, filter_srapure
 import os
 import shutil
 
 def test_filter_srapure():
-    test_result = filter_srapure("", "")
+    test_result = filter_srapure(path="./data/test_data/test_sraFind.txt",  organism_name="Lactobacillus oryzae", strains=1, get_all=True)
     print(test_result)
-    assert ["DRR021662"] == filter_srapure("test_srapure", "Lactobacillus oryzae")
+
+    assert ["DRR021662"] == test_result
+    print(test_result)
 
 def test_download_SRA():
     if os.path.isdir("./test_function"):
