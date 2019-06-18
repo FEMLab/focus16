@@ -18,9 +18,14 @@ def get_args():
     "fastq-dump. Also downloads downsampled [1000000 reads] version of each SRA")
     parser.add_argument("-o", "--output_dir", help="path to output", required=True)
     parser.add_argument("-n", "--organism_name", help="genus species in quotes", required=True)
+    parser.add_argument("-l", "--approx_length", help="approximate genome length", required=True)
     parser.add_argument("-s", "--sraFind_path", dest="sra_path",
                         default="srapure",
-                        help="path to sraFind file with accession and genus/species", required=False)
+                        help="path to sraFind file", required=False)
+    parser.add_argument("--single_SRA",
+                        default=None,
+                        help="run pipeline on this SRA accession only",
+                        required=False)
     parser.add_argument(
         "-g",
         "--genomes_dir",
@@ -36,10 +41,10 @@ def get_args():
     parser.add_argument("-S", "--nstrains", help="number of strains",
                         type=int, required=True)
     parser.add_argument("--get_all", help="get both sras if organism has two",
-                        actions="store_true",
-                        required=True)
+                        action="store_true",
+                        required=False)
     parser.add_argument("--cores", help="number of cores for riboSeed",
-                        required=True)
+                        required=False)
     return(parser.parse_args())
 
 
@@ -51,15 +56,16 @@ def filter_srapure(path, organism_name, strains, get_all):
     with open(path, "r") as infile:
         for line in infile:
             split_line = [x.replace('"', '').replace("'", "") for x in line.strip().split("\t")]
-            if split_line[11] == organism_name:
+            if split_line[11].startswith(organism_name):
                 results.append(split_line[17])
     random.shuffle(results)
+    print(results)
     if strains != 0:
         results = results[0:strains]
 
     sras = []
     for result in results:
-        these_sras = results.split(",")
+        these_sras = result.split(",")
         if get_all:
             for sra in these_sras:
                 sras.append(sra)
@@ -71,8 +77,8 @@ def filter_srapure(path, organism_name, strains, get_all):
 #create a variable that is the fastq-dump command, with relevant SRA and output
 
 def download_SRA(SRA, destination):
-    suboutput_dir_raw = os.path.join(destination, "raw")
-    suboutput_dir_downsampled = os.path.join(destination, "downsampled")
+    suboutput_dir_raw = os.path.join(destination, "raw", "")
+    suboutput_dir_downsampled = os.path.join(destination, "downsampled", "")
     os.makedirs(suboutput_dir_raw)
     os.makedirs(suboutput_dir_downsampled)
     cmd = "fastq-dump --split-files " + SRA + " -O " + suboutput_dir_raw
@@ -81,13 +87,15 @@ def download_SRA(SRA, destination):
                    stdout=subprocess.PIPE,
                    stderr=subprocess.PIPE,
                    check=True)
-    downcmd = "seqtk sample -s100 " + suboutput_dir_raw + "/" + SRA + "_1.fastq 1000000 > " + suboutput_dir_downsampled + "reads" + SRA + ".fq"
+    downpath = os.path.join(suboutput_dir_downsampled, "downsampledreadsf.fastq")
+    downcmd = "seqtk sample -s100 " + suboutput_dir_raw + SRA + "_1.fastq 1000000 > " + downpath
+    
     subprocess.run(downcmd,
                   shell=sys.platform !="win32",
                   stdout=subprocess.PIPE,
                   stderr=subprocess.PIPE,
                    check=True)
-    return()
+    return(downpath)
 
 
 def pob(genomes_dir, readsf, output_dir):
@@ -118,15 +126,41 @@ def get_ave_read_len_from_fastq(fastq1, N=50):
         for read in data:
             count += 1
             tot += len(read)
-            if count >= N:
-                break 
     ave_read_len = float(tot / count)  
-    if ave_read_len < 20:
-        print('Exiting: read length is too low :', ave_read_len, 'bp')
-        sys.exit()
+    return(ave_read_len, count)
+
+def coverage(approx_length, fastq1, SRA, destination, N=50):
+    count, tot = 0, 0
+   
+    if os.path.splitext(fastq1)[-1] in ['.gz', '.gzip']:
+        open_fun = gzip.open
     else:
-        print('read length is OK :', ave_read_len, 'bp')
-    return()
+        open_fun = open
+    with open_fun(fastq1, "rt") as file_handle:
+        data = SeqIO.parse(file_handle, "fastq")
+        for read in data:
+            count += 1
+            tot += len(read)
+
+    ave_read_len = float(tot / count)  
+    coverage = float((count * ave_read_len) / approx_length)
+
+    suboutput_dir_raw = os.path.join(destination, "raw", "")
+    suboutput_dir_downsampled = os.path.join(destination, "downsampled", "")
+    downpath = os.path.join(suboutput_dir_downsampled, "downsampledreadsr.fastq")
+    downcmd = "seqtk sample -s100 " + suboutput_dir_raw + SRA + "_2.fastq 0.5 > " + downpath
+    
+    
+    if (coverage > 0.5):
+        subprocess.run(downcmd,
+                   shell=sys.platform !="win32",
+                   stdout=subprocess.PIPE,
+                   stderr=subprocess.PIPE,
+                   check=True)
+    else:
+        pass
+    return(coverage)
+        
 
 def riboseed(sra, readsf, readsr, cores, threads, v, output):
     cmd = "ribo run -r" + sra + "-F" + readsf + "-R" + readsr + "--cores" + cores + "--threads" + threads + "-v" + v + "--serialize -o" + suboutput_dir
@@ -140,17 +174,19 @@ def riboseed(sra, readsf, readsr, cores, threads, v, output):
 
 if __name__ == '__main__':
     # main()
-    #calling the previously made functions
     args=get_args()
     os.makedirs(args.output_dir)
     if not os.path.exists(args.sra_path):
         sraFind_output_dir = os.path.join(args.output_dir, "sraFind")
         args.sra_path = fsd.main(args, output_dir=sraFind_output_dir)
-    filtered_sras = filter_srapure(
-        path=args.sra_path,
-        organism_name=args.organism_name,
-        strains=args.nstrains,
-        get_all=args.get_all)
+    if args.single_SRA is None:
+        filtered_sras = filter_srapure(
+            path=args.sra_path,
+            organism_name=args.organism_name,
+            strains=args.nstrains,
+            get_all=args.get_all)
+    else:
+        filtered_sras = [args.single_SRA]
     if os.path.exists(args.genomes_dir):
         if len(os.listdir(args.genomes_dir)) == 0:
             print("Warning: genome directory exists but is " +
@@ -166,11 +202,18 @@ if __name__ == '__main__':
         os.makedirs(this_output)
         print("Downloading " + accession)
         download_SRA(SRA=accession, destination=this_output)
-        readsf = os.path.join(this_output, "/downsampled/reads1.fq")
-        readsr = os.path.join(this_output, "/downsampled/reads2.fq")
-        pob_dir = os.path.join(output_dir, "plentyofbugs")
-        ribo_dir = os.path.join(output_dir, "riboSeed")
-        get_ave_read_len_from_fastq(fastq1=readsf, N=50)
-        pob(genomes_dir=genomes_dir, readsf=readsf, output_dir=pob_dir)
+
+        rawreadsf=os.path.join(this_output, "raw/*_1.fastq")
+        downreadsf=os.path.join(this_output, "downsampled/downsampledreadsf.fastq")
+        downreadsr=os.path.join(this_output, "downsampled/downsampledreadsr.fastq")
+        pob_dir=os.path.join(this_output, "plentyofbugs")
+        ribo_dir=os.path.join(this_output, "riboSeed")
+
+        get_ave_read_len_from_fastq(fastq1=downreadsf, N=50)
+        pob(genomes_dir=args.genomes_dir, readsf=downreadsf, output_dir=pob_dir)
+        coverage(approx_length=args.approx_length, fastq1=rawreadsf, N=50, SRA=accession, destination=this_output)
+   
+   
+        best_reference=os.path.join(this_output, "plentyofbugs/best_reference")
         riboseed(sra=best_reference, readsf=readsf, readsr=readsr, cores=args.cores,
                  threads=1, v=1, output=ribo_dir)
