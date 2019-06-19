@@ -88,7 +88,7 @@ def download_SRA(SRA, destination):
                    stderr=subprocess.PIPE,
                    check=True)
     downpath = os.path.join(suboutput_dir_downsampled, "downsampledreadsf.fastq")
-    downcmd = "seqtk sample -s100 " + suboutput_dir_raw + SRA + "_1.fastq 1000000 > " + downpath
+    downcmd = "seqtk sample -s100 " + suboutput_dir_raw + SRA + "_1.fastq 0.5 > " + downpath
     
     subprocess.run(downcmd,
                   shell=sys.platform !="win32",
@@ -106,11 +106,12 @@ def pob(genomes_dir, readsf, output_dir):
                    stderr=subprocess.PIPE,
                    check=True)
     best_ref = os.path.join(output_dir, "best_reference")
+    sra = []
     with open(best_ref, "r") as infile:
         for line in infile:
             print(line)
             sraacc = line.strip().split('\t')
-    return(sraacc)
+            return(sraacc)
 
 #taken from github.com/nickp60/riboSeed/riboSeed/classes.py
 def get_ave_read_len_from_fastq(fastq1, N=50):
@@ -129,7 +130,7 @@ def get_ave_read_len_from_fastq(fastq1, N=50):
     ave_read_len = float(tot / count)  
     return(ave_read_len, count)
 
-def coverage(approx_length, fastq1, SRA, destination, N=50):
+def get_coverage(approx_length, fastq1):
     count, tot = 0, 0
    
     if os.path.splitext(fastq1)[-1] in ['.gz', '.gzip']:
@@ -144,26 +145,35 @@ def coverage(approx_length, fastq1, SRA, destination, N=50):
 
     ave_read_len = float(tot / count)  
     coverage = float((count * ave_read_len) / approx_length)
+    print(coverage)
+    return(coverage)
 
+def downsample(approx_length, fastq1, fastq2, maxcoverage, destination):
     suboutput_dir_raw = os.path.join(destination, "raw", "")
     suboutput_dir_downsampled = os.path.join(destination, "downsampled", "")
-    downpath = os.path.join(suboutput_dir_downsampled, "downsampledreadsr.fastq")
-    downcmd = "seqtk sample -s100 " + suboutput_dir_raw + SRA + "_2.fastq 0.5 > " + downpath
+    downpath1 = os.path.join(suboutput_dir_downsampled, "downsampledreadsf.fastq") 
+    downpath2 = os.path.join(suboutput_dir_downsampled, "downsampledreadsr.fastq")
+    coverage = get_coverage(approx_length, fastq1)
     
-    
-    if (coverage > 0.5):
-        subprocess.run(downcmd,
-                   shell=sys.platform !="win32",
-                   stdout=subprocess.PIPE,
-                   stderr=subprocess.PIPE,
-                   check=True)
+    covfraction = round(float(maxcoverage / coverage), 3)
+    print(covfraction)
+    if (coverage > maxcoverage):
+         downcmd = "seqtk sample -s100 {fastq1} {covfraction} > {downpath1}".format(**locals())
+         downcmd2 = "seqtk sample -s100 {fastq2} {covfraction} > {downpath2}".format(**locals())
+         for command in [downcmd, downcmd2]:
+             print(command)
+             subprocess.run(command,
+                            shell=sys.platform !="win32",
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            check=True)
+         return(downpath1, downpath2)
     else:
-        pass
-    return(coverage)
-        
+        return(fastq1, fastq2)
+    
 
 def riboseed(sra, readsf, readsr, cores, threads, v, output):
-    cmd = "ribo run -r" + sra + "-F" + readsf + "-R" + readsr + "--cores" + cores + "--threads" + threads + "-v" + v + "--serialize -o" + suboutput_dir
+    cmd = "ribo run -r " + sra + " -F " + readsf + " -R " + readsr + " --cores " + cores + " --threads " + threads + " -v " + v + " --serialize -o " + output
     subprocess.run(cmd,
                    shell=sys.platform !="win32",
                    stdout=subprocess.PIPE,
@@ -197,23 +207,44 @@ if __name__ == '__main__':
             pass
     else:
         gng.main(args)
+    if filtered_sras == []:
+        print("Organism not found on sraFind")
     for i, accession in enumerate(filtered_sras):
         this_output=os.path.join(args.output_dir, str(i))
         os.makedirs(this_output)
         print("Downloading " + accession)
         download_SRA(SRA=accession, destination=this_output)
-
+        
         rawreadsf=os.path.join(this_output, "raw/*_1.fastq")
+        rawreadsr=os.path.join(this_output, "raw/*_2.fastq")
         downreadsf=os.path.join(this_output, "downsampled/downsampledreadsf.fastq")
         downreadsr=os.path.join(this_output, "downsampled/downsampledreadsr.fastq")
         pob_dir=os.path.join(this_output, "plentyofbugs")
         ribo_dir=os.path.join(this_output, "riboSeed")
-
+        
         get_ave_read_len_from_fastq(fastq1=downreadsf, N=50)
         pob(genomes_dir=args.genomes_dir, readsf=downreadsf, output_dir=pob_dir)
-        coverage(approx_length=args.approx_length, fastq1=rawreadsf, N=50, SRA=accession, destination=this_output)
-   
-   
         best_reference=os.path.join(this_output, "plentyofbugs/best_reference")
-        riboseed(sra=best_reference, readsf=readsf, readsr=readsr, cores=args.cores,
-                 threads=1, v=1, output=ribo_dir)
+        sra=[]
+        for sra in best_reference: 
+            best_ref = sra.strip().split('/t')
+            sra = sra.append(best_ref[0])
+            for acc in sra:
+                if acc == os.path.basename(genomes_dir): 
+                    print(os.path(genomes_dir)) 
+                    
+                    coverage(approx_length=args.approx_length,
+                             fastq1=rawreadsf)
+                    
+                    downsample(approx_length=args.approx_length, fastq1=rawreadsf,
+                               maxcoverage=50, destination=this_output)
+                    
+                    if os.path.exists(downreadsr):    
+                        riboseed(sra=best_reference, readsf=downreadsf,
+                                 readsr=downreadsr, cores=args.cores,
+                                 threads=1, v=1, output=ribo_dir)
+                    else:
+                        riboseed(sra=best_reference, readsf=rawreadsf,
+                                 readsr=rawreadsr, cores=args.cores,
+                                 threads=1, v=1, output=ribo_dir)
+                    
