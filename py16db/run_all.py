@@ -6,52 +6,39 @@ import os
 import subprocess
 import random
 import shutil
-
-from Bio import SeqIO
+import re
 
 import get_n_genomes as gng
 import fetch_sraFind_data as fsd
+from Bio import SeqIO
 
 def get_args():
-    parser = argparse.ArgumentParser(
-    description = "given a genus species, downloads the raw reads for each SRA using " +
-    "fastq-dump. Also downloads downsampled [1000000 reads] version of each SRA")
+    parser = argparse.ArgumentParser()
     parser.add_argument("-o", "--output_dir", help="path to output", required=True)
     parser.add_argument("-n", "--organism_name", help="genus species in quotes", required=True)
     parser.add_argument("-l", "--approx_length", help="approximate genome length", required=True)
-    parser.add_argument("-s", "--sraFind_path", dest="sra_path",
-                        default="srapure",
+    parser.add_argument("-s", "--sraFind_path", dest="sra_path", default="srapure",
                         help="path to sraFind file", required=False)
-    parser.add_argument("--single_SRA",
-                        default=None,
-                        help="run pipeline on this SRA accession only",
+    parser.add_argument("--single_SRA", default=None,
+                        help="run pipeline on this SRA accession only", required=False)
+    parser.add_argument( "-g", "--genomes_dir",help="path to genomes directory",
+                         required=True)
+    parser.add_argument("-p", "--prokaryotes", action="store",
+                        help="path_to_prokaryotes.txt", default="./prokaryotes.txt",
                         required=False)
-    parser.add_argument(
-        "-g",
-        "--genomes_dir",
-        help="path to genomes directory",
-        required=True)
-    parser.add_argument(
-        "-p",
-        "--prokaryotes",
-        action="store",
-        help="path_to_prokaryotes.txt",
-        default="./prokaryotes.txt",
-        required=False)
     parser.add_argument("-S", "--nstrains", help="number of strains",
                         type=int, required=True)
     parser.add_argument("--get_all", help="get both sras if organism has two",
-                        action="store_true",
-                        required=False)
+                        action="store_true", required=False)
     parser.add_argument("--cores", help="number of cores for riboSeed",
                         required=False)
     return(parser.parse_args())
 
 
 #srapure = file containing only [0]accession and [1]genuspecies for 16S sequences
-#remove " and ' from the lines
 
 def filter_srapure(path, organism_name, strains, get_all):
+    """For srapure or sraFind, take specified number of organisms and SRAs"""
     results = []
     with open(path, "r") as infile:
         for line in infile:
@@ -73,10 +60,8 @@ def filter_srapure(path, organism_name, strains, get_all):
             sras.append(these_sras[0])
     return(sras)
 
-#create two suboutputs, raw and downampled
-#create a variable that is the fastq-dump command, with relevant SRA and output
-
 def download_SRA(SRA, destination):
+    """Download sras from filter_srapure into raw reads file, downsample forward reads to 1000000"""
     suboutput_dir_raw = os.path.join(destination, "raw", "")
     suboutput_dir_downsampled = os.path.join(destination, "downsampled", "")
     os.makedirs(suboutput_dir_raw)
@@ -88,7 +73,7 @@ def download_SRA(SRA, destination):
                    stderr=subprocess.PIPE,
                    check=True)
     downpath = os.path.join(suboutput_dir_downsampled, "downsampledreadsf.fastq")
-    downcmd = "seqtk sample -s100 " + suboutput_dir_raw + SRA + "_1.fastq 0.5 > " + downpath
+    downcmd = "seqtk sample -s100 " + suboutput_dir_raw + SRA + "_1.fastq 1000000 > " + downpath
     
     subprocess.run(downcmd,
                   shell=sys.platform !="win32",
@@ -99,6 +84,7 @@ def download_SRA(SRA, destination):
 
 
 def pob(genomes_dir, readsf, output_dir):
+    """Uses plentyofbugs, a package that uses mash to find the best reference genome for draft genome """
     pobcmd = "plentyofbugs -g " + genomes_dir +  " -f " + readsf + " -o " + output_dir
     subprocess.run(pobcmd,
                    shell=sys.platform !="win32",
@@ -106,17 +92,15 @@ def pob(genomes_dir, readsf, output_dir):
                    stderr=subprocess.PIPE,
                    check=True)
     best_ref = os.path.join(output_dir, "best_reference")
-    sra = []
     with open(best_ref, "r") as infile:
         for line in infile:
             print(line)
             sraacc = line.strip().split('\t')
             return(sraacc)
 
-#taken from github.com/nickp60/riboSeed/riboSeed/classes.py
+
 def get_ave_read_len_from_fastq(fastq1, N=50):
-    """from LP; return average read length in fastq1 file from first N reads
-    """
+    """from LP: taken from github.com/nickp60/riboSeed/riboSeed/classes.py; return average read length in fastq1 file from first N reads"""
     count, tot = 0, 0
     if os.path.splitext(fastq1)[-1] in ['.gz', '.gzip']:
         open_fun = gzip.open
@@ -128,9 +112,10 @@ def get_ave_read_len_from_fastq(fastq1, N=50):
             count += 1
             tot += len(read)
     ave_read_len = float(tot / count)  
-    return(ave_read_len, count)
+    return(ave_read_len)
 
 def get_coverage(approx_length, fastq1):
+    """Obtains the coverage for a read set, when given the estimated genome size"""
     count, tot = 0, 0
    
     if os.path.splitext(fastq1)[-1] in ['.gz', '.gzip']:
@@ -149,6 +134,7 @@ def get_coverage(approx_length, fastq1):
     return(coverage)
 
 def downsample(approx_length, fastq1, fastq2, maxcoverage, destination):
+    """Given the coverage from coverage(), downsamples the reads if over the max coverage set"""
     suboutput_dir_raw = os.path.join(destination, "raw", "")
     suboutput_dir_downsampled = os.path.join(destination, "downsampled", "")
     downpath1 = os.path.join(suboutput_dir_downsampled, "downsampledreadsf.fastq") 
@@ -172,8 +158,9 @@ def downsample(approx_length, fastq1, fastq2, maxcoverage, destination):
         return(fastq1, fastq2)
     
 
-def riboseed(sra, readsf, readsr, cores, threads, v, output):
-    cmd = "ribo run -r " + sra + " -F " + readsf + " -R " + readsr + " --cores " + cores + " --threads " + threads + " -v " + v + " --serialize -o " + output
+def run_riboseed(sra, readsf, readsr, cores, threads, v, output):
+    """Runs riboSeed to reassemble reads """
+    cmd = "ribo run -r " + sra + " -F " + readsf + " -R " + readsr + " --cores " + cores + " --threads " + threads + " -v " + v + " --serialize -o " + output + " --subassembler " + "skesa" 
     subprocess.run(cmd,
                    shell=sys.platform !="win32",
                    stdout=subprocess.PIPE,
@@ -181,6 +168,38 @@ def riboseed(sra, readsf, readsr, cores, threads, v, output):
                    check=True)
     return()
 
+def  extract_16s_from_contigs(input_contigs, barr_out, output):
+    """Uses barrnap to identify rRNA operons within the riboSeed assembled contigs, then uses extractRegion to extract the 16S sequences """
+    barrnap = "barrnap {input_contigs} > {barr_out}".format(**locals())
+    subprocess.run(barrnap,
+                   shell=sys.platform !="win32",
+                   stdout=subprocess.PIPE,
+                   stderr=subprocess.PIPE,
+                   check=True)
+
+    sixteens = re.compile(r'16S')
+    with open(barr_out, "r") as rrn:
+        sixteens = filter(sixteens.search, barr_out)
+        sixteenslines = sixteenslines.strip().split('\t')
+        sixteens_cut = sixteens_cut.append(sixteenslines[0, 3, 4, 6])
+        for line in sixteens_cut:
+            if line[3] == "-":
+                sixteens_rc =  line.replace('-', '-RC_')
+            else:
+                sixteens_rc = line.replace('-', '')
+            extractregion = "../open_utils/extractRegion.py"
+            chrom=chrom.append(sixteens_rc[0])
+            start=start.append(sixteens_rc[1])
+            end=start.append(sixteens_rc[2])
+            suffix=start.append(sixteens_rc[3])
+        cmd = "python {extractregion} \'{chrom}{suffix} :{start}:{end}\' {input_contigs} -v 1 >> {output}".format(**locals())
+        subprocess.run(cmd,
+                   shell=sys.platform !="win32",
+                   stdout=subprocess.PIPE,
+                   stderr=subprocess.PIPE,
+                   check=True)
+     
+    return(output)
 
 if __name__ == '__main__':
     # main()
@@ -215,8 +234,8 @@ if __name__ == '__main__':
         print("Downloading " + accession)
         download_SRA(SRA=accession, destination=this_output)
         
-        rawreadsf=os.path.join(this_output, "raw/*_1.fastq")
-        rawreadsr=os.path.join(this_output, "raw/*_2.fastq")
+        rawreadsf=os.path.join(this_output, "raw/", accession, "_1.fastq")
+        rawreadsr=os.path.join(this_output, "raw/", accession, "_2.fastq")
         downreadsf=os.path.join(this_output, "downsampled/downsampledreadsf.fastq")
         downreadsr=os.path.join(this_output, "downsampled/downsampledreadsr.fastq")
         pob_dir=os.path.join(this_output, "plentyofbugs")
@@ -225,26 +244,25 @@ if __name__ == '__main__':
         get_ave_read_len_from_fastq(fastq1=downreadsf, N=50)
         pob(genomes_dir=args.genomes_dir, readsf=downreadsf, output_dir=pob_dir)
         best_reference=os.path.join(this_output, "plentyofbugs/best_reference")
-        sra=[]
-        for sra in best_reference: 
-            best_ref = sra.strip().split('/t')
-            sra = sra.append(best_ref[0])
-            for acc in sra:
-                if acc == os.path.basename(genomes_dir): 
-                    print(os.path(genomes_dir)) 
-                    
-                    coverage(approx_length=args.approx_length,
-                             fastq1=rawreadsf)
-                    
-                    downsample(approx_length=args.approx_length, fastq1=rawreadsf,
-                               maxcoverage=50, destination=this_output)
-                    
-                    if os.path.exists(downreadsr):    
-                        riboseed(sra=best_reference, readsf=downreadsf,
-                                 readsr=downreadsr, cores=args.cores,
-                                 threads=1, v=1, output=ribo_dir)
-                    else:
-                        riboseed(sra=best_reference, readsf=rawreadsf,
-                                 readsr=rawreadsr, cores=args.cores,
-                                 threads=1, v=1, output=ribo_dir)
+        best_ref_fastq=best_ref_fastq.append(best_reference[0])
+        
+        get_coverage(approx_length=args.approx_length, 
+                     fastq1=rawreadsf)
+        
+        downsample(approx_length=args.approx_length, fastq1=rawreadsf, fastq2=rawreadsr, 
+                   maxcoverage=50, destination=this_output)
+        
+        if os.path.exists(downreadsr):    
+            run_riboseed(sra=best_ref_fastq, readsf=downreadsf,
+                         readsr=downreadsr, cores=args.cores,
+                         threads=1, v=1, output=ribo_dir)
+        else:
+            run_riboseed(sra=best_ref_fastq, readsf=rawreadsf,
+                         readsr=rawreadsr, cores=args.cores,
+                         threads=1, v=1, output=ribo_dir)
+        
+        barr_out=os.path.join(ribo_dir, "barrnap/")
+        ribo_contigs=os.path.join(ribo_dir, "path/to/contigs")
+        sixteens_extracted=os.path.join(ribo_dir, "ribo16s/")
+        extract_16s_from_contigs(input_contigs=ribo_contigs, barr_out=barr_out, output=sixteens_extracted)
                     
