@@ -20,7 +20,7 @@ def get_args():
                         help="???", required=True)
     return(parser.parse_args())
 
-#mash [best_ref.py] produces a file with "acc/tpercentage"
+#pob [best_ref.py] produces a file with "acc/tpercentage"
 def riboseed(sra, Freads, Rreads, cores, threads, v,  serialize, output):
       cmd = "ribo run -r" + sra + "-F" + Freads + "-R" + Rreads + "--cores" + cores +
     "--threads" + threads + "-v" + v + "--serialize" + serialize + "-o" + suboutput_dir

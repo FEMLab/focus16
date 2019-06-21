@@ -19,8 +19,7 @@ def run_sickle(fastq1, fastq2, output_dir):
     else:
         cmd = str("sickle pe -f {fastq1} -r {fastq2} -t illumina " +
                   "-o {new_fastq1} -p {new_fastq2} " +
-                  "-s new_fastqs}" +
-                  "sickle pe -f {fastq1}").format(**locals())
+                  "-s {new_fastqs}").format(**locals())
     print(cmd)
     try:
         subprocess.run(cmd,

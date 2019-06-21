@@ -10,8 +10,8 @@ def file_len(fname):
     return i + 1
 
 def test_sickle_singles():
-    sickle_test_dir = "tmp_sickle"
-    fastq1 = "../riboSeed/tests/references/toy_reads1.fq"
+    sickle_test_dir = "../testsickle/"
+    fastq1 = "./data/test_data/mutans/downsampled/downsampledreadsf.fastq"
     fastq2 = None
     if os.path.exists(sickle_test_dir):
         shutil.rmtree(sickle_test_dir)
