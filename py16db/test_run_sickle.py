@@ -2,6 +2,8 @@ from run_sickle import run_sickle
 import os
 import shutil
 from Bio import SeqIO
+from nose.tools.nontrivial import with_setup
+
 
 def file_len(fname):
     with open(fname) as f:
@@ -9,9 +11,21 @@ def file_len(fname):
             pass
     return i + 1
 
+def setup_func():
+    "set up test fixtures"
+    if os.path.exists("./py16db/testsickle/"):
+        shutil.rmtree("./py16db/testsickle/")
+    pass
+
+def teardown_func():
+    "tear down test fixtures"
+    shutil.rmtree("./py16db/testsickle/")
+
+
+@with_setup(setup_func, teardown_func)
 def test_sickle_singles():
-    sickle_test_dir = "../testsickle/"
-    fastq1 = "./data/test_data/mutans/downsampled/downsampledreadsf.fastq"
+    sickle_test_dir = "./py16db/testsickle/"
+    fastq1 = os.path.join(os.path.dirname(__file__),"data", "test_data", "mutans", "downsampled", "downsampledreadsf.fastq")
     fastq2 = None
     if os.path.exists(sickle_test_dir):
         shutil.rmtree(sickle_test_dir)
