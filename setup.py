@@ -11,4 +11,5 @@ setup(name='16db',
       packages=['py16db'],
       scripts=['py16db/get_sra_for_organism.py', 'best_ref.py', 
                'get_n_genomes.py', 'riboseed.py'],
+      install_requires = ["biopython"]
       zip_safe=False)
