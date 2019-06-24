@@ -43,9 +43,7 @@ def check_programs():
             print("{program} not installed".format(**locals()))
             sys.exit(1)
    
-    
-       
-
+           
 #srapure = file containing only [0]accession and [1]genuspecies for 16S sequences
 
 def filter_srapure(path, organism_name, strains, get_all):
@@ -78,6 +76,7 @@ def download_SRA(SRA, destination):
     os.makedirs(suboutput_dir_raw)
     os.makedirs(suboutput_dir_downsampled)
     cmd = "fastq-dump --split-files " + SRA + " -O " + suboutput_dir_raw
+    
     subprocess.run(cmd,
                    shell=sys.platform !="win32",
                    stdout=subprocess.PIPE,
@@ -154,6 +153,7 @@ def downsample(approx_length, fastq1, fastq2, maxcoverage, destination):
     """Given the coverage from coverage(), downsamples the reads if over the max coverage set"""
     suboutput_dir_raw = os.path.join(destination, "raw", "")
     suboutput_dir_downsampled = os.path.join(destination, "downsampled", "")
+    os.makedirs(os.path.join(destination, "downsampled", ""))
     downpath1 = os.path.join(suboutput_dir_downsampled, "downsampledreadsf.fastq") 
     downpath2 = os.path.join(suboutput_dir_downsampled, "downsampledreadsr.fastq")
     coverage = get_coverage(approx_length, fastq1)
@@ -161,18 +161,18 @@ def downsample(approx_length, fastq1, fastq2, maxcoverage, destination):
     covfraction = round(float(maxcoverage / coverage), 3)
     print(covfraction)
     if (coverage > maxcoverage):
-         downcmd = "seqtk sample -s100 {fastq1} {covfraction} > {downpath1}".format(**locals())
-         downcmd2 = "seqtk sample -s100 {fastq2} {covfraction} > {downpath2}".format(**locals())
-         for command in [downcmd, downcmd2]:
-             print(command)
-             subprocess.run(command,
-                            shell=sys.platform !="win32",
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
-                            check=True)
-         return(downpath1, downpath2)
-    else:
-        return(fastq1, fastq2)
+        downcmd = "seqtk sample -s100 {fastq1} {covfraction} > {downpath1}".format(**locals())
+        downcmd2 = "seqtk sample -s100 {fastq2} {covfraction} > {downpath2}".format(**locals())
+        for command in [downcmd, downcmd2]:
+            print(command)
+            subprocess.run(command,
+                           shell=sys.platform !="win32",
+                           stdout=subprocess.PIPE,
+                           stderr=subprocess.PIPE,
+                           check=True)
+            return(downpath1, downpath2)
+        else:
+            return(fastq1, fastq2)
     
 
 def run_riboseed(sra, readsf, readsr, cores, threads, output):
