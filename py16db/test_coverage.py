@@ -6,7 +6,7 @@ from nose.tools.nontrivial import with_setup
 
 def test_coverage():
 #genome is built from NC_0176759.1 ~150000bp
-    reads = os.path.join(os.path.dirname(__file__),"data", "test_data", "test_reads1.fq")
+    reads = os.path.join(os.path.dirname(__file__), "test_data", "test_reads1.fq")
     test_result = get_coverage(approx_length=150000, fastq1=reads)
     print(test_result)
     assert 9.8  == test_result
@@ -26,7 +26,7 @@ def teardown_func():
 @with_setup(setup_func, teardown_func)
 def test_downsample():
 #genome is built from NC_0176759.1 ~150000bp
-    reads = os.path.join(os.path.dirname(__file__), "data", "test_data", "test_reads1.fq")
+    reads = os.path.join(os.path.dirname(__file__), "test_data", "test_reads1.fq")
     os.makedirs("./py16db/downsample_test_result/")
     os.makedirs("./py16db/downsample_test_result/downsampled/")
     destination = "./py16db/downsample_test_result/"
