@@ -26,7 +26,7 @@ def test_pob():
    
     test_result = pob(genomes_dir=plasmids, readsf=reads, output_dir=output_dir)
     print(test_result)
-    assert ["./test_data/plasmids/NC_009837.1.fasta", "0.0340249"] == test_result
+    assert ["./data/test_data/plasmids/NC_009837.1.fasta", "0.0340249"] == test_result
     return()
 
 
