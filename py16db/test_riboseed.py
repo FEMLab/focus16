@@ -18,11 +18,11 @@ def teardown_func():
 @with_setup(setup_func, teardown_func)
 
 def test_riboseed():
-    readsf="./example_data/reads1.fq"
-    readsr="./example_data/reads2.fq"
-    output_dir="./py16db/riboSeed/"
+    readsf="./py16db/example_data/reads1.fq"
+    readsr="./py16db/example_data/reads2.fq"
+    output_dir="py16db/riboSeed/"
     os.makedir=(output_dir)
-    sra="./example_data/NC_013928.1.fna"
+    sra="./py16db/example_data/NC_013928.1.fna"
           
     run_riboseed(sra=sra, readsf=readsf,
                  readsr=readsr, cores="4", threads="1",

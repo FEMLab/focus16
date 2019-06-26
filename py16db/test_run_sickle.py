@@ -25,7 +25,7 @@ def teardown_func():
 @with_setup(setup_func, teardown_func)
 def test_sickle_singles():
     sickle_test_dir = "./py16db/testsickle/"
-    fastq1 = os.path.join(os.path.dirname(__file__),"data", "test_data", "mutans", "downsampled", "downsampledreadsf.fastq")
+    fastq1 = os.path.join(os.path.dirname(__file__), "test_data", "mutans", "downsampled", "downsampledreadsf.fastq")
     fastq2 = None
     if os.path.exists(sickle_test_dir):
         shutil.rmtree(sickle_test_dir)

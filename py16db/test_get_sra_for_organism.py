@@ -5,7 +5,7 @@ from nose.tools.nontrivial import with_setup
 
 
 def test_filter_srapure():
-    test_result = filter_srapure(path="./py16db/data/test_data/test_sraFind.txt",  organism_name="Lactobacillus oryzae", strains=1, get_all=True)
+    test_result = filter_srapure(path="./py16db/test_data/test_sraFind.txt",  organism_name="Lactobacillus oryzae", strains=1, get_all=True)
     assert ["DRR021662"] == test_result
 
 def setup_func():
