@@ -17,7 +17,7 @@ setup(name='16db',
                'py16db/test.py',
                'get_n_genomes.py'],
       install_requires = ["biopython"],
-      zip_safe=False),
+      zip_safe=False,
       include_package_data=True,
       package_data={
           'py16db':[
