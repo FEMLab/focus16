@@ -1,4 +1,4 @@
-16db - Highly curated 16S databases from correctly assembled RNA operons
+16db - High resolution 16S databases from correctly assembled RNA operons
 
 #Installation
 Packages required for  

@@ -202,7 +202,7 @@ def  extract_16s_from_contigs(input_contigs, barr_out, output):
                    stderr=subprocess.PIPE,
                    check=True)
     
-    results16s = []   # [chromosome, start, end, reverse complimented?]
+    results16s = []   # [chromosome, start, end, reverse complimented]
     with open(barr_out, "r") as rrn:
         for rawline in rrn:
             line = rawline.strip().split('\t')
@@ -251,9 +251,8 @@ def process_strain(rawreadsf, rawreadsr, this_output, args):
                  readsr=downsampledr, cores=args.cores,
                  threads=1, output=ribo_dir)
     
-    barr_out=os.path.join(ribo_dir, "barrnap/")
-    ribo_contigs=os.path.join(ribo_dir, "")
-    sixteens_extracted=os.path.join(ribo_dir, "ribo16s/")
+    barr_out=os.path.join(ribo_dir, "barrnap")
+    sixteens_extracted=os.path.join(ribo_dir, "ribo16s")
     extract_16s_from_contigs(input_contigs=ribo_contigs, barr_out=barr_out, output=sixteens_extracted)
     
 
