@@ -9,9 +9,9 @@ import shutil
 import re
 import gzip
 
-import get_n_genomes as gng
-import fetch_sraFind_data as fsd
-from run_sickle import run_sickle
+from . import get_n_genomes as gng
+from . import fetch_sraFind_data as fsd
+from . import run_sickle
 from Bio import SeqIO
 
 def get_args():
@@ -38,7 +38,6 @@ def get_args():
                         required=False, type=int)
     parser.add_argument("--example_reads", help="input of example reads", nargs='+',
                         required=False, type=str)
-    
     return(parser.parse_args())
 
 
@@ -182,7 +181,7 @@ def downsample(approx_length, fastq1, fastq2, maxcoverage, destination):
 
 def run_riboseed(sra, readsf, readsr, cores, threads, output):
     """Runs riboSeed to reassemble reads """
-    cmd = "ribo run -r {sra} -F {readsf} -R {readsr} --cores {cores} --threads {threads} -v 1 --serialize -o {output} --subassembler skesa".format(**locals())
+    cmd = "ribo run -r {sra} -F {readsf} -R {readsr} --cores {cores} --threads {threads} -v 1 --serialize -o {output} --subassembler skesa --additional_libs '--only-assembler'".format(**locals())
     if readsr is None:
         cmd = "ribo run -r {sra} -F {readsf} --cores {cores} --threads {threads} -v 1 --serialize -o {output} --subassembler skesa".format(**locals())
     print(cmd)
@@ -210,7 +209,7 @@ def  extract_16s_from_contigs(input_contigs, barr_out, output):
                continue
             if line[8].startswith("Name=16S"):
                 if line[6] == "-":
-                    suffix = '-RC_'
+                    suffix = 'strep-RC@'
                 else:
                     suffix = ''
                 chrom=line[0]
@@ -218,7 +217,7 @@ def  extract_16s_from_contigs(input_contigs, barr_out, output):
                 end=line[4]
                 results16s = [chrom, start, end, suffix]
                 print(results16s)    
-                cmd = "extractRegion \'{results16s[0]}{results16s[3]} :{results16s[1]}:{results16s[2]}\' {input_contigs} -v 1 >> {output}".format(**locals())
+                cmd = "extractRegion \'{results16s[3]}{results16s[0]} :{results16s[1]}:{results16s[2]}\' -f {input_contigs} -v 1 >> {output}".format(**locals())
                 subprocess.run(cmd,
                                shell=sys.platform !="win32",
                                stdout=subprocess.PIPE,
@@ -227,6 +226,23 @@ def  extract_16s_from_contigs(input_contigs, barr_out, output):
                 
     return(output)
 
+def alignment(fasta, output):
+    output = os.path.join(output, "alignment", "")
+    os.makedirs(output)
+    seqout = os.path.join(output, "16soneline.fasta")
+    mafftout = os.path.join(output, "MSA.fasta")
+    #iqtreeout = os.path.join(output, "iqtree")
+    seqcmd = "seqtk seq -S {fasta} > {seqout}".format(**locals())
+    mafftcmd = "mafft {seqout} > {mafftout}".format(**locals())
+    iqtreecmd = "iqtree -s {mafftout} -nt AUTO".format(**locals())
+    for cmd in [seqcmd, mafftcmd, iqtreecmd]:
+        subprocess.run(cmd,
+                       shell=sys.platform !="win32",
+                       stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE,
+                       check=True)
+    return(mafftout)
+            
 
 def process_strain(rawreadsf, rawreadsr, this_output, args):
     pob_dir=os.path.join(this_output, "plentyofbugs")
@@ -254,6 +270,7 @@ def process_strain(rawreadsf, rawreadsr, this_output, args):
     barr_out=os.path.join(ribo_dir, "barrnap")
     sixteens_extracted=os.path.join(ribo_dir, "ribo16s")
     extract_16s_from_contigs(input_contigs=ribo_contigs, barr_out=barr_out, output=sixteens_extracted)
+    alignment(fasta=sixteens_extracted, output=this_output)
     
 
 if __name__ == '__main__':

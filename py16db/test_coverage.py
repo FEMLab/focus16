@@ -1,4 +1,4 @@
-from run_all import get_coverage, downsample
+from .run_all import get_coverage, downsample
 import os
 import shutil
 from nose.tools.nontrivial import with_setup

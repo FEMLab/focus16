@@ -1,4 +1,4 @@
-from run_all import download_SRA, filter_srapure
+from .run_all import download_SRA, filter_srapure
 import os
 import shutil
 from nose.tools.nontrivial import with_setup

@@ -1,4 +1,4 @@
-from run_sickle import run_sickle
+from .run_sickle import run_sickle
 import os
 import shutil
 from Bio import SeqIO

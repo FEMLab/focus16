@@ -1,4 +1,4 @@
-from run_all import pob
+from .run_all import pob
 import os
 import shutil
 from nose.tools.nontrivial import with_setup

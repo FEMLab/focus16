@@ -1,4 +1,4 @@
-from run_all import get_ave_read_len_from_fastq
+from .run_all import get_ave_read_len_from_fastq
 import os
 import shutil
 
