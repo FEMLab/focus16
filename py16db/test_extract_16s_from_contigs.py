@@ -1,4 +1,4 @@
-from run_all import extract_16s_from_contigs
+from .run_all import extract_16s_from_contigs
 from nose.tools.nontrivial import with_setup
 import os
 import shutil
@@ -21,7 +21,7 @@ def test_extract():
     output="./py16db/extract_test/ribo16"
     test_result=extract_16s_from_contigs(input_contigs=input_contigs,
                                          barr_out=barr_out, output=output)
-    assert []  == test_result
+    assert os.path.exists(test_result)
 
 
 
