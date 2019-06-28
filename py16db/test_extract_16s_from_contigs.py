@@ -2,27 +2,35 @@ from .run_all import extract_16s_from_contigs
 from nose.tools.nontrivial import with_setup
 import os
 import shutil
+import unittest
 
-def setup_func():
-   "set up test fixtures"
-   if os.path.exists("./py16db/extract_test/"):
-       shutil.rmtree("./py16db/extract_test/")
-       pass
-
-def teardown_func():
-    "tear down test fixtures"
-    shutil.rmtree("./py16db/extract_test/")
-
-@with_setup(setup_func, teardown_func)
-def test_extract():
-    os.makedirs("./py16db/extract_test/")
-    input_contigs = os.path.join(os.path.dirname(__file__), "test_data", "riboseed", "genomes", "NC_018089.1.fna")
-    barr_out="./py16db/extract_test/barrnap"
-    output="./py16db/extract_test/ribo16"
-    test_result=extract_16s_from_contigs(input_contigs=input_contigs,
-                                         barr_out=barr_out, output=output)
-    assert os.path.exists(test_result)
-
+class extractTest(unittest.TestCase):
+   """ test for extract_16s_from_contigs 
+   """
+   def setUp(self):
+      self.test_dir = os.path.join(os.path.dirname(__file__),
+                                   "extract_test")
+      self.contigs = os.path.join(os.path.dirname(__file__),
+                                  "test_data", "riboseed", "genomes", "NC_018089.1.fna")
+      self.barrnap = os.path.join(self.test_dir, "barrnap")
+      self.out_dir = os.path.join(self.test_dir, "ribo16")
+      if os.path.exists(self.test_dir):
+         shutil.rmtree(self.test_dir)
+      
+   def tearDown(self):
+      """tear down test fixtures
+      """
+      shutil.rmtree(self.test_dir)
+      
+   def test_extract(self):
+      os.makedirs(self.test_dir)
+      input_contigs = (self.contigs)
+      barr_out = (self.barrnap)
+      output = (self.out_dir)
+      test_result=extract_16s_from_contigs(input_contigs=input_contigs,
+                                           barr_out=barr_out, output=output)
+      assert os.path.exists(test_result)
+            
 
 
     
