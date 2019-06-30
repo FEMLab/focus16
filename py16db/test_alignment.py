@@ -15,10 +15,10 @@ class alignmentTest(unittest.TestCase):
       if os.path.exists(self.test_dir):
          shutil.rmtree(self.test_dir)
          
-   #def tearDown(self):
-   #   """ tear down test fixtures
-   #   """
-   #   shutil.rmtree(self.test_dir)
+   def tearDown(self):
+      """ tear down test fixtures
+      """
+      shutil.rmtree(self.test_dir)
    
    def test_alignment(self):
       test_output = (self.test_dir)
