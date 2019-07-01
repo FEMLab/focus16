@@ -24,7 +24,6 @@ install:
 
 - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION seqtk sickle-trim sra-tools skesa barrnap
 - source activate test-environment
-- python setup.py install
 
 script:
  - python setup.py install
