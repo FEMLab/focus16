@@ -22,7 +22,7 @@ install:
 - conda update -q conda
 - conda info -a
 
-- conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION seqtk sickle-trim sra-tools riboseed mash skesa barrnap
+- conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION seqtk sickle-trim sra-tools skesa barrnap
 - source activate test-environment
 - python setup.py install
 
