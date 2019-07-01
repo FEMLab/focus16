@@ -21,8 +21,10 @@ class bestrefTest(unittest.TestCase):
     def tearDown(self):
         "tear down test fixtures"
         shutil.rmtree(self.test_dir)
-            
 
+
+    @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
+                     "skipping this test on travis.CI")
     def test_pob(self):
         plasmids = (self.plasmids_dir)
         reads = (self.readsf)
