@@ -21,7 +21,9 @@ class extractTest(unittest.TestCase):
       """tear down test fixtures
       """
       shutil.rmtree(self.test_dir)
-      
+
+   @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
+                    "skipping this test on travis.CI")
    def test_extract(self):
       os.makedirs(self.test_dir)
       input_contigs = (self.contigs)

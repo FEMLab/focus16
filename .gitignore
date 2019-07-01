@@ -3,3 +3,8 @@
 *~
 *__pycache__/
 tmp*/
+py16db/test_data/mutans/
+py16db/test_data/plasmid_accessions
+py16db/test_data/riboseed/
+py16db/test_data/test_accession
+py16db/test_data/test_srapure

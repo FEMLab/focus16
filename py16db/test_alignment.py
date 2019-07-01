@@ -19,7 +19,9 @@ class alignmentTest(unittest.TestCase):
       """ tear down test fixtures
       """
       shutil.rmtree(self.test_dir)
-   
+
+   @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
+                    "skipping this test on travis.CI")    
    def test_alignment(self):
       test_output = (self.test_dir)
       os.makedirs(test_output)

@@ -20,7 +20,7 @@ class coverageTests(unittest.TestCase):
         "tear down test fixtures"
         if os.path.exists(self.test_dir):
             shutil.rmtree(self.test_dir)
-
+    
     def test_coverage(self):
         #genome is built from NC_0176759.1 ~150000bp
         reads = (self.reads)
@@ -28,7 +28,9 @@ class coverageTests(unittest.TestCase):
         print(test_result)
         assert 9.8  == test_result
         return()
-        
+    
+    @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
+                     "skipping this test on travis.CI")
     def test_downsample(self):
             #genome is built from NC_0176759.1 ~150000bp
         os.makedirs(self.test_dir)

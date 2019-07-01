@@ -97,7 +97,6 @@ def download_SRA(SRA, destination):
                    check=True)
     return(downpath)
 
-
 def pob(genomes_dir, readsf, output_dir):
     """Uses plentyofbugs, a package that uses mash to find the best reference genome for draft genome """
 
@@ -117,7 +116,7 @@ def pob(genomes_dir, readsf, output_dir):
         for line in infile:
             print(line)
             sraacc = line.strip().split('\t')
-            return(sraacc)
+        return(sraacc)
 
 
 def get_ave_read_len_from_fastq(fastq1, N=50):
@@ -181,16 +180,11 @@ def downsample(approx_length, fastq1, fastq2, maxcoverage, destination):
 
 def run_riboseed(sra, readsf, readsr, cores, threads, output):
     """Runs riboSeed to reassemble reads """
-    cmd = "ribo run -r {sra} -F {readsf} -R {readsr} --cores {cores} --threads {threads} -v 1 --serialize -o {output} --subassembler skesa --additional_libs '--only-assembler'".format(**locals())
+    cmd = "ribo run -r {sra} -F {readsf} -R {readsr} --cores {cores} --threads {threads} -v 1 --serialize -o {output} --subassembler skesa".format(**locals())
     if readsr is None:
         cmd = "ribo run -r {sra} -F {readsf} --cores {cores} --threads {threads} -v 1 --serialize -o {output} --subassembler skesa".format(**locals())
     print(cmd)
-    subprocess.run(cmd,
-                   shell=sys.platform !="win32",
-                   stdout=subprocess.PIPE,
-                   stderr=subprocess.PIPE,
-                   check=True)
-    return()
+    return(cmd)
 
 def  extract_16s_from_contigs(input_contigs, barr_out, output):
     """Uses barrnap to identify rRNA operons within the riboSeed assembled contigs, then uses extractRegion to extract the 16S sequences """
@@ -227,14 +221,14 @@ def  extract_16s_from_contigs(input_contigs, barr_out, output):
     return(output)
 
 def alignment(fasta, output):
-    output = os.path.join(output, "alignment", "")
+    output = os.path.join(output, "alignment")
     os.makedirs(output)
     seqout = os.path.join(output, "16soneline.fasta")
     mafftout = os.path.join(output, "MSA.fasta")
-    #iqtreeout = os.path.join(output, "iqtree")
+    iqtreeout = os.path.join(output, "iqtree")
     seqcmd = "seqtk seq -S {fasta} > {seqout}".format(**locals())
     mafftcmd = "mafft {seqout} > {mafftout}".format(**locals())
-    iqtreecmd = "iqtree -s {mafftout} -nt AUTO".format(**locals())
+    iqtreecmd = "iqtree -s {mafftout} -nt AUTO > iqtreeout".format(**locals())
     for cmd in [seqcmd, mafftcmd, iqtreecmd]:
         subprocess.run(cmd,
                        shell=sys.platform !="win32",
@@ -250,7 +244,7 @@ def process_strain(rawreadsf, rawreadsr, this_output, args):
     sickle_out=os.path.join(this_output, "sickle")
     get_ave_read_len_from_fastq(fastq1=rawreadsf, N=50)
     pob(genomes_dir=args.genomes_dir, readsf=rawreadsf, output_dir=pob_dir)
-    best_reference=os.path.join(this_output, "plentyofbugs/best_reference")
+    best_reference=os.path.join(pob_dir, "best_reference")
     with open(best_reference, "r") as infile:
         for line in infile:
             best_ref_fasta = line.split('\t')[0]
@@ -263,9 +257,14 @@ def process_strain(rawreadsf, rawreadsr, this_output, args):
     print("Downsampled f reads: ", downsampledf)
     print("Downsample r reads: ", downsampledr)
         
-    run_riboseed(sra=best_ref_fasta, readsf=downsampledf,
+    riboseed_cmd = run_riboseed(sra=best_ref_fasta, readsf=downsampledf,
                  readsr=downsampledr, cores=args.cores,
                  threads=1, output=ribo_dir)
+    subprocess.run(riboseed_cmd,
+                   shell=sys.platform !="win32",
+                   stdout=subprocess.PIPE,
+                   stderr=subprocess.PIPE,
+                   check=True)
     
     barr_out=os.path.join(ribo_dir, "barrnap")
     sixteens_extracted=os.path.join(ribo_dir, "ribo16s")

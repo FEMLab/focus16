@@ -15,13 +15,15 @@ class get_sra_for_organismTest(unittest.TestCase):
     def teardown(self):
         "tear down test fixtures"
         shutil.rmtree(self.test_dir)
-        
+
     def test_filter_srapure(self):
         test_result = filter_srapure(path=self.sra_find,
                                      organism_name="Lactobacillus oryzae", 
                                      strains=1, get_all=True)
         assert ["DRR021662"] == test_result
-            
+
+    @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
+                 "skipping this test on travis.CI")        
     def test_download_SRA(self):
         os.makedirs(self.test_dir)
         download_SRA(destination=self.test_dir,

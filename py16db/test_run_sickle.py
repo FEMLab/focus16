@@ -1,6 +1,7 @@
 from .run_sickle import run_sickle
 import os
 import shutil
+import unittest
 from Bio import SeqIO
 from nose.tools.nontrivial import with_setup
 
@@ -23,6 +24,8 @@ def teardown_func():
 
 
 @with_setup(setup_func, teardown_func)
+@unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
+                 "skipping this test on travis.CI")
 def test_sickle_singles():
     sickle_test_dir = "./py16db/testsickle/"
     fastq1 = os.path.join(os.path.dirname(__file__), "test_data", "mutans", "downsampled", "downsampledreadsf.fastq")
