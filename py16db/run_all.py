@@ -85,7 +85,7 @@ def download_SRA(SRA, destination):
     suboutput_dir_downsampled = os.path.join(destination, "downsampled", "")
     os.makedirs(suboutput_dir_raw)
     os.makedirs(suboutput_dir_downsampled)
-    cmd = "fastq-dump --split-files {SRA} -O {suboutput_dir_raw}".format(locals**())
+    cmd = "fastq-dump --split-files {SRA} -O {suboutput_dir_raw}".format(**locals())
   
     subprocess.run(cmd,
                    shell=sys.platform !="win32",
@@ -93,7 +93,7 @@ def download_SRA(SRA, destination):
                    stderr=subprocess.PIPE,
                    check=True)
     downpath = os.path.join(suboutput_dir_downsampled, "downsampledreadsf.fastq")
-    downcmd = "seqtk sample -s100 {suboutput_dir_raw} {SRA}_1.fastq 1000000 > {downpath}".format(locals**())
+    downcmd = "seqtk sample -s100 {suboutput_dir_raw} {SRA}_1.fastq 1000000 > {downpath}".format(**locals())
     
     subprocess.run(downcmd,
                    shell=sys.platform !="win32",
