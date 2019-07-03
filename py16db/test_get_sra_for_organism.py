@@ -5,7 +5,8 @@ import unittest
 from nose.tools.nontrivial import with_setup
 
 class get_sra_for_organismTest(unittest.TestCase):
-    ''' test for filter_srapure and download_sra in run_all.py'''
+    ''' test for filter_srapure and download_sra in run_all.py
+    '''
     def setUp(self):
         self.test_dir=os.path.join(os.path.dirname(__file__), "test_function", "")
         self.sra_find=os.path.join(os.path.dirname(__file__), "test_data", "test_sraFind.txt")

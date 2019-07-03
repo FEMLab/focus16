@@ -21,7 +21,7 @@ class test_run_sickle(unittest.TestCase):
         if os.path.exists(self.test_dir):
             shutil.rmtree(self.test_dir)
             
-    def teardown(self):
+    def tearDown(self):
         "tear down test fixtures"
         shutil.rmtree(self.test_dir)
 
