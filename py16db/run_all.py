@@ -85,7 +85,7 @@ def download_SRA(SRA, destination):
     suboutput_dir_downsampled = os.path.join(destination, "downsampled", "")
     os.makedirs(suboutput_dir_raw)
     os.makedirs(suboutput_dir_downsampled)
-    cmd = "fastq-dump --split-files " + SRA + " -O " + suboutput_dir_raw
+    cmd = "fastq-dump --split-files {SRA} -O {suboutput_dir_raw}".format(locals**())
   
     subprocess.run(cmd,
                    shell=sys.platform !="win32",
@@ -93,12 +93,12 @@ def download_SRA(SRA, destination):
                    stderr=subprocess.PIPE,
                    check=True)
     downpath = os.path.join(suboutput_dir_downsampled, "downsampledreadsf.fastq")
-    downcmd = "seqtk sample -s100 " + suboutput_dir_raw + SRA + "_1.fastq 1000000 > " + downpath
+    downcmd = "seqtk sample -s100 {suboutput_dir_raw} {SRA}_1.fastq 1000000 > {downpath}".format(locals**())
     
     subprocess.run(downcmd,
-                  shell=sys.platform !="win32",
-                  stdout=subprocess.PIPE,
-                  stderr=subprocess.PIPE,
+                   shell=sys.platform !="win32",
+                   stdout=subprocess.PIPE,
+                   stderr=subprocess.PIPE,
                    check=True)
     return(downpath)
 
@@ -210,7 +210,7 @@ def extract_16s_from_contigs(input_contigs, barr_out, output):
                continue
             if line[8].startswith("Name=16S"):
                 if line[6] == "-":
-                    suffix = 'strep-RC@'
+                    suffix = 'chromosome-RC@'
                 else:
                     suffix = ''
                 chrom=line[0]
@@ -228,6 +228,8 @@ def extract_16s_from_contigs(input_contigs, barr_out, output):
     return(output)
 
 def alignment(fasta, output):
+    """ Performs multiple sequence alignment with mafft and contructs a tree with iqtree
+    """
     output = os.path.join(output, "alignment")
     os.makedirs(output)
     seqout = os.path.join(output, "16soneline.fasta")
@@ -235,7 +237,7 @@ def alignment(fasta, output):
     iqtreeout = os.path.join(output, "iqtree")
     seqcmd = "seqtk seq -S {fasta} > {seqout}".format(**locals())
     mafftcmd = "mafft {seqout} > {mafftout}".format(**locals())
-    iqtreecmd = "iqtree -s {mafftout} -nt AUTO > iqtreeout".format(**locals())
+    iqtreecmd = "iqtree -s {mafftout} -nt AUTO > {iqtreeout}".format(**locals())
     for cmd in [seqcmd, mafftcmd, iqtreecmd]:
         subprocess.run(cmd,
                        shell=sys.platform !="win32",
@@ -281,9 +283,9 @@ def process_strain(rawreadsf, rawreadsr, this_output, args):
                    stderr=subprocess.PIPE,
                    check=True)
     
-    dir_for_16s=os.path.join(this_output, "16s", "")
-    barr_out=os.path.join(dir_for_16s, "barrnap")
-    sixteens_extracted=os.path.join(dir_for_16s, "ribo16s")
+    
+    barr_out=os.path.join(this_output, "barrnap")
+    sixteens_extracted=os.path.join(this_output, "ribo16s")
     ribo_contigs = os.path.join(this_output, "riboSeed", "seed",
                                 "final_long_reads", "riboSeedContigs.fasta")
     extract_16s_from_contigs(input_contigs=ribo_contigs, 
@@ -293,9 +295,11 @@ def process_strain(rawreadsf, rawreadsr, this_output, args):
     
 def main():
     args=get_args()
+    check_programs()
+    os.makedirs(args.output_dir)
     logging.basicConfig(
         level=logging.DEBUG,
-        filename= "16db.log",
+        filename= os.path.join(args.output_dir, "16db.log"),
         format="%(asctime)s - %(levelname)s - %(message)s",
         )
     console = logging.StreamHandler()
@@ -304,9 +308,7 @@ def main():
     console.setFormatter(formatter)
     logging.getLogger('').addHandler(console)
     logger = logging.getLogger(__name__)
-
-    check_programs()
-    os.makedirs(args.output_dir)
+    
     if not os.path.exists(args.sra_path):
         sraFind_output_dir = os.path.join(args.output_dir, "sraFind")
         args.sra_path = fsd.main(args, output_dir=sraFind_output_dir)
@@ -330,9 +332,11 @@ def main():
         gng.main(args)
     if filtered_sras == []:
         logging.debug('No complete genomes found on NCBI by sraFind')
+        
+    
     if args.example_reads is not None:
         this_output=os.path.join(args.output_dir, "example", "")
-        os.makedirs(this_output)
+        os.makedirs(this_output)        
         rawreadsf = args.example_reads[0]
         try:
             rawreadsr = args.example_reads[1]
@@ -344,6 +348,7 @@ def main():
         for i, accession in enumerate(filtered_sras):
             this_output=os.path.join(args.output_dir, str(i))
             os.makedirs(this_output)
+            
             logging.debug('Downloading SRA: %s', accession)
             download_SRA(SRA=accession, destination=this_output)
         
