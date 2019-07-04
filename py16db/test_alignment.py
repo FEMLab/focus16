@@ -3,6 +3,7 @@ from nose.tools.nontrivial import with_setup
 import os
 import shutil
 import unittest
+import logging as logger
 
 class alignmentTest(unittest.TestCase):
    """ test for alignment function
@@ -26,7 +27,7 @@ class alignmentTest(unittest.TestCase):
       test_output = (self.test_dir)
       os.makedirs(test_output)
       test_fasta = (self.fasta)
-      test_result = alignment(fasta=test_fasta, output=test_output)
+      test_result = alignment(fasta=test_fasta, output=test_output, logger=logger)
       print(test_result)
       mafftoutput = os.path.join(self.test_dir, "alignment", "MSA.fasta")
       with open(mafftoutput, "r") as infile:

@@ -2,6 +2,7 @@ from .run_all import get_coverage, downsample
 import os
 import shutil
 import unittest
+import logging as logger
 from nose.tools.nontrivial import with_setup
 
 class coverageTests(unittest.TestCase):
@@ -24,7 +25,7 @@ class coverageTests(unittest.TestCase):
     def test_coverage(self):
         #genome is built from NC_0176759.1 ~150000bp
         reads = (self.reads)
-        test_result = get_coverage(approx_length=150000, fastq1=reads)
+        test_result = get_coverage(approx_length=150000, fastq1=reads, logger=logger)
         print(test_result)
         assert 9.8  == test_result
         return()
@@ -40,8 +41,9 @@ class coverageTests(unittest.TestCase):
             fastq1=self.reads,
             fastq2=self.reads,
             destination=self.test_dir, 
-            maxcoverage=2)
-        down_cov = get_coverage(approx_length=150000, fastq1=reads1)
+            maxcoverage=2,
+            logger=logger)
+        down_cov = get_coverage(approx_length=150000, fastq1=reads1, logger=logger)
         assert 1.993 == down_cov
         return()
 

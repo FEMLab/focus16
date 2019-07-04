@@ -3,6 +3,7 @@ from nose.tools.nontrivial import with_setup
 import os
 import shutil
 import unittest
+import logging as logger
 
 class extractTest(unittest.TestCase):
    """ test for extract_16s_from_contigs 
@@ -30,7 +31,8 @@ class extractTest(unittest.TestCase):
       barr_out = (self.barrnap)
       output = (self.out_dir)
       test_result=extract_16s_from_contigs(input_contigs=input_contigs,
-                                           barr_out=barr_out, output=output)
+                                           barr_out=barr_out, output=output,
+                                           logger=logger)
       assert os.path.exists(test_result)
             
 
