@@ -28,7 +28,7 @@ def main(args, output_dir):
         sys.exit(1)
     else:
         os.makedirs(output_dir)
-    sraFind_results = "https://raw.githubusercontent.com/nickp60/sraFind/master/results/sraFind-CompleteGenome-biosample-with-SRA-hits.txt"
+    sraFind_results = "https://raw.githubusercontent.com/nickp60/sraFind/master/results/sraFind-All-biosample-with-SRA-hits.txt"
     # gets just the file name
     sraFind_results_path = os.path.join(
         output_dir, os.path.basename(sraFind_results))

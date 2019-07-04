@@ -9,6 +9,7 @@ import sys
 import subprocess
 import argparse
 import shutil
+import logging
 from random import shuffle
 
 def get_args():  # pragma nocover
@@ -43,7 +44,7 @@ def get_args():  # pragma nocover
 
 
 
-def main(args=None):
+def main(args=None, logger=None):
     if args is None:
         args = get_args()
     try:
@@ -52,6 +53,8 @@ def main(args=None):
         print("genomes output directory already  exists!")
         sys.exit(1)
 
+    if logger is None:
+        logger = logging
     if not os.path.exists(args.prokaryotes):
 
         subprocess.run("wget ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/prokaryotes.txt -O " + args.prokaryotes,
@@ -77,7 +80,7 @@ def main(args=None):
     #    print(line[20])
     # # if file is empty, raise an error
     if len(org_lines) == 0:
-        print("no " + args.organism_name +
+        logger.critical("no " + args.organism_name +
               " matches in the prokaryotes.txt file")
 
     shuffle(org_lines)
