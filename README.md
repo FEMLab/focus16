@@ -1,5 +1,5 @@
 # 16db 
-## High resolution 16S databases from correctly assembled RNA operons
+## High resolution 16S database construction from correctly assembled rDNA operons
 
 ## Description
 16db is a package built for the construction of species-specific, high-resolution 16S rDNA databases. 
