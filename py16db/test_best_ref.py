@@ -3,6 +3,7 @@ import os
 import shutil
 import unittest
 from nose.tools.nontrivial import with_setup
+import logging as logger
 
 class bestrefTest(unittest.TestCase):
     """ test for pob function in run_all.py
@@ -30,7 +31,7 @@ class bestrefTest(unittest.TestCase):
         reads = (self.readsf)
         os.makedirs(self.test_dir)
         output_dir= (self.out_dir)
-        test_result = pob(genomes_dir=plasmids, readsf=reads, output_dir=output_dir)
+        test_result = pob(genomes_dir=plasmids, readsf=reads, output_dir=output_dir, logger=logger)
         print(test_result)
         assert "0.0340249" == test_result[1]
         assert os.path.basename("./test_data/plasmids/NC_009837.1.fasta") == \
