@@ -3,6 +3,7 @@ import sys
 import shutil
 import subprocess
 
+
 def run_sickle(fastq1, fastq2, output_dir):
     """ run sickle for read trimming, return paths to trimmed reads
     """
@@ -20,7 +21,7 @@ def run_sickle(fastq1, fastq2, output_dir):
         cmd = str("sickle pe -f {fastq1} -r {fastq2} -t illumina " +
                   "-o {new_fastq1} -p {new_fastq2} " +
                   "-s {new_fastqs}").format(**locals())
-    print(cmd)
+    
     try:
         subprocess.run(cmd,
                        shell=sys.platform !="win32",
@@ -44,7 +45,7 @@ def run_sickle(fastq1, fastq2, output_dir):
                                stderr=subprocess.PIPE,
                                check=True)
             except:
-                print(cmd)
+                
                 raise ValueError("Error executing sickle cmd!")
 
     return (new_fastq1, new_fastq2)

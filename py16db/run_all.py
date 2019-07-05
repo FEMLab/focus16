@@ -132,14 +132,17 @@ def pob(genomes_dir, readsf, output_dir, logger):
     downcmd2 = "seqtk sample -s100 {readsf} 1000000 > {ds_reads}".format(**locals())
         
     pobcmd = "plentyofbugs -g " + genomes_dir +  " -f " + ds_reads + " -o " + output_dir
+    logger.debug('Finding best reference genome: %s', pobcmd)
+    
     for command in [downcmd2, pobcmd]:
-        logger.debug('Finding best reference genome: %s', command)
         subprocess.run(command,
-                   shell=sys.platform !="win32",
-                   stdout=subprocess.PIPE,
-                   stderr=subprocess.PIPE,
-                   check=True)
-    best_ref = os.path.join(output_dir, "best_reference")
+                       shell=sys.platform !="win32",
+                       stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE,
+                       check=True)
+        best_ref = os.path.join(output_dir, "best_reference")
+            
+    
     with open(best_ref, "r") as infile:
         for line in infile:
             sraacc = line.strip().split('\t')            
@@ -208,32 +211,48 @@ def downsample(approx_length, fastq1, fastq2, maxcoverage, destination, logger):
     """Given the coverage from coverage(), downsamples the reads if over the max coverage set by args.maxcov. Default 50."""
     suboutput_dir_raw = os.path.join(destination, "raw", "")
     suboutput_dir_downsampled = os.path.join(destination, "downsampled", "")
+    os.makedirs(suboutput_dir_downsampled)
     downpath1 = os.path.join(suboutput_dir_downsampled, "downsampledreadsf.fastq") 
     downpath2 = os.path.join(suboutput_dir_downsampled, "downsampledreadsr.fastq")
     coverage = get_coverage(approx_length, fastq1, logger=logger)
-    
     covfraction = round(float(maxcoverage / coverage), 3)
-    if (coverage > maxcoverage):
-        logger.debug('Downsampling to %s X coverage', maxcoverage)
-        downcmd = "seqtk sample -s100 {fastq1} {covfraction} > {downpath1}".format(**locals())
-        downcmd2 = "seqtk sample -s100 {fastq2} {covfraction} > {downpath2}".format(**locals())
-        for command in [downcmd, downcmd2]:
-            subprocess.run(command,
-                           shell=sys.platform !="win32",
-                           stdout=subprocess.PIPE,
-                           stderr=subprocess.PIPE,
-                           check=True)
-        return(downpath1, downpath2)
+    downcmd = "seqtk sample -s100 {fastq1} {covfraction} > {downpath1}".format(**locals())
+    downcmd2 = "seqtk sample -s100 {fastq2} {covfraction} > {downpath2}".format(**locals())     
+    if fastq2 is None:
+        if (coverage > maxcoverage):
+            logger.debug('Downsampling to %s X coverage', maxcoverage)
+
+            for command in [downcmd, downcmd2]:
+                subprocess.run(command,
+                               shell=sys.platform !="win32",
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE,
+                               check=True)
+                return(downpath1, None)
+            else:
+                return(fastq1, None)
+            
     else:
-        return(fastq1, fastq2)
-    
+        if (coverage > maxcoverage):
+            logger.debug('Downsampling to %s X coverage', maxcoverage)
+            
+            for command in [downcmd, downcmd2]:
+                subprocess.run(command,
+                               shell=sys.platform !="win32",
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE,
+                               check=True)
+                return(downpath1, downpath2)
+            else:
+                return(fastq1, fastq2)
+        
 
 def run_riboseed(sra, readsf, readsr, cores, threads, output, logger):
     """Runs riboSeed to reassemble reads """
     cmd = "ribo run -r {sra} -F {readsf} -R {readsr} --cores {cores} --threads {threads} -v 1 --serialize -o {output} --subassembler skesa --stages score".format(**locals())
 
     if readsr is None:
-        cmd = "ribo run -r {sra} -F {readsf} --cores {cores} --threads {threads} -v 1 --serialize -o {output} --subassembler skesa --stages score".format(**locals())
+        cmd = "ribo run -r {sra} --fastqS {readsf} --cores {cores} --threads {threads} -v 1 --serialize -o {output} --subassembler skesa --stages score".format(**locals())
 
     logger.debug('Running riboSeed: %s', cmd)
     return(cmd)
@@ -301,29 +320,28 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
     sickle_out=os.path.join(this_output, "sickle")
     get_ave_read_len_from_fastq(fastq1=rawreadsf, N=50, logger=logger)
     pob(genomes_dir=args.genomes_dir, readsf=rawreadsf, output_dir=pob_dir, logger=logger)
+      
     best_reference=os.path.join(pob_dir, "best_reference")
     with open(best_reference, "r") as infile:
         for line in infile:
             best_ref_fasta = line.split('\t')[0]
     check_rDNA_copy_number(ref=best_ref_fasta, output=this_output, logger=logger) 
+    
     logger.debug('Quality trimming reads')
     trimmed_fastq1, trimmed_fastq2 = run_sickle(fastq1=rawreadsf,
                                                 fastq2=rawreadsr,
-                                                output_dir=sickle_out) 
-       
-    logger.debug('Trimmed forward reads: %s', trimmed_fastq1)
-    logger.debug('Trimmed reverse reads: %s', trimmed_fastq2)
+                                                output_dir=sickle_out)
+    logger.debug('Quality trimmed reads: %s', trimmed_fastq1)
     
+    logger.debug('Downsampling reads')
     downsampledf, downsampledr = downsample(approx_length=args.approx_length,
                                             fastq1=trimmed_fastq1,
                                             fastq2=trimmed_fastq2, 
                                             maxcoverage=args.maxcov,
                                             destination=this_output,
                                             logger=logger)
-
-    logger.debug('Downsampled forward reads: %s', downsampledf)
-    logger.debug('Downsample reverse reads: %s', downsampledr)
-       
+    logger.debug('Downsampled reads: %s', downsampledf)    
+    
     riboseed_cmd = run_riboseed(sra=best_ref_fasta, readsf=downsampledf,
                                 readsr=downsampledr, cores=args.cores,
                                 threads=1, output=ribo_dir, logger=logger)
@@ -333,10 +351,8 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
                        stdout=subprocess.PIPE,
                        stderr=subprocess.PIPE,
                        check=True)
-        
-    except subprocess.CalledProcessError:
-        logger.error('riboSeed Assembly failure')
-        
+    except:
+        raise riboSeedError("Error running the following command: ", riboseed_cmd)
     
     barr_out=os.path.join(this_output, "barrnap")
     sixteens_extracted=os.path.join(this_output, "ribo16s")
@@ -346,7 +362,16 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
                              barr_out=barr_out, output=sixteens_extracted, logger=logger)
     alignment(fasta=sixteens_extracted, output=this_output, logger=logger)
 
-    
+
+class plentyofbugsError(Exception):
+    pass
+
+class riboSeedError(Exception):
+    pass
+
+
+
+
 def main():
     args=get_args()
     os.makedirs(args.output_dir)
@@ -398,8 +423,19 @@ def main():
         
             rawreadsf=os.path.join(this_output, "raw/", accession + "_1.fastq")
             rawreadsr=os.path.join(this_output, "raw/", accession + "_2.fastq")
-            process_strain(rawreadsf, rawreadsr, this_output, args, logger)
-            
+            if not os.path.exists(rawreadsr):
+                rawreadsr = None
+            if not os.path.exists(rawreadsf):
+                logger.critical('Forward reads not detected')
+            try:
+                process_strain(rawreadsf, rawreadsr, this_output, args, logger)
+            except subprocess.CalledProcessError:
+                logger.error('unknown subprocess error')
+                continue
+            except riboSeedError as e:
+                logger.error(e)
+                continue
+        
 
 if __name__ == '__main__':
     main()
