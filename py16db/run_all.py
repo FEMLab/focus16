@@ -184,8 +184,13 @@ def get_ave_read_len_from_fastq(fastq1, N=50, logger=None):
             count += 1
             tot += len(read)
     ave_read_len = float(tot / count)
-    if ave_read_len > 300:
+    if ave_read_len < 65:
+        logger.critical("Average read length is too short: %s", ave_read_len)
         sys.exit
+    if ave_read_len > 300:
+        logger.critical("Average read length is too long: %s", ave_read_len)
+        sys.exit
+    logger.debug("Average read length: %s", ave_read_len)
     return(ave_read_len)
 
 def get_coverage(approx_length, fastq1, logger):
@@ -211,7 +216,6 @@ def downsample(approx_length, fastq1, fastq2, maxcoverage, destination, logger):
     """Given the coverage from coverage(), downsamples the reads if over the max coverage set by args.maxcov. Default 50."""
     suboutput_dir_raw = os.path.join(destination, "raw", "")
     suboutput_dir_downsampled = os.path.join(destination, "downsampled", "")
-    os.makedirs(suboutput_dir_downsampled)
     downpath1 = os.path.join(suboutput_dir_downsampled, "downsampledreadsf.fastq") 
     downpath2 = os.path.join(suboutput_dir_downsampled, "downsampledreadsr.fastq")
     coverage = get_coverage(approx_length, fastq1, logger=logger)
@@ -252,7 +256,7 @@ def run_riboseed(sra, readsf, readsr, cores, threads, output, logger):
     cmd = "ribo run -r {sra} -F {readsf} -R {readsr} --cores {cores} --threads {threads} -v 1 --serialize -o {output} --subassembler skesa --stages score".format(**locals())
 
     if readsr is None:
-        cmd = "ribo run -r {sra} --fastqS {readsf} --cores {cores} --threads {threads} -v 1 --serialize -o {output} --subassembler skesa --stages score".format(**locals())
+        cmd = "ribo run -r {sra} -S1 {readsf} --cores {cores} --threads {threads} -v 1 --serialize -o {output} --subassembler skesa --stages score".format(**locals())
 
     logger.debug('Running riboSeed: %s', cmd)
     return(cmd)
