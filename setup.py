@@ -41,7 +41,7 @@ setup(name='16db',
         },
       entry_points={ 
         'console_scripts': [
-            '16db = py16db.run_all.py:main',
+            '16db = py16db.run_all:main',
             ],
         }
       )
