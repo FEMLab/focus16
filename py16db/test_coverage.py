@@ -19,8 +19,9 @@ class coverageTests(unittest.TestCase):
 
     def tearDown(self):
         "tear down test fixtures"
-        if os.path.exists(self.test_dir):
-            shutil.rmtree(self.test_dir)
+        for dir in [self.test_dir, self.downsample_dir]:
+            if os.path.exists(dir):
+                shutil.rmtree(dir)
     
     def test_coverage(self):
         #genome is built from NC_0176759.1 ~150000bp
@@ -34,7 +35,7 @@ class coverageTests(unittest.TestCase):
                      "skipping this test on travis.CI")
     def test_downsample_PE(self):
             #genome is built from NC_0176759.1 ~150000bp
-        os.makedirs(self.test_dir)
+        os.makedirs(self.downsample_dir)
         reads1, reads2 = downsample(
             approx_length=150000,
             fastq1=self.reads,
@@ -49,7 +50,7 @@ class coverageTests(unittest.TestCase):
     @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
                      "skipping this test on travis.CI")
     def test_downsample_SE(self):
-        os.makedirs(self.test_dir)
+        os.makedirs(self.downsample_dir)
         reads1, reads2 = downsample(
             approx_length=150000,
             fastq1=self.reads,
