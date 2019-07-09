@@ -10,3 +10,5 @@ py16db/test_data/test_accession
 py16db/test_data/test_srapure
 py16db/prokaryotes.txt
 py16db/example_data/reads*
+py16db/run_all_reads_test/
+py16db/run_all_test/
