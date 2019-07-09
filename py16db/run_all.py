@@ -186,10 +186,10 @@ def get_ave_read_len_from_fastq(fastq1, N=50, logger=None):
     ave_read_len = float(tot / count)
     if ave_read_len < 65:
         logger.critical("Average read length is too short: %s", ave_read_len)
-        sys.exit
+        sys.exit(1)
     if ave_read_len > 300:
         logger.critical("Average read length is too long: %s", ave_read_len)
-        sys.exit
+        sys.exit(1)
     logger.debug("Average read length: %s", ave_read_len)
     return(ave_read_len)
 
