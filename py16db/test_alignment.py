@@ -48,8 +48,8 @@ class alignmentLongTest(unittest.TestCase):
       if os.path.exists(self.test2_dir):
          shutil.rmtree(self.test2_dir)
          
-    def tearDown(self):
-       shutil.rmtree(self.test2_dir)
+   def tearDown(self):
+      shutil.rmtree(self.test2_dir)
    
    
    @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
