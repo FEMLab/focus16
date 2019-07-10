@@ -216,41 +216,33 @@ def downsample(approx_length, fastq1, fastq2, maxcoverage, destination, logger):
     """Given the coverage from coverage(), downsamples the reads if over the max coverage set by args.maxcov. Default 50."""
     suboutput_dir_raw = os.path.join(destination, "raw", "")
     suboutput_dir_downsampled = os.path.join(destination, "downsampled", "")
+    os.makedirs(suboutput_dir_downsampled)
     downpath1 = os.path.join(suboutput_dir_downsampled, "downsampledreadsf.fastq") 
     downpath2 = os.path.join(suboutput_dir_downsampled, "downsampledreadsr.fastq")
     coverage = get_coverage(approx_length, fastq1, logger=logger)
     covfraction = round(float(maxcoverage / coverage), 3)
     downcmd = "seqtk sample -s100 {fastq1} {covfraction} > {downpath1}".format(**locals())
     downcmd2 = "seqtk sample -s100 {fastq2} {covfraction} > {downpath2}".format(**locals())     
-    if fastq2 is None:
-        if (coverage > maxcoverage):
-            logger.debug('Downsampling to %s X coverage', maxcoverage)
 
-            for command in [downcmd, downcmd2]:
-                subprocess.run(command,
-                               shell=sys.platform !="win32",
-                               stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE,
-                               check=True)
-                return(downpath1, None)
-            else:
-                return(fastq1, None)
-            
+    commands = [downcmd]
+    if (coverage > maxcoverage):
+        logger.debug('Downsampling to %s X coverage', maxcoverage)
+        if fastq2 is not None:
+            commands.append(downcmd2)
+        else:
+            downpath2 = None
+        for command in commands:
+            subprocess.run(command,
+                           shell=sys.platform !="win32",
+                           stdout=subprocess.PIPE,
+                           stderr=subprocess.PIPE,
+                           check=True)
+        return(downpath1, downpath2)
     else:
-        if (coverage > maxcoverage):
-            logger.debug('Downsampling to %s X coverage', maxcoverage)
+        logger.debug('Skipping downsampling as max coverage is %s', maxcoverage)
+        return(fastq1, fastq2)
             
-            for command in [downcmd, downcmd2]:
-                subprocess.run(command,
-                               shell=sys.platform !="win32",
-                               stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE,
-                               check=True)
-                return(downpath1, downpath2)
-            else:
-                return(fastq1, fastq2)
-        
-
+    
 def run_riboseed(sra, readsf, readsr, cores, threads, output, logger):
     """Runs riboSeed to reassemble reads """
     cmd = "ribo run -r {sra} -F {readsf} -R {readsr} --cores {cores} --threads {threads} -v 1 --serialize -o {output} --subassembler skesa --stages score".format(**locals())
@@ -296,26 +288,6 @@ def extract_16s_from_contigs(input_contigs, barr_out, output, logger):
                                check=True)
                 
     return(output)
-
-def alignment(fasta, output, logger):
-    """ Performs multiple sequence alignment with mafft and contructs a tree with iqtree
-    """
-    output = os.path.join(output, "alignment")
-    os.makedirs(output)
-    seqout = os.path.join(output, "16soneline.fasta")
-    mafftout = os.path.join(output, "MSA.fasta")
-    iqtreeout = os.path.join(output, "iqtree")
-    seqcmd = "seqtk seq -S {fasta} > {seqout}".format(**locals())
-    mafftcmd = "mafft {seqout} > {mafftout}".format(**locals())
-    iqtreecmd = "iqtree -s {mafftout} -nt AUTO > {iqtreeout}".format(**locals())
-    for cmd in [seqcmd, mafftcmd, iqtreecmd]:
-        logger.debug('Performing alignment: %s', cmd)
-        subprocess.run(cmd,
-                       shell=sys.platform !="win32",
-                       stdout=subprocess.PIPE,
-                       stderr=subprocess.PIPE,
-                       check=True)
-    return(mafftout)
             
 
 def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
@@ -335,7 +307,9 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
     trimmed_fastq1, trimmed_fastq2 = run_sickle(fastq1=rawreadsf,
                                                 fastq2=rawreadsr,
                                                 output_dir=sickle_out)
-    logger.debug('Quality trimmed reads: %s', trimmed_fastq1)
+    logger.debug('Quality trimmed f reads: %s', trimmed_fastq1)
+    logger.debug('Quality trimmed r reads: %s', trimmed_fastq2)
+    
     
     logger.debug('Downsampling reads')
     downsampledf, downsampledr = downsample(approx_length=args.approx_length,
@@ -359,12 +333,32 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
         raise riboSeedError("Error running the following command: ", riboseed_cmd)
     
     barr_out=os.path.join(this_output, "barrnap")
-    sixteens_extracted=os.path.join(this_output, "ribo16s")
+    extract16soutput=os.path.join(args.output_dir, "ribo16s")
     ribo_contigs = os.path.join(this_output, "riboSeed", "seed",
                                 "final_long_reads", "riboSeedContigs.fasta")
     extract_16s_from_contigs(input_contigs=ribo_contigs, 
-                             barr_out=barr_out, output=sixteens_extracted, logger=logger)
-    alignment(fasta=sixteens_extracted, output=this_output, logger=logger)
+                             barr_out=barr_out, output=extract16soutput, logger=logger)
+    
+
+def alignment(fasta, output, logger):
+    """ Performs multiple sequence alignment with mafft and contructs a tree with iqtree
+    """
+    output = os.path.join(output, "alignment")
+    os.makedirs(output)
+    seqout = os.path.join(output, "16soneline.fasta")
+    mafftout = os.path.join(output, "MSA.fasta")
+    iqtreeout = os.path.join(output, "iqtree")
+    seqcmd = "seqtk seq -S {fasta} > {seqout}".format(**locals())
+    mafftcmd = "mafft {seqout} > {mafftout}".format(**locals())
+    iqtreecmd = "iqtree -s {mafftout} -nt AUTO >> {iqtreeout}".format(**locals())
+    for cmd in [seqcmd, mafftcmd, iqtreecmd]:
+        logger.debug('Performing alignment: %s', cmd)
+        subprocess.run(cmd,
+                       shell=sys.platform !="win32",
+                       stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE,
+                       check=True)
+    return(output)
 
 
 class plentyofbugsError(Exception):
@@ -372,7 +366,6 @@ class plentyofbugsError(Exception):
 
 class riboSeedError(Exception):
     pass
-
 
 
 
@@ -414,9 +407,9 @@ def main():
         try:
             rawreadsr = args.example_reads[1]
         except IndexError:
-            rawreadsr = None
-        
+            rawreadsr = None    
         process_strain(rawreadsf, rawreadsr, this_output, args, logger)
+       
     else:
         for i, accession in enumerate(filtered_sras):
             this_output=os.path.join(args.output_dir, str(i))
@@ -439,6 +432,10 @@ def main():
             except riboSeedError as e:
                 logger.error(e)
                 continue
+
+    extract16soutput = os.path.join(args.output_dir, "ribo16s")
+    alignoutput = os.path.join(args.output_dir, "allsequences")
+    alignment(fasta=extract16soutput, output=alignoutput, logger=logger)
         
 
 if __name__ == '__main__':
