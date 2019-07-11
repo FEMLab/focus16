@@ -25,6 +25,7 @@ class coverageTests(unittest.TestCase):
     
     def test_coverage(self):
         #genome is built from NC_0176759.1 ~150000bp
+        
         reads = (self.reads)
         test_result = get_coverage(approx_length=150000, fastq1=reads, logger=logger)
         print(test_result)
@@ -35,7 +36,7 @@ class coverageTests(unittest.TestCase):
                      "skipping this test on travis.CI")
     def test_downsample_PE(self):
             #genome is built from NC_0176759.1 ~150000bp
-       
+        os.makedirs(self.downsample_dir)
         reads1, reads2 = downsample(
             approx_length=150000,
             fastq1=self.reads,
@@ -52,7 +53,7 @@ class coverageTests(unittest.TestCase):
     @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
                      "skipping this test on travis.CI")
     def test_downsample_SE(self):
-       
+        os.makedirs(self.downsample_dir)
         reads1, reads2 = downsample(
             approx_length=150000,
             fastq1=self.reads,
