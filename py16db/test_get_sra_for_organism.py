@@ -31,8 +31,8 @@ class get_sra_for_organismTest(unittest.TestCase):
         os.makedirs(self.test_dir)
         download_SRA(destination=self.test_dir,
                      SRA="SRR8443698", logger=logger)
-        
-        assert os.path.isdir(self.test_dir), "not creating correct subdirectory"
+        downsampled = os.path.join(self.test_dir, "downsampled")
+        assert os.path.exists(downsampled) 
                 
 
     
