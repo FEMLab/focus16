@@ -43,21 +43,21 @@ def get_args():
                         required=True)
     parser.add_argument("-l", "--approx_length", help="approximate genome length",
                         required=True, type=int)
-    parser.add_argument("-s", "--sraFind_path", dest="sra_path", default="srapure",
+    parser.add_argument("-s", "--sraFind_path", dest="sra_path", default="srapure", 
                         help="path to sraFind file", required=False)
     parser.add_argument("--single_SRA", default=None,
                         help="run pipeline on this SRA accession only",
                         required=False)
-    parser.add_argument( "-g", "--genomes_dir",help="path to genomes directory",
+    parser.add_argument( "-g", "--genomes_dir",help="path to directory containing, or empty, candidate genomes for reference",
                          required=True)
     parser.add_argument("-p", "--prokaryotes", action="store",
                         help="path_to_prokaryotes.txt", default="./prokaryotes.txt",
                         required=False)
-    parser.add_argument("-S", "--nstrains", help="number of strains",
+    parser.add_argument("-S", "--nstrains", help="number of strains to be tested as reference genome",
                         type=int, required=True)
-    parser.add_argument("--get_all", help="get both sras if organism has two",
+    parser.add_argument("--get_all", help="get both SRAs if organism has two",
                         action="store_true", required=False)
-    parser.add_argument("--cores", help="number of cores for riboSeed", default=1,
+    parser.add_argument("--cores", help="how many cores you wish to use", default=1,
                         required=False, type=int)
     parser.add_argument("--maxcov", help="maximum coverage of reads", default=50,
                         required=False, type=int)
@@ -108,6 +108,7 @@ def download_SRA(SRA, destination, logger):
     suboutput_dir_downsampled = os.path.join(destination, "downsampled", "")
     os.makedirs(suboutput_dir_raw)
     os.makedirs(suboutput_dir_downsampled)
+
     cmd = "fastq-dump --split-files {SRA} -O {suboutput_dir_raw}".format(**locals())
   
     subprocess.run(cmd,
@@ -116,7 +117,7 @@ def download_SRA(SRA, destination, logger):
                    stderr=subprocess.PIPE,
                    check=True)
     downpath = os.path.join(suboutput_dir_downsampled, "downsampledreadsf.fastq")
-    downcmd = "seqtk sample -s100 {suboutput_dir_raw} {SRA}_1.fastq 1000000 > {downpath}".format(**locals())
+    downcmd = "seqtk sample -s100 {suboutput_dir_raw}{SRA}_1.fastq 1000000 > {downpath}".format(**locals())
     
     subprocess.run(downcmd,
                    shell=sys.platform !="win32",
@@ -169,6 +170,7 @@ def check_rDNA_copy_number(ref, output, logger):
         logger.debug('%s rrn operons detected in reference genome', rrn_num)
     else:
         logger.critical('Species does not have multiple rrn operons')
+        sys.exit(1)
     return(rrn_num)            
 
 def get_ave_read_len_from_fastq(fastq1, N=50, logger=None):
@@ -216,7 +218,6 @@ def downsample(approx_length, fastq1, fastq2, maxcoverage, destination, logger):
     """Given the coverage from coverage(), downsamples the reads if over the max coverage set by args.maxcov. Default 50."""
     suboutput_dir_raw = os.path.join(destination, "raw", "")
     suboutput_dir_downsampled = os.path.join(destination, "downsampled", "")
-    os.makedirs(suboutput_dir_downsampled)
     downpath1 = os.path.join(suboutput_dir_downsampled, "downsampledreadsf.fastq") 
     downpath2 = os.path.join(suboutput_dir_downsampled, "downsampledreadsr.fastq")
     coverage = get_coverage(approx_length, fastq1, logger=logger)
@@ -239,7 +240,7 @@ def downsample(approx_length, fastq1, fastq2, maxcoverage, destination, logger):
                            check=True)
         return(downpath1, downpath2)
     else:
-        logger.debug('Skipping downsampling as max coverage is %s', maxcoverage)
+        logger.debug('Skipping downsampling as max coverage is < %s', maxcoverage)
         return(fastq1, fastq2)
             
     
@@ -350,7 +351,7 @@ def alignment(fasta, output, logger):
     iqtreeout = os.path.join(output, "iqtree")
     seqcmd = "seqtk seq -S {fasta} > {seqout}".format(**locals())
     mafftcmd = "mafft {seqout} > {mafftout}".format(**locals())
-    iqtreecmd = "iqtree -s {mafftout} -nt AUTO >> {iqtreeout}".format(**locals())
+    iqtreecmd = "iqtree -s {mafftout} -nt AUTO > {iqtreeout}".format(**locals())
     for cmd in [seqcmd, mafftcmd, iqtreecmd]:
         logger.debug('Performing alignment: %s', cmd)
         subprocess.run(cmd,
@@ -436,6 +437,8 @@ def main():
     extract16soutput = os.path.join(args.output_dir, "ribo16s")
     alignoutput = os.path.join(args.output_dir, "allsequences")
     alignment(fasta=extract16soutput, output=alignoutput, logger=logger)
+    pathtotree = os.path.join(alignoutput, "MSA.fasta.tree")
+    logger.debug('Maximum-likelihood tree available at: %s', pathtotree) 
         
 
 if __name__ == '__main__':
