@@ -216,9 +216,9 @@ def get_coverage(read_length, approx_length, fastq1, logger):
     with open_fun(fastq1, "rt") as file_handle:
         for count, line in enumerate(file_handle):
             pass
-   
-      
-    coverage = float((count * read_length) / approx_length)
+
+    #4 lines per read in a fastq
+    coverage = float((count * read_length) / (approx_length*4))
     logger.debug('Read coverage is : %s', coverage)
     return(coverage)
 
