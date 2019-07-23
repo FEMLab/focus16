@@ -73,7 +73,7 @@ def check_programs(logger):
     """exits if the following programs are not installed"""
     
     required_programs = ["ribo", "barrnap",
-                         "fastq-dump", "mash", "skesa", "plentyofbugs"]
+                         "parallel-fastq-dump", "mash", "skesa", "plentyofbugs"]
     for program in required_programs:
         if shutil.which(program) is None:
             logger.error ( '%s is not installed: exiting.', program) 
@@ -104,14 +104,14 @@ def filter_SRA(path, organism_name, strains, get_all, logger):
             sras.append(these_sras[0])
     return(sras)
 
-def download_SRA(SRA, destination, logger):
+def download_SRA(cores, SRA, destination, logger):
     """Download SRAs, downsample forward reads to 1000000"""
     suboutput_dir_raw = os.path.join(destination, "raw", "")
     suboutput_dir_downsampled = os.path.join(destination, "downsampled", "")
     os.makedirs(suboutput_dir_raw)
     os.makedirs(suboutput_dir_downsampled)
 
-    cmd = "fastq-dump --split-files {SRA} -O {suboutput_dir_raw}".format(**locals())
+    cmd = "parallel-fastq-dump --sra-id {SRA} --threads {cores} -O {suboutput_dir_raw} --split-files ".format(**locals())
   
     subprocess.run(cmd,
                    shell=sys.platform !="win32",
@@ -336,7 +336,9 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
                                             destination=this_output,
                                             read_length=read_length,
                                             logger=logger)
-    logger.debug('Downsampled reads: %s', downsampledf)    
+    logger.debug('Downsampled f reads: %s', downsampledf)    
+    logger.debug('Downsampled r reads: %s', downsampledr)    
+    
     
     riboseed_cmd = run_riboseed(sra=best_ref_fasta, readsf=downsampledf,
                                 readsr=downsampledr, cores=args.cores,
@@ -439,7 +441,7 @@ def main():
             os.makedirs(this_output)
             
             logger.debug('Downloading SRA: %s', accession)
-            download_SRA(SRA=accession, destination=this_output,logger=logger)
+            download_SRA(cores=args.cores, SRA=accession, destination=this_output,logger=logger)
         
             rawreadsf=os.path.join(this_output, "raw/", accession + "_1.fastq")
             rawreadsr=os.path.join(this_output, "raw/", accession + "_2.fastq")
