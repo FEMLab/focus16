@@ -14,6 +14,7 @@ from . import get_n_genomes as gng
 from . import fetch_sraFind_data as fsd
 from py16db.run_sickle import run_sickle
 from Bio import SeqIO
+from . import __version__
 
 def setup_logging(args):
     logging.basicConfig(
@@ -41,7 +42,9 @@ def get_args():
     parser.add_argument("-o", "--output_dir", help="path to output", required=True)
     parser.add_argument("-n", "--organism_name", help="genus species in quotes",
                         required=True)
-    parser.add_argument("-l", "--approx_length", help="approximate genome length",
+    parser.add_argument('--version', action='version',
+                        version='%(prog)s {version}'.format(version=__version__))
+    parser.add_argument("-l", "--approx_length", help="Integer forapproximate genome length",
                         required=True, type=int)
     parser.add_argument("-s", "--sraFind_path", dest="sra_path", default="srapure", 
                         help="path to sraFind file", required=False)
@@ -53,13 +56,13 @@ def get_args():
     parser.add_argument("-p", "--prokaryotes", action="store",
                         help="path_to_prokaryotes.txt", default="./prokaryotes.txt",
                         required=False)
-    parser.add_argument("-S", "--nstrains", help="number of strains to be tested as reference genome",
+    parser.add_argument("-S", "--nstrains", help="number of strains to be tested as reference genome",             
                         type=int, required=True)
     parser.add_argument("--get_all", help="get both SRAs if organism has two",
                         action="store_true", required=False)
-    parser.add_argument("--cores", help="how many cores you wish to use", default=1,
+    parser.add_argument("--cores", help="integer for how many cores you wish to use", default=1,
                         required=False, type=int)
-    parser.add_argument("--maxcov", help="maximum coverage of reads", default=50,
+    parser.add_argument("--maxcov", help="integer for maximum coverage of reads", default=50,
                         required=False, type=int)
     parser.add_argument("--example_reads", help="input of example reads", nargs='+',
                         required=False, type=str)
@@ -83,7 +86,6 @@ def filter_SRA(path, organism_name, strains, get_all, logger):
     with open(path, "r") as infile:
         for line in infile:
             split_line = [x.replace('"', '').replace("'", "") for x in line.strip().split("\t")]
-            # check if organism name match
             if split_line[11].startswith(organism_name):
                 if split_line[8].startswith("ILLUMINA"):
                     results.append(split_line[17])
@@ -127,22 +129,23 @@ def download_SRA(SRA, destination, logger):
     return(downpath)
 
 def pob(genomes_dir, readsf, output_dir, logger):
-    """Uses plentyofbugs, a package that uses mash to find the best reference genome for draft genome """
+    """Uses plentyofbugs, a package that useqs mash to find the best reference genome for draft genome """
 
-    ds_reads = os.path.join(os.path.dirname(output_dir), "reads_for_pob.fastq")
-    downcmd2 = "seqtk sample -s100 {readsf} 1000000 > {ds_reads}".format(**locals())
-        
-    pobcmd = "plentyofbugs -g " + genomes_dir +  " -f " + ds_reads + " -o " + output_dir
+       
+    pobcmd = "plentyofbugs -g " + genomes_dir +  " -f " + readsf + " -o " + output_dir + " --downsampling_ammount 1000000"
     logger.debug('Finding best reference genome: %s', pobcmd)
     
-    for command in [downcmd2, pobcmd]:
-        subprocess.run(command,
-                       shell=sys.platform !="win32",
-                       stdout=subprocess.PIPE,
-                       stderr=subprocess.PIPE,
-                       check=True)
-        best_ref = os.path.join(output_dir, "best_reference")
-            
+    for command in [pobcmd]:
+        try:
+            subprocess.run(command,
+                           shell=sys.platform !="win32",
+                           stdout=subprocess.PIPE,
+                           stderr=subprocess.PIPE,
+                           check=True)
+            best_ref = os.path.join(output_dir, "best_reference")
+        except:
+            raise bestreferenceError("Error running the following command: %s", command)
+    
     
     with open(best_ref, "r") as infile:
         for line in infile:
@@ -169,23 +172,30 @@ def check_rDNA_copy_number(ref, output, logger):
     if rrn_num > 1:
         logger.debug('%s rrn operons detected in reference genome', rrn_num)
     else:
-        logger.critical('Species does not have multiple rrn operons')
+        logger.critical('SRA does not have multiple rrn operons')
         sys.exit(1)
     return(rrn_num)            
 
-def get_ave_read_len_from_fastq(fastq1, N=50, logger=None):
+def get_and_check_ave_read_len_from_fastq(fastq1, N=50, logger=None):
     """from LP: taken from github.com/nickp60/riboSeed/riboSeed/classes.py; return average read length in fastq1 file from first N reads"""
     count, tot = 0, 0
     if os.path.splitext(fastq1)[-1] in ['.gz', '.gzip']:
         open_fun = gzip.open
     else:
         open_fun = open
+
+
     with open_fun(fastq1, "rt") as file_handle:
         data = SeqIO.parse(file_handle, "fastq")
+        logger.debug("Obtaining average read length from first 30 reads")
         for read in data:
             count += 1
             tot += len(read)
-    ave_read_len = float(tot / count)
+            if count == 30:
+                break
+
+    
+    ave_read_len = float(tot / 30)
     if ave_read_len < 65:
         logger.critical("Average read length is too short: %s", ave_read_len)
         sys.exit(1)
@@ -195,36 +205,34 @@ def get_ave_read_len_from_fastq(fastq1, N=50, logger=None):
     logger.debug("Average read length: %s", ave_read_len)
     return(ave_read_len)
 
-def get_coverage(approx_length, fastq1, logger):
+def get_coverage(read_length, approx_length, fastq1, logger):
     """Obtains the coverage for a read set, when given the estimated genome size"""
-    count, tot = 0, 0
    
     if os.path.splitext(fastq1)[-1] in ['.gz', '.gzip']:
         open_fun = gzip.open
     else:
         open_fun = open
+    logger.debug("Counting reads")
     with open_fun(fastq1, "rt") as file_handle:
-        data = SeqIO.parse(file_handle, "fastq")
-        for read in data:
-            count += 1
-            tot += len(read)
-
-    ave_read_len = float(tot / count)  
-    coverage = float((count * ave_read_len) / approx_length)
+        for count, line in enumerate(file_handle):
+            pass
+   
+      
+    coverage = float((count * read_length) / approx_length)
     logger.debug('Read coverage is : %s', coverage)
     return(coverage)
 
-def downsample(approx_length, fastq1, fastq2, maxcoverage, destination, logger):
+def downsample(read_length, approx_length, fastq1, fastq2, maxcoverage, destination, logger):
     """Given the coverage from coverage(), downsamples the reads if over the max coverage set by args.maxcov. Default 50."""
     suboutput_dir_raw = os.path.join(destination, "raw", "")
     suboutput_dir_downsampled = os.path.join(destination, "downsampled", "")
     downpath1 = os.path.join(suboutput_dir_downsampled, "downsampledreadsf.fastq") 
     downpath2 = os.path.join(suboutput_dir_downsampled, "downsampledreadsr.fastq")
-    coverage = get_coverage(approx_length, fastq1, logger=logger)
+    coverage = get_coverage(read_length, approx_length, fastq1, logger=logger)
     covfraction = round(float(maxcoverage / coverage), 3)
     downcmd = "seqtk sample -s100 {fastq1} {covfraction} > {downpath1}".format(**locals())
     downcmd2 = "seqtk sample -s100 {fastq2} {covfraction} > {downpath2}".format(**locals())     
-
+    
     commands = [downcmd]
     if (coverage > maxcoverage):
         logger.debug('Downsampling to %s X coverage', maxcoverage)
@@ -233,11 +241,14 @@ def downsample(approx_length, fastq1, fastq2, maxcoverage, destination, logger):
         else:
             downpath2 = None
         for command in commands:
-            subprocess.run(command,
-                           shell=sys.platform !="win32",
-                           stdout=subprocess.PIPE,
-                           stderr=subprocess.PIPE,
-                           check=True)
+           try:
+               subprocess.run(command,
+                              shell=sys.platform !="win32",
+                              stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE,
+                              check=True)
+           except:
+               raise downsamplingError("Error running following command ", command) 
         return(downpath1, downpath2)
     else:
         logger.debug('Skipping downsampling as max coverage is < %s', maxcoverage)
@@ -259,12 +270,15 @@ def extract_16s_from_contigs(input_contigs, barr_out, output, logger):
 
     barrnap = "barrnap {input_contigs} > {barr_out}".format(**locals())
     logger.debug('Extracting 16S sequences: %s', barrnap)
-    subprocess.run(barrnap,
-                   shell=sys.platform !="win32",
-                   stdout=subprocess.PIPE,
-                   stderr=subprocess.PIPE,
-                   check=True)
-    
+    try:
+        subprocess.run(barrnap,
+                       shell=sys.platform !="win32",
+                       stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE,
+                       check=True)
+    except:
+        raise extracting16sError("Error running the following command %s", barrnap)
+
     results16s = []   # [chromosome, start, end, reverse complimented]
     with open(barr_out, "r") as rrn:
         for rawline in rrn:
@@ -282,12 +296,14 @@ def extract_16s_from_contigs(input_contigs, barr_out, output, logger):
                 results16s = [chrom, start, end, suffix]
                 
                 cmd = "extractRegion \'{results16s[3]}{results16s[0]} :{results16s[1]}:{results16s[2]}\' -f {input_contigs} -v 1 >> {output}".format(**locals())
-                subprocess.run(cmd,
-                               shell=sys.platform !="win32",
-                               stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE,
-                               check=True)
-                
+                try:
+                    subprocess.run(cmd,
+                                   shell=sys.platform !="win32",
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE,
+                                   check=True)
+                except:
+                    raise extracting16sError("Error running following command %s", cmd)
     return(output)
             
 
@@ -295,7 +311,7 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
     pob_dir=os.path.join(this_output, "plentyofbugs")
     ribo_dir=os.path.join(this_output, "riboSeed")
     sickle_out=os.path.join(this_output, "sickle")
-    get_ave_read_len_from_fastq(fastq1=rawreadsf, N=50, logger=logger)
+    read_length = get_and_check_ave_read_len_from_fastq(fastq1=rawreadsf, N=50, logger=logger)
     pob(genomes_dir=args.genomes_dir, readsf=rawreadsf, output_dir=pob_dir, logger=logger)
       
     best_reference=os.path.join(pob_dir, "best_reference")
@@ -318,6 +334,7 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
                                             fastq2=trimmed_fastq2, 
                                             maxcoverage=args.maxcov,
                                             destination=this_output,
+                                            read_length=read_length,
                                             logger=logger)
     logger.debug('Downsampled reads: %s', downsampledf)    
     
@@ -362,16 +379,21 @@ def alignment(fasta, output, logger):
     return(output)
 
 
-class plentyofbugsError(Exception):
+class bestreferenceError(Exception):
     pass
-
+class downsamplingError(Exception):
+    pass
 class riboSeedError(Exception):
+    pass
+class extracting16sError(Exception):
     pass
 
 
 
 def main():
     args=get_args()
+    if not args.genomes_dir.endswith("/"):
+        args.genomes_dir = args.genomes_dir + "/" 
     os.makedirs(args.output_dir)
     logger = setup_logging(args)
     check_programs(logger)
@@ -398,7 +420,7 @@ def main():
     else:
         gng.main(args, logger)
     if filtered_sras == []:
-        logger.debug('No complete genomes found on NCBI by sraFind')
+        logger.debug('No SRAs found on NCBI by sraFind')
         
     
     if args.example_reads is not None:
@@ -428,9 +450,18 @@ def main():
             try:
                 process_strain(rawreadsf, rawreadsr, this_output, args, logger)
             except subprocess.CalledProcessError:
-                logger.error('unknown subprocess error')
+                logger.error('Unknown subprocess error')
+                continue
+            except bestreferenceError as e:
+                logger.error(e)
+                continue
+            except downsamplingError as e:
+                logger.error(e)
                 continue
             except riboSeedError as e:
+                logger.error(e)
+                continue
+            except extracting16sError as e:
                 logger.error(e)
                 continue
 
