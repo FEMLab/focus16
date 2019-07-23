@@ -19,6 +19,7 @@ class filter_SRATest(unittest.TestCase):
                                      strains=1, get_all=True, logger=logger)
         assert ["DRR021662"] == test_result
 
+
 class download_SRATest(unittest.TestCase):
     ''' test for filter_srapure and download_sra in run_all.py
     '''
@@ -33,7 +34,8 @@ class download_SRATest(unittest.TestCase):
         "tear down test fixtures"
         shutil.rmtree(self.test_dir)
 
-        
+    @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
+                     "skipping this test on travis.CI")        
     def test_download_SRA(self):
         os.makedirs(self.test_dir)
         download_SRA(cores=4, destination=self.test_dir,
