@@ -10,7 +10,7 @@ riboSeed to take an input of arguments listed below and produces a file containi
 
 ## Installation
 Packages required for 16db:  
-```conda install seqtk sickle-trim sra-tools riboseed mash skesa plentyofbugs barrnap```
+```conda install seqtk sickle-trim sra-tools riboseed mash skesa plentyofbugs barrnap prallel-fastq-dump```
 ```pip install riboseed```
 ```pip install plentyofbugs```
 
