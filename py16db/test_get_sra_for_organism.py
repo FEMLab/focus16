@@ -10,7 +10,6 @@ class filter_SRATest(unittest.TestCase):
     '''
     
     def setUp(self):
-        self.test_dir=os.path.join(os.path.dirname(__file__), "test_function", "")
         self.sra_find=os.path.join(os.path.dirname(__file__), "test_data", "test_sraFind.txt")
    
     def test_filter_SRA(self):
@@ -37,11 +36,11 @@ class download_SRATest(unittest.TestCase):
     @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
                      "skipping this test on travis.CI")        
     def test_download_SRA(self):
-        os.makedirs(self.test_dir)
+        
         download_SRA(cores=4, destination=self.test_dir,
                      SRA="SRR8443698", logger=logger)
-        downsampled = os.path.join(self.test_dir, "downsampled")
-        assert os.path.exists(downsampled) 
+        
+        assert os.path.exists(os.path.join(self.test_dir, "SRR8443698_1.fastq"))
                 
 
     
