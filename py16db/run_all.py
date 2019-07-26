@@ -70,6 +70,11 @@ def get_args():
                         help="which program should riboseed use for sub assemblies",
                         choices=["spades", "skesa"], 
                         required=False, default="spades")
+    parser.add_argument("--memory", 
+                        help="amount of RAM to be used",
+                        default=4, 
+                        required=False, type=int)
+    
     return(parser.parse_args())
 
 
@@ -252,12 +257,12 @@ def downsample(read_length, approx_length, fastq1, fastq2, maxcoverage, destinat
         return(fastq1, fastq2)
             
     
-def run_riboseed(sra, readsf, readsr, cores, subassembler, threads, output, logger):
+def run_riboseed(sra, readsf, readsr, cores, subassembler, threads, output, memory, logger):
     """Runs riboSeed to reassemble reads """
-    cmd = "ribo run -r {sra} -F {readsf} -R {readsr} --cores {cores} --threads {threads} -v 1 --serialize -o {output} --subassembler {subassembler} --stages score".format(**locals())
+    cmd = "ribo run -r {sra} -F {readsf} -R {readsr} --cores {cores} --threads {threads} -v 1 --serialize -o {output} --subassembler {subassembler} --stages score --memory {memory}".format(**locals())
 
     if readsr is None:
-        cmd = "ribo run -r {sra} -S1 {readsf} --cores {cores} --threads {threads} -v 1 --serialize -o {output} --subassembler {subassembler} --stages score".format(**locals())
+        cmd = "ribo run -r {sra} -S1 {readsf} --cores {cores} --threads {threads} -v 1 --serialize -o {output} --subassembler {subassembler} --stages score --memory {memory}".format(**locals())
 
     logger.debug('Running riboSeed: %s', cmd)
     return(cmd)
@@ -301,7 +306,7 @@ def extract_16s_from_contigs(input_contigs, barr_out, output, logger):
                                    stderr=subprocess.PIPE,
                                    check=True)
                 except:
-                    raise extracting16sError("Error running following command %s", cmd)
+                    raise extracting16sError("Error running following command ", cmd)
     return(output)
             
 
