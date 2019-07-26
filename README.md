@@ -10,7 +10,8 @@ riboSeed to take an input of arguments listed below and produces a file containi
 
 ## Installation
 Packages required for 16db:  
-```conda install seqtk sickle-trim sra-tools riboseed mash skesa plentyofbugs barrnap prallel-fastq-dump```
+```conda install seqtk sickle-trim sra-tools riboseed mash skesa barrnap prallel-fastq-dump```
+```git clone https://github.com/nickp60/open_utils.git``` #For extractRegion command
 ```pip install riboseed```
 ```pip install plentyofbugs```
 
@@ -31,3 +32,15 @@ Packages required for 16db:
 '[--cores]' the amount of cores your computer has/ you want to use
 '[--maxcov]' maximum coverage of reads, downsamples if over
 '[--example_reads]' use own reads: forwardreads.fq reversereads.fq OR reads.fq 
+
+## Test Data
+16db/py16db/generator.py is a script that generates the test data used for the
+various tests in this repo
+
+Required:
+ART - generates synthetic next-gen reads.
+{https://www.niehs.nih.gov/research/resources/software/biostatistics/art/index.cfm}
+Also move art_bin_MountRainier/ into 16db/py16db/
+
+Repo containing test data, we just need the plentyofbugs/test_data/plasmids folder.
+{https://github.com/nickp60/plentyofbugs.git}
