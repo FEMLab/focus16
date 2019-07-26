@@ -270,8 +270,6 @@ def run_riboseed(sra, readsf, readsr, cores, subassembler, threads, output, memo
 def extract_16s_from_contigs(input_contigs, barr_out, output, logger):
     """Uses barrnap to identify rRNA operons within the riboSeed assembled contigs, then uses extractRegion to extract the 16S sequences """
 
-    
-
     barrnap = "barrnap {input_contigs} > {barr_out}".format(**locals())
     logger.debug('Extracting 16S sequences: %s', barrnap)
     try:
@@ -351,6 +349,10 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
                                 threads=1, output=ribo_dir, logger=logger)
     
     status = os.path.join(this_output, "status")
+
+    #file that will contain riboseed contigs
+    ribo_contigs = os.path.join(this_output, "riboSeed", "seed",
+                                "final_long_reads", "riboSeedContigs.fasta")
     if not "RIBOSEED COMPLETE" in parse_status_file(status):            
         try:
             subprocess.run(riboseed_cmd,
@@ -359,11 +361,17 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
                            stderr=subprocess.PIPE,
                            check=True)
             
+            
+                
+            
             with open(status, "a") as statusfile:
                 statusfile.write("RIBOSEED COMPLETE")
                 
         except:
-            raise riboSeedError("Error running the following command: ", riboseed_cmd)
+            if os.path.exists(ribo_contigs):
+                pass
+            else:
+                raise riboSeedError("Error running the following command: %s", riboseed_cmd)
     else:
         logger.debug("Skipping riboSeed")
         
