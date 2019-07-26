@@ -346,6 +346,7 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
     
     riboseed_cmd = run_riboseed(sra=best_ref_fasta, readsf=downsampledf,
                                 readsr=downsampledr, cores=args.cores,
+                                memory=args.memory,
                                 subassembler=args.subassembler,
                                 threads=1, output=ribo_dir, logger=logger)
     
