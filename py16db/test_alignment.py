@@ -35,8 +35,6 @@ class alignmentTest(unittest.TestCase):
          print(firstline)
       assert firstline == ">CP003686.1 :16889:18441"
 
-
-
 class alignmentLongTest(unittest.TestCase):
    """ test for the alignment step, using 5 whole genome sequences from E. coli
    """
@@ -44,7 +42,7 @@ class alignmentLongTest(unittest.TestCase):
       self.test2_dir = os.path.join(os.path.dirname(__file__),
                                     "alignment_test_long")
       self.inputfasta = os.path.join(os.path.dirname(__file__), "test_data",
-                                     "ecoli16s", "ribo16")
+                                     "ecoli", "ribo16")
       if os.path.exists(self.test2_dir):
          shutil.rmtree(self.test2_dir)
          
@@ -58,6 +56,4 @@ class alignmentLongTest(unittest.TestCase):
       test_output = (self.test2_dir)
       inputfasta = (self.inputfasta)
       test_result = alignment(fasta=inputfasta, output=test_output, logger=logger)
-    
-
       assert os.path.exists(test_result)
