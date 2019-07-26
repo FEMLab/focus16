@@ -38,7 +38,8 @@ class coverageTests(unittest.TestCase):
         test_result = run_riboseed(sra=sra, readsf=readsf,
                                    readsr=readsr, cores="4", threads="1",
                                    subassembler="spades",
+                                   memory=8,
                                    output=output_dir, logger=logger)
 
-        assert test_result == "ribo run -r /Users/alexandranolan/Desktop/16db/py16db/example_data/NC_013928.1.fna -F /Users/alexandranolan/Desktop/16db/py16db/example_data/reads10X1.fq -R /Users/alexandranolan/Desktop/16db/py16db/example_data/reads10X2.fq --cores 4 --threads 1 -v 1 --serialize -o /Users/alexandranolan/Desktop/16db/py16db/riboSeed --subassembler spades --stages score"
+        assert test_result == "ribo run -r /Users/alexandranolan/Desktop/16db/py16db/example_data/NC_013928.1.fna -F /Users/alexandranolan/Desktop/16db/py16db/example_data/reads10X1.fq -R /Users/alexandranolan/Desktop/16db/py16db/example_data/reads10X2.fq --cores 4 --threads 1 -v 1 --serialize -o /Users/alexandranolan/Desktop/16db/py16db/riboSeed --subassembler spades --stages score --memory 8"
     
