@@ -32,7 +32,7 @@ setup(name='16db',
                'py16db/test_run_sickle.py',
                'py16db/get_n_genomes.py',
                'py16db/fetch_sraFind_data.py'],
-      install_requires = ['biopython'],
+      install_requires = ['biopython', 'open-utils'],
       zip_safe=False,
       include_package_data=True,
       package_data={
