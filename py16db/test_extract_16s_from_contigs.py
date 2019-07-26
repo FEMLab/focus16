@@ -57,7 +57,7 @@ class extractTestLong(unittest.TestCase):
    @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
                     "skipping this test on travis.CI")
    
-   def test_extract(self):
+   def test_extractLong(self):
       os.makedirs(self.test_dir)
       barr_out = (self.barrnap)
       output = (self.out_dir)
