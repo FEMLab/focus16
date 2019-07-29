@@ -14,7 +14,7 @@ class bestrefTest(unittest.TestCase):
                                      "pob_test_result")
         self.out_dir = os.path.join(self.test_dir, "plentyofbugs")
         self.data_dir = os.path.join(os.path.dirname(__file__), "test_data")
-        self.plasmids_dir = os.path.join(self.data_dir, "plasmids", "")
+        self.plasmids_dir = os.path.join(self.data_dir, "ecoli", "")
         self.readsf = os.path.join(self.data_dir, "test_reads1.fq")
         if os.path.exists(self.test_dir):
             shutil.rmtree(self.test_dir)
@@ -33,8 +33,8 @@ class bestrefTest(unittest.TestCase):
         output_dir= (self.out_dir)
         test_result = pob(genomes_dir=plasmids, readsf=reads, output_dir=output_dir, logger=logger)
         print(test_result)
-        assert "0.0340249" == test_result[1]
-        assert os.path.basename("./test_data/plasmids/NC_009837.1.fasta") == \
+        assert "1.0" == test_result[1]
+        assert os.path.basename(os.path.join(self.plasmids_dir, "NC_000913.3.fna")) == \
             os.path.basename(test_result[0])
         return()
 

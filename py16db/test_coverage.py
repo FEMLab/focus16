@@ -24,31 +24,32 @@ class coverageTests(unittest.TestCase):
                 shutil.rmtree(dir)
     
     def test_coverage(self):
-        #genome is built from NC_0176759.1 ~150000bp
+        #genome is from CP003686.1 ~2027088bp
+        #reads are generated from this, under 16db/py16db/generator.py
         
         reads = (self.reads)
-        test_result = get_coverage(approx_length=150000, fastq1=reads, read_length=150, logger=logger)
-        print(test_result)
-        assert 9.79975  == test_result
+        test_result = get_coverage(approx_length=2027088, fastq1=reads, read_length=150, logger=logger)
+       
+        assert 4.999585612464777 == test_result
         return()
     
     @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
                      "skipping this test on travis.CI")
     def test_downsample_PE(self):
-            #genome is built from NC_0176759.1 ~150000bp
+            #genome is built from CP003686.1 ~2027088bp
         #os.makedirs(self.downsample_dir, )
         reads1, reads2 = downsample(
             read_length=150,
-            approx_length=150000,
+            approx_length=2027088,
             fastq1=self.reads,
             fastq2=self.reads,
             destination=self.downsample_dir, 
             maxcoverage=2,
             logger=logger)
-        down_cov1 = get_coverage(read_length=150, approx_length=150000, fastq1=reads1, logger=logger)
-        down_cov2 = get_coverage(read_length=150, approx_length=150000, fastq1=reads2, logger=logger)
-        assert 1.99275 == down_cov1
-        assert 1.99275 == down_cov2
+        down_cov1 = get_coverage(read_length=150, approx_length=2027088, fastq1=reads1, logger=logger)
+        down_cov2 = get_coverage(read_length=150, approx_length=2027088, fastq1=reads2, logger=logger)
+        assert 1.9982358930643367 == down_cov1
+        assert 1.9982358930643367 == down_cov2
         return()
     
     @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
@@ -56,13 +57,13 @@ class coverageTests(unittest.TestCase):
     def test_downsample_SE(self):
         reads1, reads2 = downsample(
             read_length=150,
-            approx_length=150000,
+            approx_length=2027088,
             fastq1=self.reads,
             fastq2=None,
             destination=self.downsample_dir, 
             maxcoverage=2,
             logger=logger)
-        down_cov = get_coverage(read_length=150, approx_length=150000, fastq1=reads1, logger=logger)
-        assert 1.99275 == down_cov
+        down_cov = get_coverage(read_length=150, approx_length=2027088, fastq1=reads1, logger=logger)
+        assert 1.9982358930643367 == down_cov
         return()
         

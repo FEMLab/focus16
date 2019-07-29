@@ -48,6 +48,8 @@ class extractTestLong(unittest.TestCase):
       self.out_dir = os.path.join(self.test_dir, "extracttestribo16")
       if os.path.exists(self.test_dir):
          shutil.rmtree(self.test_dir)
+      if os.path.exists(os.path.join(self.contigs, "reference.msh")):
+         os.remove(os.path.join(self.contigs, "reference.msh"))
       
    def tearDown(self):
       """tear down test fixtures

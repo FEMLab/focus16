@@ -73,8 +73,6 @@ class test_alignmentData(unittest.TestCase):
         strepbarrnap = self.strepbarrnap
         ecolibarrnap = self.ecolibarrnap
         strepoutput = self.strepout
-        
-       
 
         WGETcmd =  "wget ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/271/865/GCA_000271865.1_ASM27186v1/GCA_000271865.1_ASM27186v1_genomic.fna.gz -O {acc}.gz".format(**locals())
         subprocess.run(
@@ -89,6 +87,7 @@ class test_alignmentData(unittest.TestCase):
             check=True)
         
         ra.extract_16s_from_contigs(input_contigs=acc, barr_out=strepbarrnap, output=strepoutput, logger=logger)
+
         ##Now for the 5 ecoli genomes
         os.makedirs(self.ecolidir)
         
@@ -97,7 +96,11 @@ class test_alignmentData(unittest.TestCase):
         ecolicmd3 = "{self.ecoliurl3} -O {self.ecoliacc3}.gz".format(**locals())
         ecolicmd4 = "{self.ecoliurl4} -O {self.ecoliacc4}.gz".format(**locals())
         ecolicmd5 = "{self.ecoliurl5} -O {self.ecoliacc5}.gz".format(**locals())
-            
+        
+        ribo16 = os.path.join(self.testdir, "ribo16")
+        if os.path.exists(ribo16):
+            os.remove(ribo16)
+        
         for cmd in [ecolicmd1, ecolicmd2, ecolicmd3, ecolicmd4, ecolicmd5]:
             subprocess.run(cmd, 
                            shell=sys.platform != "win32",
@@ -108,9 +111,8 @@ class test_alignmentData(unittest.TestCase):
             subprocess.run(gzipcmd,
                            shell=sys.platform !="win32",
                            check=True)
-            
-        ribo16 = os.path.join(self.testdir, "ribo16")
-
+           
+        
         ra.extract_16s_from_contigs(input_contigs=acc, barr_out=ecolibarrnap, output=ribo16, logger=logger)
                            
         return()
@@ -138,8 +140,7 @@ class test_ave_read_length(unittest.TestCase):
         for file in alignmentfiles:
             os.remove(file)
             
-        
-                                                     
+                                                   
     def test_ave_read_len(self):
         artdir = self.art
         reads = self.artreads

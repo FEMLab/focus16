@@ -12,7 +12,7 @@ class alignmentTest(unittest.TestCase):
       self.test_dir = os.path.join(os.path.dirname(__file__),
                                    "alignment_test")
       self.fasta = os.path.join(os.path.dirname(__file__),
-                                "test_data", "test_16s_multiline.fasta")
+                                "test_data", "test_16s_multilineSHORT.fasta")
       if os.path.exists(self.test_dir):
          shutil.rmtree(self.test_dir)
          
@@ -41,14 +41,14 @@ class alignmentLongTest(unittest.TestCase):
    def setUp(self):
       self.test2_dir = os.path.join(os.path.dirname(__file__),
                                     "alignment_test_long")
-      self.inputfasta = os.path.join(os.path.dirname(__file__), "test_data",
-                                     "ecoli", "ribo16")
+      self.inputfasta = os.path.join(os.path.dirname(__file__), "test_data", "ribo16")
       if os.path.exists(self.test2_dir):
          shutil.rmtree(self.test2_dir)
+      
          
    def tearDown(self):
       shutil.rmtree(self.test2_dir)
-   
+      
    
    @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
                        "skipping this test on travis.CI")       
