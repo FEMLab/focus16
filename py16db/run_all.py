@@ -176,7 +176,7 @@ def check_rDNA_copy_number(ref, output, logger):
     return(rrn_num)            
 
 
-def get_and_check_ave_read_len_from_fastq(fastq1, N=50, logger=None):
+def get_and_check_ave_read_len_from_fastq(fastq1, logger=None):
     """from LP: taken from github.com/nickp60/riboSeed/riboSeed/classes.py; return average read length in fastq1 file from first N reads"""
     count, tot = 0, 0
     if os.path.splitext(fastq1)[-1] in ['.gz', '.gzip']:
@@ -213,12 +213,14 @@ def get_coverage(read_length, approx_length, fastq1, logger):
     else:
         open_fun = open
     logger.debug("Counting reads")
+    
     with open_fun(fastq1, "rt") as file_handle:
-        for count, line in enumerate(file_handle):
+        data = SeqIO.parse(file_handle, "fastq") 
+        for count, line in enumerate(data):
             pass
 
     #4 lines per read in a fastq
-    coverage = float((count * read_length) / (approx_length*4))
+    coverage = float((count * read_length) / (approx_length))
     logger.debug('Read coverage is : %s', coverage)
     return(coverage)
 
@@ -312,7 +314,7 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
     pob_dir=os.path.join(this_output, "plentyofbugs")
     ribo_dir=os.path.join(this_output, "riboSeed")
     sickle_out=os.path.join(this_output, "sickle")
-    read_length = get_and_check_ave_read_len_from_fastq(fastq1=rawreadsf, N=50, logger=logger)
+    read_length = get_and_check_ave_read_len_from_fastq(fastq1=rawreadsf, logger=logger)
     
     pob(genomes_dir=args.genomes_dir, readsf=rawreadsf, output_dir=pob_dir, logger=logger)
       
