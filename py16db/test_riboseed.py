@@ -12,12 +12,12 @@ class coverageTests(unittest.TestCase):
     def setUp(self):
         self.test_dir = os.path.join(os.path.dirname(__file__),
                                      "riboSeed")
-        self.readsf = os.path.join(os.path.dirname(__file__), "example_data",
-                                   "reads10X1.fq")
-        self.readsr = os.path.join(os.path.dirname(__file__), "example_data",
-                                   "reads10X2.fq")
-        self.sra = os.path.join(os.path.dirname(__file__), "example_data",
-                                "NC_013928.1.fna")
+        self.readsf = os.path.join(os.path.dirname(__file__), "test_data",
+                                   "reads1.fq")
+        self.readsr = os.path.join(os.path.dirname(__file__), "test_data",
+                                   "reads2.fq")
+        self.sra = os.path.join(os.path.dirname(__file__), "test_data",
+                                "ecoli", "NC_011750.1.fna")
         if os.path.exists(self.test_dir):
             shutil.rmtree(self.test_dir)
 
@@ -41,5 +41,5 @@ class coverageTests(unittest.TestCase):
                                    memory=8,
                                    output=output_dir, logger=logger)
 
-        assert test_result == "ribo run -r /Users/alexandranolan/Desktop/16db/py16db/example_data/NC_013928.1.fna -F /Users/alexandranolan/Desktop/16db/py16db/example_data/reads10X1.fq -R /Users/alexandranolan/Desktop/16db/py16db/example_data/reads10X2.fq --cores 4 --threads 1 -v 1 --serialize -o /Users/alexandranolan/Desktop/16db/py16db/riboSeed --subassembler spades --stages score --memory 8"
+        assert test_result == "ribo run -r /Users/alexandranolan/Desktop/16db/py16db/test_data/ecoli/NC_011750.1.fna -F /Users/alexandranolan/Desktop/16db/py16db/test_data/reads1.fq -R /Users/alexandranolan/Desktop/16db/py16db/test_data/reads2.fq --cores 4 --threads 1 -v 1 --serialize -o /Users/alexandranolan/Desktop/16db/py16db/riboSeed --subassembler spades --stages score --memory 8"
     
