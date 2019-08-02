@@ -40,9 +40,11 @@ def setup_logging(args):
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-o", "--output_dir", help="path to output", required=True)
-    parser.add_argument("-n", "--organism_name", help="genus species in quotes",
+    parser.add_argument("-n", "--organism_name", help="genus or genus species in quotes",
                         required=True)
-    parser.add_argument('--version', action='version',
+    parser.add_argument("--sra_list", help="Input a list of sras for assembly[one column]",
+                        required=False)
+    parser.add_argument("--version", action='version',
                         version='%(prog)s {version}'.format(version=__version__))
     parser.add_argument("-l", "--approx_length", help="Integer forapproximate genome length",
                         required=True, type=int)
@@ -113,6 +115,18 @@ def filter_SRA(path, organism_name, strains, get_all, logger):
             sras.append(these_sras[0])
     return(sras)
 
+def sralist(list):
+    """ takes a list of SRAs as input, for if you wish to use SRAs that are very recent and ahead of sraFind
+    """
+    sralistn = []
+    with open(list, "r") as infile:
+        for sra in infile:
+            sra.split()
+            sralistn.append(sra)
+            sralist = [sra.strip() for sra in sralistn]
+    return(sralist)
+    
+
 def download_SRA(cores, SRA, destination, logger):
     """Download SRAs, downsample forward reads to 1000000"""
     suboutput_dir_raw = os.path.join(destination, "")
@@ -129,9 +143,8 @@ def download_SRA(cores, SRA, destination, logger):
  
 def pob(genomes_dir, readsf, output_dir, logger):
     """Uses plentyofbugs, a package that useqs mash to find the best reference genome for draft genome """
-
        
-    pobcmd = "plentyofbugs -g " + genomes_dir +  " -f " + readsf + " -o " + output_dir + " --downsampling_ammount 1000000"
+    pobcmd = "plentyofbugs -g {genomes_dir} -f {readsf} -o {output_dir} --downsampling_ammount 1000000".format(**locals())
     logger.debug('Finding best reference genome: %s', pobcmd)
     
     for command in [pobcmd]:
@@ -205,9 +218,9 @@ def get_and_check_ave_read_len_from_fastq(fastq1, logger=None):
     logger.debug("Average read length: %s", ave_read_len)
     return(ave_read_len)
 
-def get_coverage(read_length, approx_length, fastq1, logger):
+def get_coverage(read_length, approx_length, fastq1, fastq2, logger):
     """Obtains the coverage for a read set, when given the estimated genome size"""
-   
+        
     if os.path.splitext(fastq1)[-1] in ['.gz', '.gzip']:
         open_fun = gzip.open
     else:
@@ -218,8 +231,11 @@ def get_coverage(read_length, approx_length, fastq1, logger):
         data = SeqIO.parse(file_handle, "fastq") 
         for count, line in enumerate(data):
             pass
-
-    #4 lines per read in a fastq
+    
+    if os.path.exists(fastq2):
+        read_length = read_length * 2
+    
+    
     coverage = float((count * read_length) / (approx_length))
     logger.debug('Read coverage is : %s', coverage)
     return(coverage)
@@ -231,7 +247,7 @@ def downsample(read_length, approx_length, fastq1, fastq2, maxcoverage, destinat
     os.makedirs(suboutput_dir_downsampled)
     downpath1 = os.path.join(suboutput_dir_downsampled, "downsampledreadsf.fastq") 
     downpath2 = os.path.join(suboutput_dir_downsampled, "downsampledreadsr.fastq")
-    coverage = get_coverage(read_length, approx_length, fastq1, logger=logger)
+    coverage = get_coverage(read_length, approx_length, fastq1, fastq2, logger=logger)
     covfraction = round(float(maxcoverage / coverage), 3)
     downcmd = "seqtk sample -s100 {fastq1} {covfraction} > {downpath1}".format(**locals())
     downcmd2 = "seqtk sample -s100 {fastq2} {covfraction} > {downpath2}".format(**locals())     
@@ -434,6 +450,8 @@ def parse_status_file(path):
 def main():
     args=get_args()
     
+    genomesdir = args.genomes_dir
+
     if not args.genomes_dir.endswith("/"):
         args.genomes_dir = args.genomes_dir + "/"
         
@@ -454,15 +472,19 @@ def main():
     if not os.path.exists(os.path.dirname(args.sra_path)):
         args.sra_path = fsd.main(args, output_dir=os.path.dirname(args.sra_path))
 
-    if args.single_SRA is None:
+    if args.single_SRA is not None:
+        filtered_SRA = [args.single_SRA]
+        
+    elif args.sra_list is not None:
+        filtered_sras = sralist(list=args.sra_list)
+    else:
         filtered_sras = filter_SRA(
             path=args.sra_path,
             organism_name=args.organism_name,
             strains=args.nstrains,
             logger=logger,
             get_all=args.get_all)
-    else:
-        filtered_SRA = [args.single_SRA]
+
     if os.path.exists(args.genomes_dir):
         if len(os.listdir(args.genomes_dir)) == 0:
             logger.debug('Warning: genome directory exists but is ' +
@@ -494,7 +516,6 @@ def main():
             this_results = os.path.join(this_output, "results")
             os.makedirs(this_output, exist_ok=True)
             status = os.path.join(this_output, "status")
-
             
             # check status file for SRA COMPLETE
 
