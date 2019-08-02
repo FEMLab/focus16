@@ -18,7 +18,10 @@ class bestrefTest(unittest.TestCase):
         self.readsf = os.path.join(self.data_dir, "test_reads1.fq")
         if os.path.exists(self.test_dir):
             shutil.rmtree(self.test_dir)
-            
+        if os.path.exists(os.path.join(self.plasmids_dir, "reference.msh")):
+            os.remove(os.path.join(self.plasmids_dir, "reference.msh"))
+
+
     def tearDown(self):
         "tear down test fixtures"
         shutil.rmtree(self.test_dir)
@@ -33,8 +36,8 @@ class bestrefTest(unittest.TestCase):
         output_dir= (self.out_dir)
         test_result = pob(genomes_dir=plasmids, readsf=reads, output_dir=output_dir, logger=logger)
         print(test_result)
-        assert "1.0" == test_result[1]
-        assert os.path.basename(os.path.join(self.plasmids_dir, "NC_000913.3.fna")) == \
+        assert "0.00924552" == test_result[1]
+        assert os.path.basename(os.path.join(self.plasmids_dir, "NC_011750.1.fna")) == \
             os.path.basename(test_result[0])
         return()
 

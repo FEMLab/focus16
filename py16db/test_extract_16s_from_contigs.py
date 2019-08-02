@@ -12,7 +12,7 @@ class extractTest(unittest.TestCase):
       self.test_dir = os.path.join(os.path.dirname(__file__),                     
                                    "extract_test")
       self.contigs = os.path.join(os.path.dirname(__file__),
-                                  "test_data", "ecoli", "NC_000913.3.fna")
+                                  "test_data", "ecoli", "NC_011750.1.fna")
       self.barrnap = os.path.join(self.test_dir, "barrnap")
       self.out_dir = os.path.join(self.test_dir, "ribo16")
       if os.path.exists(self.test_dir):
