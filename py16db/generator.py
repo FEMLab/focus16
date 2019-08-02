@@ -17,7 +17,7 @@ class test_requirements(unittest.TestCase):
             sys.exit(1)
 
 # ##test_alignment 
-# #16S from Streptococcus mutans complete genome {CP003686.1}
+# #16S from Escherichia coli genome {NC_011750.1.fna}
 
 class test_alignmentData(unittest.TestCase):
     """ Using unittest for setUp and tearDown. This function creates the data
@@ -25,7 +25,6 @@ class test_alignmentData(unittest.TestCase):
 
     def setUp(self):
         self.testdir = os.path.join(os.path.dirname(__file__), "test_data", "")
-        self.acc = os.path.join(self.testdir, "CP003686.1.fna")
         self.ecolidir = os.path.join(self.testdir, "ecoli")
 
         self.ecoliacc1 = os.path.join(self.ecolidir, "NC_011750.1.fna")
@@ -44,49 +43,36 @@ class test_alignmentData(unittest.TestCase):
         self.ecoliurl5 = "wget ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/026/325/GCA_000026325.2_ASM2632v2/GCA_000026325.2_ASM2632v2_genomic.fna.gz"
         
         
-        self.strepbarrnap = os.path.join(os.path.dirname(__file__), "barrnapS")
+        self.shortbarrnap = os.path.join(os.path.dirname(__file__), "barrnapS")
         self.ecolibarrnap = os.path.join(os.path.dirname(__file__), "barrnapE")
-        self.strepout = os.path.join(os.path.dirname(__file__), "test_data", "test_16s_multilineSHORT.fasta")
+        self.shortoutput = os.path.join(os.path.dirname(__file__), "test_data", "test_16s_multilineSHORT.fasta")
         self.ecoliout = os.path.join(os.path.dirname(__file__), "test_data", "ecoli")
-        if os.path.exists(self.strepbarrnap):
-            os.remove(self.strepbarrnap)
+
+        if os.path.exists(self.shortbarrnap):
+            os.remove(self.shortbarrnap)
         if os.path.exists(self.ecolibarrnap):
             os.remove(self.ecolibarrnap)
-        if os.path.exists(self.acc):
-            os.remove(self.acc)
-        if os.path.exists(self.strepout):
-            os.remove(self.strepout)
+        if os.path.exists(self.shortoutput):
+            os.remove(self.shortoutput)
         if os.path.exists(self.ecoliout):
             os.remove(self.ecoliout)
         
     def tearDown(self):
         """ tear down test fixtures
         """
-        if os.path.exists(self.strepbarrnap):
-            os.remove(self.strepbarrnap)
+        if os.path.exists(self.shortbarrnap):
+            os.remove(self.shortbarrnap)
         if os.path.exists(self.ecolibarrnap):
             os.remove(self.ecolibarrnap)
+        if os.path.exists(self.shortbarrnap):
+            os.remove(self.shortbarrnap)
 
 
     def test_alignment(self):
-        acc = self.acc
-        strepbarrnap = self.strepbarrnap
+        accS = self.ecoliacc1
         ecolibarrnap = self.ecolibarrnap
-        strepoutput = self.strepout
-
-        WGETcmd =  "wget ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/271/865/GCA_000271865.1_ASM27186v1/GCA_000271865.1_ASM27186v1_genomic.fna.gz -O {acc}.gz".format(**locals())
-        subprocess.run(
-            WGETcmd,
-            shell=sys.platform != "win32",
-            check=True)
-        
-        GUNZIPcmd = "gunzip {acc}.gz".format(**locals())
-        subprocess.run(
-            GUNZIPcmd,
-            shell=sys.platform != "win32",
-            check=True)
-        
-        ra.extract_16s_from_contigs(input_contigs=acc, barr_out=strepbarrnap, output=strepoutput, logger=logger)
+        shortbarrnap = self.shortbarrnap
+        shortoutput = self.shortoutput
 
         ##Now for the 5 ecoli genomes
         os.makedirs(self.ecolidir)
@@ -100,7 +86,7 @@ class test_alignmentData(unittest.TestCase):
         ribo16 = os.path.join(self.testdir, "ribo16")
         if os.path.exists(ribo16):
             os.remove(ribo16)
-        
+    
         for cmd in [ecolicmd1, ecolicmd2, ecolicmd3, ecolicmd4, ecolicmd5]:
             subprocess.run(cmd, 
                            shell=sys.platform != "win32",
@@ -112,9 +98,14 @@ class test_alignmentData(unittest.TestCase):
                            shell=sys.platform !="win32",
                            check=True)
            
-        
+        ## generates 16s sequences from 5 ecoli genomes
         ra.extract_16s_from_contigs(input_contigs=acc, barr_out=ecolibarrnap, output=ribo16, logger=logger)
-                           
+
+
+        ## generates 16s sequences for 1 ecoli genome
+        ra.extract_16s_from_contigs(input_contigs=accS, barr_out=shortbarrnap, output=shortoutput, logger=logger)
+
+                       
         return()
 
 
@@ -125,15 +116,18 @@ class test_alignmentData(unittest.TestCase):
 
 class test_ave_read_length(unittest.TestCase):
     def setUp(self):
-        """ Using the genome {CP003686}, produces reads for the 
+        """ Using the genome {NC_011750.1.fna}, produces reads for the 
         get_and_check_ave_read_len_from_fastq"""
         
         self.art = shutil.which("art_illumina")
         self.artreads = os.path.join(os.path.dirname(__file__), "test_data", "test_reads")
-        self.genome = os.path.join(os.path.dirname(__file__), "test_data", "CP003686.1.fna")
+        self.genome = os.path.join(os.path.dirname(__file__), "test_data", "ecoli", "NC_011750.1.fna")
         
-        if os.path.exists(self.artreads):
-            os.remove(self.artreads)
+        if os.path.exists(self.artreads + "1.fq"):
+            os.remove(self.artreads + "1.fq")
+        if os.path.exists(self.artreads + "2.fq"):
+            os.remove(self.artreads + "2.fq")
+
 
     def tearDown(self):
         alignmentfiles = glob.glob(os.path.join(self.artreads + "*.aln"))
@@ -144,7 +138,7 @@ class test_ave_read_length(unittest.TestCase):
     def test_ave_read_len(self):
         artdir = self.art
         reads = self.artreads
-        genome = self.genome = os.path.join(os.path.dirname(__file__), "test_data", "CP003686.1.fna")
+        genome = self.genome = os.path.join(os.path.dirname(__file__), "test_data", "ecoli", "NC_011750.1.fna")
 
         cmd = "{artdir} -ss HS25 -i {genome} -p -l 150 -f 10 -m 400 -s 10 -o {reads}".format(**locals())
 
@@ -155,12 +149,17 @@ class test_ave_read_length(unittest.TestCase):
             
         return()
 
-##test_best_ref
-##plasmids are obtained from 
+##test_best_ref ~done
+##test_check_rDNA_num ~done
+##test_coverage ~done
+##test_extract_16s_from_contigs ~done
+##test_get_sra_for_organism ~NOT_DONE
+##test_parse_status ~NOT_DONE
+##test_riboseed ~done
+##test_run_sickle ~NOT_DONE
+##test_sralist ~NOT_DONE
 
-# class test_bestRef(unittest.TestCase):
-#     def setUp(self):
-#         self.reads = self.artreads = os.path.join(os.path.dirname(__file__), "test_data", "test_reads1.fq")
-#         self.plasmids = 
-     
+
+
+        
 
