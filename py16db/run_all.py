@@ -227,16 +227,16 @@ def get_coverage(read_length, approx_length, fastq1, fastq2, logger):
         open_fun = open
     logger.debug("Counting reads")
     
-    with open_fun(fastq1, "rt") as file_handle:
-        data = SeqIO.parse(file_handle, "fastq") 
+    with open_fun(fastq1, "rt") as data:
+       # data = SeqIO.parse(file_handle, "fastq") 
         for count, line in enumerate(data):
             pass
     
-    if os.path.exists(fastq2):
+    if fastq2 is not None:
         read_length = read_length * 2
     
     
-    coverage = float((count * read_length) / (approx_length))
+    coverage = float((count * read_length) / (approx_length * 4))
     logger.debug('Read coverage is : %s', coverage)
     return(coverage)
 
