@@ -58,7 +58,7 @@ def get_args():
     parser.add_argument("-p", "--prokaryotes", action="store",
                         help="path_to_prokaryotes.txt", default="./prokaryotes.txt",
                         required=False)
-    parser.add_argument("-S", "--nstrains", help="number of strains to be tested as reference genome",             
+    parser.add_argument("-S", "--nstrains", help="number of SRAs to be run",             
                         type=int, required=True)
     parser.add_argument("--get_all", help="get both SRAs if organism has two",
                         action="store_true", required=False)
@@ -91,20 +91,20 @@ def check_programs(logger):
             sys.exit(1)
    
            
-def filter_SRA(path, organism_name, strains, get_all, logger):
+def filter_SRA(sraFind, organism_name, strains, get_all, logger):
     """sraFind [github.com/nickp60/srafind], contains"""
     results = []
-    with open(path, "r") as infile:
+    with open(sraFind, "r") as infile:
         for line in infile:
             split_line = [x.replace('"', '').replace("'", "") for x in line.strip().split("\t")]
             if split_line[11].startswith(organism_name):
                 if split_line[8].startswith("ILLUMINA"):
                     results.append(split_line[17])
     random.shuffle(results)
-    logger.debug('Found SRAs: %s', results)
+    
     if strains != 0:
         results = results[0:strains]
-
+        logger.debug('Found SRAs: %s', results)
     sras = []
     for result in results:
         these_sras = result.split(",")
@@ -228,10 +228,9 @@ def get_coverage(read_length, approx_length, fastq1, fastq2, logger):
     logger.debug("Counting reads")
     
     with open_fun(fastq1, "rt") as data:
-       # data = SeqIO.parse(file_handle, "fastq") 
         for count, line in enumerate(data):
             pass
-    
+        
     if fastq2 is not None:
         read_length = read_length * 2
     
@@ -378,10 +377,7 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
                            stdout=subprocess.PIPE,
                            stderr=subprocess.PIPE,
                            check=True)
-            
-            
                 
-            
             with open(status, "a") as statusfile:
                 statusfile.write("RIBOSEED COMPLETE")
                 
@@ -479,7 +475,7 @@ def main():
         filtered_sras = sralist(list=args.sra_list)
     else:
         filtered_sras = filter_SRA(
-            path=args.sra_path,
+            sraFind=args.sra_path,
             organism_name=args.organism_name,
             strains=args.nstrains,
             logger=logger,
@@ -539,14 +535,13 @@ def main():
                 logger.critical('Forward reads not detected')
                 continue
             try:
-
                 if "PROCESSED" not in parse_status_file(path=status):
                     if os.path.exists(this_results):
                         shutil.rmtree(this_results)
-                    process_strain(rawreadsf, rawreadsr, this_results, args, logger)
-                    with open(status, "a") as statusfile:
-                        statusfile.write("PROCESSED\n")
-                       
+                        process_strain(rawreadsf, rawreadsr, this_results, args, logger)
+                        with open(status, "a") as statusfile:
+                            statusfile.write("PROCESSED\n")
+                            
                 else:
                     logger.debug("Already processed: %s", accession)
 
