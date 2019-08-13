@@ -231,10 +231,7 @@ def get_coverage(read_length, approx_length, fastq1, fastq2, logger):
         for count, line in enumerate(data):
             pass
         
-    if fastq2 is not None:
-        read_length = read_length * 2
-    
-    
+       
     coverage = float((count * read_length) / (approx_length * 4))
     logger.debug('Read coverage is : %s', coverage)
     return(coverage)
