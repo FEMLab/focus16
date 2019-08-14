@@ -13,7 +13,7 @@ class filter_SRATest(unittest.TestCase):
         self.sra_find=os.path.join(os.path.dirname(__file__), "test_data", "test_sraFind.txt")
    
     def test_filter_SRA(self):
-        test_result = filter_SRA(path=self.sra_find,
+        test_result = filter_SRA(sraFind=self.sra_find,
                                      organism_name="Lactobacillus oryzae", 
                                      strains=1, get_all=True, logger=logger)
         assert ["DRR021662"] == test_result
