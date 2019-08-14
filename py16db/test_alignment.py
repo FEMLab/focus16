@@ -33,7 +33,7 @@ class alignmentTest(unittest.TestCase):
       with open(mafftoutput, "r") as infile:
          firstline = infile.readline().strip()
          print(firstline)
-      assert firstline == ">CP003686.1 :16889:18441"
+      assert firstline == ">chromosome-RC@CU928164.2 :480955:482492"
 
 class alignmentLongTest(unittest.TestCase):
    """ test for the alignment step, using 5 whole genome sequences from E. coli
