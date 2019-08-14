@@ -105,6 +105,7 @@ def filter_SRA(sraFind, organism_name, strains, get_all, logger):
     if strains != 0:
         results = results[0:strains]
         logger.debug('Found SRAs: %s', results)
+
     sras = []
     for result in results:
         these_sras = result.split(",")
@@ -135,12 +136,15 @@ def download_SRA(cores, SRA, destination, logger):
 
     cmd = "parallel-fastq-dump --sra-id {SRA} --threads {cores} -O {suboutput_dir_raw} --split-files ".format(**locals())
   
-    subprocess.run(cmd,
-                   shell=sys.platform !="win32",
-                   stdout=subprocess.PIPE,
-                   stderr=subprocess.PIPE,
-                   check=True)
- 
+    try:
+        subprocess.run(cmd,
+                       shell=sys.platform !="win32",
+                       stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE,
+                       check=True)
+    except:
+        raise SRAdownloadError("Error in following command: %s", cmd)
+      
 def pob(genomes_dir, readsf, output_dir, logger):
     """Uses plentyofbugs, a package that useqs mash to find the best reference genome for draft genome """
        
@@ -230,7 +234,9 @@ def get_coverage(read_length, approx_length, fastq1, fastq2, logger):
     with open_fun(fastq1, "rt") as data:
         for count, line in enumerate(data):
             pass
-        
+    
+    if fastq2 is not None:
+        read_length = read_length * 2
        
     coverage = float((count * read_length) / (approx_length * 4))
     logger.debug('Read coverage is : %s', coverage)
@@ -420,6 +426,8 @@ def alignment(fasta, output, logger):
     return(output)
 
 
+class SRAdownloadError(Exception):
+    pass
 class bestreferenceError(Exception):
     pass
 class downsamplingError(Exception):
@@ -428,6 +436,7 @@ class riboSeedError(Exception):
     pass
 class extracting16sError(Exception):
     pass
+
 
 
 def parse_status_file(path):
@@ -535,15 +544,18 @@ def main():
                 if "PROCESSED" not in parse_status_file(path=status):
                     if os.path.exists(this_results):
                         shutil.rmtree(this_results)
-                        process_strain(rawreadsf, rawreadsr, this_results, args, logger)
-                        with open(status, "a") as statusfile:
-                            statusfile.write("PROCESSED\n")
+                    process_strain(rawreadsf, rawreadsr, this_results, args, logger)
+                    with open(status, "a") as statusfile:
+                        statusfile.write("PROCESSED\n")
                             
                 else:
                     logger.debug("Already processed: %s", accession)
 
             except subprocess.CalledProcessError:
                 logger.error('Unknown subprocess error')
+                continue
+            except SRAdownloadError as e:
+                logger.error(e)
                 continue
             except bestreferenceError as e:
                 logger.error(e)
