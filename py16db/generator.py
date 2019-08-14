@@ -140,7 +140,7 @@ class test_ave_read_length(unittest.TestCase):
         reads = self.artreads
         genome = self.genome = os.path.join(os.path.dirname(__file__), "test_data", "ecoli", "NC_011750.1.fna")
 
-        cmd = "{artdir} -ss HS25 -i {genome} -p -l 150 -f 10 -m 400 -s 10 -o {reads}".format(**locals())
+        cmd = "{artdir} -ss HS25 -i {genome} -p -l 150 -f 10 -m 400 -qs 10 -s 10 -o {reads}".format(**locals())
 
         subprocess.run(
             cmd,
@@ -149,15 +149,70 @@ class test_ave_read_length(unittest.TestCase):
             
         return()
 
-##test_best_ref ~done
-##test_check_rDNA_num ~done
-##test_coverage ~done
-##test_extract_16s_from_contigs ~done
-##test_get_sra_for_organism ~NOT_DONE
-##test_parse_status ~NOT_DONE
-##test_riboseed ~done
-##test_run_sickle ~NOT_DONE
-##test_sralist ~NOT_DONE
+#sraFind file for test_get_sra_for_organism
+
+class sraFind_Test(unittest.TestCase):
+    #sraFind file from https://github.com/nickp60/sraFind/results/sraFind-All-biosample-with-SRA-hits.txt
+    #or use fetch_sraFind_data.py
+    
+    def setUp(self):
+        ''' generates mini sraFind file for test_get_sra_for_organism.py
+        '''
+        self.sraFind = os.path.join(os.path.dirname(__file__), "sraFind-All-biosample-with-SRA-hits.txt")
+        self.test_sraFind = os.path.join(os.path.dirname(__file__), "test_data", "test_sraFind.txt")
+        if os.path.exists(self.test_sraFind):
+            os.remove(self.test_sraFind)
+
+#taking 5 lines above and below target SRA for mini sraFind file
+    def TestSmallsraFind(self):
+        #grep command to take make small test_sraFind.txt
+        sraFind = self.sraFind
+        test_sraFind = self.test_sraFind
+        org = "Lactobacillus oryzae" 
+        cmd = "grep -C5 '{org}' {sraFind} > {test_sraFind}".format(**locals())
+        
+        subprocess.run(
+            cmd,
+            shell=sys.platform !="win32",
+            check=True)
+
+
+class parsefile_Test(unittest.TestCase):
+    ''' writes the files necessary for the parse_status test
+    '''
+    def setUp(self):
+        self.status = os.path.join(os.path.dirname(__file__), "test_data", "status", "")
+        self.statusSRA = os.path.join(self.status, "sra")
+        self.statusRIBO = os.path.join(self.status, "riboseed")
+
+        if os.path.exists(self.status):
+            shutil.rmtree(self.status)
+
+    def test_writestatus(self):
+
+        os.makedirs(self.status)
+
+        with open(self.statusSRA, "a") as file1:
+            file1.write("SRA COMPLETE\n")
+        with open(self.statusRIBO, "a") as file2:
+            file2.write("SRA COMPLETE\n")
+            file2.write("RIBOSEED COMPLETE\n")
+            file2.write("PROCESSED\n")
+            
+#list of SRAs             
+class sralist_Test(unittest.TestCase):
+    def setUp(self):
+        self.sralist = os.path.join(os.path.dirname(__file__), "test_data", "test_sralist.txt")
+        
+        if os.path.exists(self.sralist):
+            os.remove(self.sralist)
+
+    def test_sralist(self):
+        with open(self.sralist, "a") as file:
+            file.write("ERX3310125\n")
+            file.write("ERX3289350\n")
+            file.write("ERX3289335\n")
+            file.write("SRX2141371\n")
 
 
 
