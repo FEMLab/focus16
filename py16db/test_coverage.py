@@ -33,7 +33,7 @@ class coverageTests(unittest.TestCase):
         reads2 = self.reads2
         test_result = get_coverage(approx_length=5132068, fastq1=reads1, fastq2=reads2, read_length=150, logger=logger)
        
-        assert 9.999711617227208 == test_result
+        assert 9.9997554592028 == test_result
         return()
     
     @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
@@ -51,8 +51,8 @@ class coverageTests(unittest.TestCase):
             logger=logger)
         down_cov1 = get_coverage(read_length=150, approx_length=5132068, fastq1=reads1, fastq2=reads2, logger=logger)
         down_cov2 = get_coverage(read_length=150, approx_length=5132068, fastq1=reads2, fastq2=reads2, logger=logger)
-        assert 2.011002192488486 == down_cov1
-        assert 2.011002192488486 == down_cov2
+        assert 2.0110460344640795 == down_cov1
+        assert 2.0110460344640795 == down_cov2
         return()
     
     @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
@@ -67,6 +67,6 @@ class coverageTests(unittest.TestCase):
             maxcoverage=2,
             logger=logger)
         down_cov = get_coverage(read_length=150, approx_length=5132068, fastq1=reads1, fastq2=reads2, logger=logger)
-        assert 2.011002192488486 == down_cov
+        assert 2.0110460344640795 == down_cov
         return()
         
