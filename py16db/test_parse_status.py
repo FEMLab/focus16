@@ -11,20 +11,9 @@ class parse_statusTest(unittest.TestCase):
     def setUp(self):
         ##sra is a status file with just sra checkpoint
         ##riboseed is a status file with just riboseed checkpoint    
-        self.statusnew = os.path.join(os.path.dirname(__file__), "test_data", "teststatus")
 
         self.statusSRA = os.path.join(os.path.dirname(__file__), "test_data",  "status", "sra")
         self.statusriboseed = os.path.join(os.path.dirname(__file__), "test_data", "status", "riboseed")
-        
-        with open(self.statusnew, "a") as statusfile:
-            statusfile.write("SRA COMPLETE\n")
-            statusfile.write("NEXT\n")
-            
-
-
-    def tearDown(self):
-        if os.path.exists(self.statusnew):
-            os.remove(self.statusnew)
 
     
     def test_parse_status_SRA(self):
@@ -39,11 +28,6 @@ class parse_statusTest(unittest.TestCase):
         assert ["SRA COMPLETE", "RIBOSEED COMPLETE", "PROCESSED"] == test_result
 
     
-    def test_statusnew(self):
-        statusfile = (self.statusnew)
-        test_result = parse_status_file(path = statusfile)
-        
-        assert ["SRA COMPLETE", "NEXT"] == test_result
         
         
     
