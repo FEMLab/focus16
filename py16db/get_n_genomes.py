@@ -70,6 +70,8 @@ def main(args=None, logger=None):
     if os.path.exists(tmp_file):
         os.remove(tmp_file)
     org_lines = []
+    
+    
     with open(args.prokaryotes, "r") as proks:
         for line in proks:
             splitline = line.strip().split("\t")
