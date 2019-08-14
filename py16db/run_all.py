@@ -84,7 +84,7 @@ def check_programs(logger):
     """exits if the following programs are not installed"""
     
     required_programs = ["ribo", "barrnap",
-                         "parallel-fastq-dump", "mash", "skesa", "plentyofbugs"]
+                         "fasterq-dump", "mash", "skesa", "plentyofbugs"]
     for program in required_programs:
         if shutil.which(program) is None:
             logger.error ( '%s is not installed: exiting.', program) 
@@ -114,6 +114,7 @@ def filter_SRA(sraFind, organism_name, strains, get_all, logger):
                 sras.append(sra)
         else:
             sras.append(these_sras[0])
+
     return(sras)
 
 def sralist(list):
@@ -132,9 +133,8 @@ def download_SRA(cores, SRA, destination, logger):
     """Download SRAs, downsample forward reads to 1000000"""
     suboutput_dir_raw = os.path.join(destination, "")
     os.makedirs(suboutput_dir_raw)
-   
 
-    cmd = "parallel-fastq-dump --sra-id {SRA} --threads {cores} -O {suboutput_dir_raw} --split-files ".format(**locals())
+    cmd = "fasterq-dump {SRA} --threads {cores} -O {suboutput_dir_raw} --split-files ".format(**locals())
   
     try:
         subprocess.run(cmd,
@@ -490,7 +490,7 @@ def main():
     if os.path.exists(args.genomes_dir):
         if len(os.listdir(args.genomes_dir)) == 0:
             logger.debug('Warning: genome directory exists but is ' +
-                  'empty: downloading genomes')
+                         'empty: downloading genomes')
             shutil.rmtree(args.genomes_dir)
             gng.main(args, logger)
         else:
