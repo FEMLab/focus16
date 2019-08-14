@@ -142,8 +142,8 @@ def download_SRA(cores, SRA, destination, logger):
                        stdout=subprocess.PIPE,
                        stderr=subprocess.PIPE,
                        check=True)
-    except:
-        raise SRAdownloadError("Error in following command: %s", cmd)
+    except subprocess.CalledProcessError():
+        logger.critical("Error with fasterq-dump")
       
 def pob(genomes_dir, readsf, output_dir, logger):
     """Uses plentyofbugs, a package that useqs mash to find the best reference genome for draft genome """
@@ -426,8 +426,6 @@ def alignment(fasta, output, logger):
     return(output)
 
 
-class SRAdownloadError(Exception):
-    pass
 class bestreferenceError(Exception):
     pass
 class downsamplingError(Exception):
@@ -553,9 +551,6 @@ def main():
 
             except subprocess.CalledProcessError:
                 logger.error('Unknown subprocess error')
-                continue
-            except SRAdownloadError as e:
-                logger.error(e)
                 continue
             except bestreferenceError as e:
                 logger.error(e)
