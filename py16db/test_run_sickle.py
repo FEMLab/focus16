@@ -16,10 +16,10 @@ class test_run_sickle(unittest.TestCase):
     '''
     def setUp(self):
         self.test_dir = os.path.join(os.path.dirname(__file__), "testsickle", "")
-        self.fastq1 = os.path.join(os.path.dirname(__file__), "test_data", "mutans",
-                                   "downsampled", "downsampledreadsf.fastq")
-        self.fastq2 = os.path.join(os.path.dirname(__file__), "test_data", "mutans",
-                                   "downsampled", "downsampledreadsr.fastq")
+
+        self.fastq1 = os.path.join(os.path.dirname(__file__), "test_data", "test_reads1.fq")
+        self.fastq2 = os.path.join(os.path.dirname(__file__), "test_data", "test_reads2.fq")
+                                   
         if os.path.exists(self.test_dir):
             shutil.rmtree(self.test_dir)
             
@@ -32,21 +32,23 @@ class test_run_sickle(unittest.TestCase):
                      "skipping this test on travis.CI")
     def test_sickle_SE(self):
         sickle_test_dir = (self.test_dir)
-        fastq1 = (self.fastq1)
+        fastq1 = self.fastq1
         fastq2 = None
         new_fastq1, new_fastq2 = run_sickle(fastq1=self.fastq1, fastq2 = None,
-                                                output_dir=self.test_dir)
-        assert new_fastq2 == None
-        assert file_len(fastq1) > file_len(new_fastq1)
-        
+                                            output_dir=self.test_dir)
+
+        assert file_len(fastq1) == file_len(new_fastq1)
+        assert fastq2 == None
+
+    #assert equal, as these reads don't need to be trimmed, the output is no trimmed reads.
     @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
                      "skipping this test on travis.CI")
     def test_sickle_singles_PE(self):
-        sickle_test_dir = (self.test_dir)
-        fastq1 = (self.fastq1)
-        fastq2 = (self.fastq2)
+        sickle_test_dir = self.test_dir
+        fastq1 = self.fastq1
+        fastq2 = self.fastq2
         new_fastq1, new_fastq2 = run_sickle(fastq1=self.fastq1, fastq2 = self.fastq2,
                                             output_dir=self.test_dir)
-        assert file_len(fastq1) > file_len(new_fastq1)
-        assert file_len(fastq2) > file_len(new_fastq2)
-            
+        assert file_len(fastq1) == file_len(new_fastq1)
+        assert file_len(fastq2) == file_len(new_fastq2)
+        #assert equal, as these reads don't need to be trimmed, the output is no trimmed reads.
