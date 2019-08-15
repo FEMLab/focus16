@@ -165,11 +165,15 @@ def pob(genomes_dir, readsf, output_dir, logger):
     
     with open(best_ref, "r") as infile:
         for line in infile:
+            sim = float(line.split('\t')[1])
+            percentSim = float(100.0 - sim)
+            logger.debug("Reference genome similarity: {percentSim}%".format(**locals()))
             sraacc = line.strip().split('\t')            
+            
             return(sraacc)
 
 def check_rDNA_copy_number(ref, output, logger):
-    """ Using barrnap to check that there are multiple rDNA copies in the reference genoem   """
+    """ Using barrnap to check that there are multiple rDNA copies in the reference genome   """
     barroutput = os.path.join(output, "barrnap_reference")
     cmd = "barrnap {ref} > {barroutput}".format(**locals())
     subprocess.run(cmd,
@@ -351,8 +355,6 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
     with open(best_reference, "r") as infile:
         for line in infile:
             best_ref_fasta = line.split('\t')[0]
-            percentageSim = float(100 - (line.split('\t')[1]))
-            logger.debug("Reference genome similarity: % %s", percentageSim )
             check_rDNA_copy_number(ref=best_ref_fasta, output=this_output, logger=logger) 
             
     logger.debug('Quality trimming reads')
@@ -580,11 +582,12 @@ def main():
 
     extract16soutput = os.path.join(args.output_dir, "ribo16s")
     alignoutput = os.path.join(args.output_dir, "allsequences")
-                                 
-                                  
-    alignment(fasta=extract16soutput, output=alignoutput, logger=logger)
     pathtotree = os.path.join(alignoutput, "MSA.fasta.tree")
-    logger.debug('Maximum-likelihood tree available at: %s', pathtotree) 
+
+    if os.path.exists(alignoutput):
+        os.remove(alignoutput)
+        alignment(fasta=extract16soutput, output=alignoutput, logger=logger)        
+        logger.debug('Maximum-likelihood tree available at: %s', pathtotree) 
         
 
 if __name__ == '__main__':
