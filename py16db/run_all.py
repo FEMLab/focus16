@@ -84,7 +84,7 @@ def check_programs(logger):
     """exits if the following programs are not installed"""
     
     required_programs = ["ribo", "barrnap",
-                         "fasterq-dump", "mash", "skesa", "plentyofbugs"]
+                         "fasterq-dump", "mash", "skesa", "plentyofbugs", "iqtree"]
     for program in required_programs:
         if shutil.which(program) is None:
             logger.error ( '%s is not installed: exiting.', program) 
@@ -300,13 +300,16 @@ def extract_16s_from_contigs(input_contigs, barr_out, output, logger):
                        check=True)
     except:
         raise extracting16sError("Error running the following command %s", barrnap)
+
     results16s = []   # [chromosome, start, end, reverse complimented]
     with open(barr_out, "r") as rrn:
+        rrn_num = 0
         for rawline in rrn:
             line = rawline.strip().split('\t')
             if line[0].startswith("##"):
                continue
             if line[8].startswith("Name=16S"):
+                rrn_num += 1
                 if line[6] == "-":
                     suffix = 'chromosome-RC@'
                 else:
@@ -315,7 +318,8 @@ def extract_16s_from_contigs(input_contigs, barr_out, output, logger):
                 start=line[3]
                 end=line[4]
                 results16s = [chrom, start, end, suffix]
-                
+        
+
                 cmd = "extractRegion \'{results16s[3]}{results16s[0]} :{results16s[1]}:{results16s[2]}\' -f {input_contigs} -v 1 >> {output}".format(**locals())
                 try:
                     subprocess.run(cmd,
@@ -325,6 +329,13 @@ def extract_16s_from_contigs(input_contigs, barr_out, output, logger):
                                    check=True)
                 except:
                     raise extracting16sError("Error running following command ", cmd)
+    if rrn_num == 1:
+        logger.debug('%s 16S sequence extracted from genome', rrn_num)
+    elif rrn_num > 1:
+        logger.debug('%s 16S sequences extracted from genome', rrn_num)
+    else:
+        logger.critical('NO 16S sequences extracted', rrn_num)
+ 
     return(output)
             
 
@@ -340,8 +351,10 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
     with open(best_reference, "r") as infile:
         for line in infile:
             best_ref_fasta = line.split('\t')[0]
-    check_rDNA_copy_number(ref=best_ref_fasta, output=this_output, logger=logger) 
-    
+            percentageSim = float(100 - (line.split('\t')[1]))
+            logger.debug("Reference genome similarity: % %s", percentageSim )
+            check_rDNA_copy_number(ref=best_ref_fasta, output=this_output, logger=logger) 
+            
     logger.debug('Quality trimming reads')
     trimmed_fastq1, trimmed_fastq2 = run_sickle(fastq1=rawreadsf,
                                                 fastq2=rawreadsr,
@@ -516,9 +529,9 @@ def main():
             this_results = os.path.join(this_output, "results")
             os.makedirs(this_output, exist_ok=True)
             status = os.path.join(this_output, "status")
-            
+            logger.debug("Organism: %s", args.organism_name)
             # check status file for SRA COMPLETE
-
+            
             if "SRA COMPLETE" not in parse_status_file(path=status) :
                 logger.debug('Downloading SRA: %s', accession)
                 # a fresh start
@@ -567,6 +580,8 @@ def main():
 
     extract16soutput = os.path.join(args.output_dir, "ribo16s")
     alignoutput = os.path.join(args.output_dir, "allsequences")
+                                 
+                                  
     alignment(fasta=extract16soutput, output=alignoutput, logger=logger)
     pathtotree = os.path.join(alignoutput, "MSA.fasta.tree")
     logger.debug('Maximum-likelihood tree available at: %s', pathtotree) 
