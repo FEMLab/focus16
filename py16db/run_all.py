@@ -100,6 +100,9 @@ def filter_SRA(sraFind, organism_name, strains, get_all, logger):
             if split_line[11].startswith(organism_name):
                 if split_line[8].startswith("ILLUMINA"):
                     results.append(split_line[17])
+    #arbitrary seed number
+    SEED = 8
+    random.seed(SEED)
     random.shuffle(results)
     
     if strains != 0:
@@ -142,7 +145,7 @@ def download_SRA(cores, SRA, destination, logger):
                        stdout=subprocess.PIPE,
                        stderr=subprocess.PIPE,
                        check=True)
-    except subprocess.CalledProcessError():
+    except subprocess.CalledProcessError:
         logger.critical("Error with fasterq-dump")
       
 def pob(genomes_dir, readsf, output_dir, logger):
@@ -431,13 +434,15 @@ def alignment(fasta, output, logger):
     seqcmd = "seqtk seq -S {fasta} > {seqout}".format(**locals())
     mafftcmd = "mafft {seqout} > {mafftout}".format(**locals())
     iqtreecmd = "iqtree -s {mafftout} -nt AUTO > {iqtreeout}".format(**locals())
+
     for cmd in [seqcmd, mafftcmd, iqtreecmd]:
-        logger.debug('Performing alignment: %s', cmd)
         subprocess.run(cmd,
                        shell=sys.platform !="win32",
                        stdout=subprocess.PIPE,
                        stderr=subprocess.PIPE,
                        check=True)
+    logger.debug('Performing alignment with mafft')
+    logger.debug('Building tree with iqtree')
     return(output)
 
 
@@ -585,9 +590,9 @@ def main():
     pathtotree = os.path.join(alignoutput, "MSA.fasta.tree")
 
     if os.path.exists(alignoutput):
-        os.remove(alignoutput)
-        alignment(fasta=extract16soutput, output=alignoutput, logger=logger)        
-        logger.debug('Maximum-likelihood tree available at: %s', pathtotree) 
+        shutil.rmtree(alignoutput)
+    alignment(fasta=extract16soutput, output=alignoutput, logger=logger)        
+    logger.debug('Maximum-likelihood tree available at: %s', pathtotree) 
         
 
 if __name__ == '__main__':
