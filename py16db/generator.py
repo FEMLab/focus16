@@ -55,7 +55,7 @@ class test_alignmentData(unittest.TestCase):
         if os.path.exists(self.shortoutput):
             os.remove(self.shortoutput)
         if os.path.exists(self.ecoliout):
-            os.remove(self.ecoliout)
+            shutil.rmtree(self.ecoliout)
         
     def tearDown(self):
         """ tear down test fixtures
@@ -120,13 +120,14 @@ class test_ave_read_length(unittest.TestCase):
         get_and_check_ave_read_len_from_fastq"""
         
         self.art = shutil.which("art_illumina")
-        self.artreads = os.path.join(os.path.dirname(__file__), "test_data", "test_reads")
-        self.genome = os.path.join(os.path.dirname(__file__), "test_data", "ecoli", "NC_011750.1.fna")
+        self.test_data = os.path.join(os.path.dirname(__file__), "test_data", "")
+        self.artreads = os.path.join(self.test_data, "test_reads")
+        self.genome = os.path.join(self.test_data, "ecoli", "NC_011750.1.fna")
         
-        if os.path.exists(self.artreads + "1.fq"):
-            os.remove(self.artreads + "1.fq")
-        if os.path.exists(self.artreads + "2.fq"):
-            os.remove(self.artreads + "2.fq")
+        if os.path.exists(self.artreads + "1.fq.gz"):
+            os.remove(self.artreads + "1.fq.gz")
+        if os.path.exists(self.artreads + "2.fq.gz"):
+            os.remove(self.artreads + "2.fq.gz")
 
 
     def tearDown(self):
@@ -147,6 +148,18 @@ class test_ave_read_length(unittest.TestCase):
             shell=sys.platform !="win32",
             check=True)
             
+        freads = os.path.join(self.test_data, "test_reads1.fq")
+        rreads = os.path.join(self.test_data, "test_reads2.fq")
+        
+        for readfile in [freads, rreads]:
+            gzipcmd = "gzip {readfile}".format(**locals())
+            subprocess.run(gzipcmd,
+                           shell=sys.platform !="win32",
+                           check=True)
+            
+                           
+        
+       
         return()
 
 #sraFind file for test_get_sra_for_organism
