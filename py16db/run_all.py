@@ -481,8 +481,7 @@ def main():
         os.makedirs(args.output_dir)
 
     logger = setup_logging(args)
-    
-        
+           
     check_programs(logger)
 
 
@@ -504,6 +503,11 @@ def main():
             strains=args.nstrains,
             logger=logger,
             get_all=args.get_all)
+
+    sra_num = 0
+    for sra in filtered_sras:
+        sra_num += 1
+    logger.debug("%s sras found:", sra_num)
 
     if os.path.exists(args.genomes_dir):
         if len(os.listdir(args.genomes_dir)) == 0:
