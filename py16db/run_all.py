@@ -46,8 +46,8 @@ def get_args():
                         required=False)
     parser.add_argument("--version", action='version',
                         version='%(prog)s {version}'.format(version=__version__))
-    parser.add_argument("-l", "--approx_length", help="Integer forapproximate genome length",
-                        required=True, type=int)
+    parser.add_argument("-l", "--approx_length", help="Integer for approximate genome length",
+                        required=False, type=int)
     parser.add_argument("-s", "--sraFind_path", dest="sra_path", 
                         help="path to sraFind file", required=False)
     parser.add_argument("--single_SRA", default=None,
@@ -168,11 +168,21 @@ def pob(genomes_dir, readsf, output_dir, logger):
     
     with open(best_ref, "r") as infile:
         for line in infile:
-            sim = float(line.split('\t')[1])
+            sraacc = line.strip().split('\t')            
+            sim = float(sraacc[1])
+            ref = sraacc[0]
             percentSim = float(100.0 - sim)
             logger.debug("Reference genome similarity: {percentSim}%".format(**locals()))
-            sraacc = line.strip().split('\t')            
+
+            length_path = os.path.join(output_dir, "genome_length")
+            cmd = "wc -c {ref} > {length_path}".format(**locals())
+            subprocess.run(cmd,
+                           shell=sys.platform !="win32",
+                           stdout=subprocess.PIPE,
+                           stderr=subprocess.PIPE,
+                           check=True)
             
+
             return(sraacc)
 
 def check_rDNA_copy_number(ref, output, logger):
@@ -348,6 +358,7 @@ def extract_16s_from_contigs(input_contigs, barr_out, output, logger):
 
 def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
     pob_dir=os.path.join(this_output, "plentyofbugs")
+    
     ribo_dir=os.path.join(this_output, "riboSeed")
     sickle_out=os.path.join(this_output, "sickle")
     read_length = get_and_check_ave_read_len_from_fastq(fastq1=rawreadsf, logger=logger)
@@ -357,9 +368,19 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
     best_reference=os.path.join(pob_dir, "best_reference")
     with open(best_reference, "r") as infile:
         for line in infile:
-            best_ref_fasta = line.split('\t')[0]
+            best_ref_fasta=line.split('\t')[0]
             check_rDNA_copy_number(ref=best_ref_fasta, output=this_output, logger=logger) 
+    
             
+    if args.approx_length is None:
+        genome_length=os.path.join(pob_dir, "genome_length")
+        with open(genome_length, "r") as infile:
+            for line in infile:
+                approx_length=float(line.split()[0])
+                logger.debug("Using genome length: %s", approx_length)
+    else:
+        approx_length = args.approx_length
+
     logger.debug('Quality trimming reads')
     trimmed_fastq1, trimmed_fastq2 = run_sickle(fastq1=rawreadsf,
                                                 fastq2=rawreadsr,
@@ -369,7 +390,7 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
     
     
     logger.debug('Downsampling reads')
-    downsampledf, downsampledr = downsample(approx_length=args.approx_length,
+    downsampledf, downsampledr = downsample(approx_length=approx_length,
                                             fastq1=trimmed_fastq1,
                                             fastq2=trimmed_fastq2, 
                                             maxcoverage=args.maxcov,
@@ -507,18 +528,26 @@ def main():
     sra_num = 0
     for sra in filtered_sras:
         sra_num += 1
-    logger.debug("%s sras found:", sra_num)
+    logger.debug("%s SRAs found:", sra_num)
 
     if os.path.exists(args.genomes_dir):
         if len(os.listdir(args.genomes_dir)) == 0:
             logger.debug('Warning: genome directory exists but is ' +
                          'empty: downloading genomes')
             shutil.rmtree(args.genomes_dir)
-            gng.main(args, logger)
+            try:
+                gng.main(args, logger)
+            except subprocess.CalledProcessError:
+                logger.error("Error downloading genome")
+                sys.exit(1)
         else:
             pass
     else:
-        gng.main(args, logger)
+        try:
+            gng.main(args, logger)
+        except subprocess.CalledProcessError:
+            logger.error("Error downloading genome")
+            sys.exit(1)
     if filtered_sras == []:
         logger.debug('No SRAs found on NCBI by sraFind')
         
