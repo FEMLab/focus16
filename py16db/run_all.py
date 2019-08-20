@@ -183,6 +183,49 @@ def pob(genomes_dir, readsf, output_dir, logger):
                            check=True)
             
 
+    
+
+def download_SRA(cores, SRA, destination, logger):
+    """Download SRAs, downsample forward reads to 1000000"""
+    suboutput_dir_raw = os.path.join(destination, "")
+    os.makedirs(suboutput_dir_raw)
+
+    cmd = "fasterq-dump {SRA} --threads {cores} -O {suboutput_dir_raw} --split-files ".format(**locals())
+  
+    try:
+        subprocess.run(cmd,
+                       shell=sys.platform !="win32",
+                       stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE,
+                       check=True)
+    except subprocess.CalledProcessError:
+        logger.critical("Error with fasterq-dump")
+      
+def pob(genomes_dir, readsf, output_dir, logger):
+    """Uses plentyofbugs, a package that useqs mash to find the best reference genome for draft genome """
+       
+    pobcmd = "plentyofbugs -g {genomes_dir} -f {readsf} -o {output_dir} --downsampling_ammount 1000000".format(**locals())
+    logger.debug('Finding best reference genome: %s', pobcmd)
+    
+    for command in [pobcmd]:
+        try:
+            subprocess.run(command,
+                           shell=sys.platform !="win32",
+                           stdout=subprocess.PIPE,
+                           stderr=subprocess.PIPE,
+                           check=True)
+            best_ref = os.path.join(output_dir, "best_reference")
+        except:
+            raise bestreferenceError("Error running the following command: %s", command)
+    
+    
+    with open(best_ref, "r") as infile:
+        for line in infile:
+            sim = float(line.split('\t')[1])
+            percentSim = float(100.0 - sim)
+            logger.debug("Reference genome similarity: {percentSim}%".format(**locals()))
+            sraacc = line.strip().split('\t')            
+            
             return(sraacc)
 
 def check_rDNA_copy_number(ref, output, logger):
@@ -300,9 +343,9 @@ def run_riboseed(sra, readsf, readsr, cores, subassembler, threads, output, memo
 
     if readsr is None:
         cmd = "ribo run -r {sra} -S1 {readsf} --cores {cores} --threads {threads} -v 1 --serialize -o {output} --subassembler {subassembler} --stages score --memory {memory}".format(**locals())
-
     logger.debug('Running riboSeed: %s', cmd)
     return(cmd)
+
 
 def extract_16s_from_contigs(input_contigs, barr_out, output, logger):
     """Uses barrnap to identify rRNA operons within the riboSeed assembled contigs, then uses extractRegion to extract the 16S sequences """
@@ -368,6 +411,7 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
     best_reference=os.path.join(pob_dir, "best_reference")
     with open(best_reference, "r") as infile:
         for line in infile:
+
             best_ref_fasta=line.split('\t')[0]
             check_rDNA_copy_number(ref=best_ref_fasta, output=this_output, logger=logger) 
     
@@ -381,6 +425,11 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
     else:
         approx_length = args.approx_length
 
+
+            best_ref_fasta = line.split('\t')[0]
+            check_rDNA_copy_number(ref=best_ref_fasta, output=this_output, logger=logger) 
+            
+
     logger.debug('Quality trimming reads')
     trimmed_fastq1, trimmed_fastq2 = run_sickle(fastq1=rawreadsf,
                                                 fastq2=rawreadsr,
@@ -390,6 +439,7 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
     
     
     logger.debug('Downsampling reads')
+
     downsampledf, downsampledr = downsample(approx_length=approx_length,
                                             fastq1=trimmed_fastq1,
                                             fastq2=trimmed_fastq2, 
@@ -528,6 +578,7 @@ def main():
     sra_num = 0
     for sra in filtered_sras:
         sra_num += 1
+
     logger.debug("%s SRAs found:", sra_num)
 
     if os.path.exists(args.genomes_dir):
@@ -535,6 +586,7 @@ def main():
             logger.debug('Warning: genome directory exists but is ' +
                          'empty: downloading genomes')
             shutil.rmtree(args.genomes_dir)
+
             try:
                 gng.main(args, logger)
             except subprocess.CalledProcessError:
@@ -548,6 +600,13 @@ def main():
         except subprocess.CalledProcessError:
             logger.error("Error downloading genome")
             sys.exit(1)
+
+            gng.main(args, logger)
+        else:
+            pass
+    else:
+        gng.main(args, logger)
+
     if filtered_sras == []:
         logger.debug('No SRAs found on NCBI by sraFind')
         

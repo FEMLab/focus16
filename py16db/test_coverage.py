@@ -21,7 +21,6 @@ class coverageTests(unittest.TestCase):
 
         self.readsgunzipd2 = os.path.join(self.data_dir, "test_reads1.fq")
         self.readsgzipd2 = os.path.join(self.data_dir, "test_reads1.fq.gz")
-
         self.downsample_dir = os.path.join(self.test_dir, "downsampled")
         if os.path.exists(self.test_dir):
             shutil.rmtree(self.test_dir)
