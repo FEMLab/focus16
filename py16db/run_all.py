@@ -424,11 +424,10 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
                 logger.debug("Using genome length: %s", approx_length)
     else:
         approx_length = args.approx_length
-
-
-            best_ref_fasta = line.split('\t')[0]
-            check_rDNA_copy_number(ref=best_ref_fasta, output=this_output, logger=logger) 
-            
+        
+    best_ref_fasta = line.split('\t')[0]
+    check_rDNA_copy_number(ref=best_ref_fasta, output=this_output, logger=logger) 
+        
 
     logger.debug('Quality trimming reads')
     trimmed_fastq1, trimmed_fastq2 = run_sickle(fastq1=rawreadsf,
@@ -586,7 +585,7 @@ def main():
             logger.debug('Warning: genome directory exists but is ' +
                          'empty: downloading genomes')
             shutil.rmtree(args.genomes_dir)
-
+            
             try:
                 gng.main(args, logger)
             except subprocess.CalledProcessError:
@@ -600,12 +599,6 @@ def main():
         except subprocess.CalledProcessError:
             logger.error("Error downloading genome")
             sys.exit(1)
-
-            gng.main(args, logger)
-        else:
-            pass
-    else:
-        gng.main(args, logger)
 
     if filtered_sras == []:
         logger.debug('No SRAs found on NCBI by sraFind')
