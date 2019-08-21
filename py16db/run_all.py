@@ -181,7 +181,7 @@ def pob(genomes_dir, readsf, output_dir, logger):
                            stdout=subprocess.PIPE,
                            stderr=subprocess.PIPE,
                            check=True)
-            
+            return(sraacc)
 
     
 
@@ -201,32 +201,6 @@ def download_SRA(cores, SRA, destination, logger):
     except subprocess.CalledProcessError:
         logger.critical("Error with fasterq-dump")
       
-def pob(genomes_dir, readsf, output_dir, logger):
-    """Uses plentyofbugs, a package that useqs mash to find the best reference genome for draft genome """
-       
-    pobcmd = "plentyofbugs -g {genomes_dir} -f {readsf} -o {output_dir} --downsampling_ammount 1000000".format(**locals())
-    logger.debug('Finding best reference genome: %s', pobcmd)
-    
-    for command in [pobcmd]:
-        try:
-            subprocess.run(command,
-                           shell=sys.platform !="win32",
-                           stdout=subprocess.PIPE,
-                           stderr=subprocess.PIPE,
-                           check=True)
-            best_ref = os.path.join(output_dir, "best_reference")
-        except:
-            raise bestreferenceError("Error running the following command: %s", command)
-    
-    
-    with open(best_ref, "r") as infile:
-        for line in infile:
-            sim = float(line.split('\t')[1])
-            percentSim = float(100.0 - sim)
-            logger.debug("Reference genome similarity: {percentSim}%".format(**locals()))
-            sraacc = line.strip().split('\t')            
-            
-            return(sraacc)
 
 def check_rDNA_copy_number(ref, output, logger):
     """ Using barrnap to check that there are multiple rDNA copies in the reference genome   """
@@ -411,7 +385,6 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
     best_reference=os.path.join(pob_dir, "best_reference")
     with open(best_reference, "r") as infile:
         for line in infile:
-
             best_ref_fasta=line.split('\t')[0]
             check_rDNA_copy_number(ref=best_ref_fasta, output=this_output, logger=logger) 
     
@@ -423,11 +396,7 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
                 approx_length=float(line.split()[0])
                 logger.debug("Using genome length: %s", approx_length)
     else:
-        approx_length = args.approx_length
-        
-    best_ref_fasta = line.split('\t')[0]
-    check_rDNA_copy_number(ref=best_ref_fasta, output=this_output, logger=logger) 
-        
+        approx_length = args.approx_length    
 
     logger.debug('Quality trimming reads')
     trimmed_fastq1, trimmed_fastq2 = run_sickle(fastq1=rawreadsf,
