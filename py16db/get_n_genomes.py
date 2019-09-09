@@ -77,7 +77,8 @@ def main(args=None, logger=None):
             splitline = line.strip().split("\t")
             if splitline[8].startswith("chrom"):
                 if splitline[0].startswith(args.organism_name):
-                    org_lines.append(splitline)
+                    if not splitline[20].startswith("-"): #@Ben Nolan, certain genomes have "-" as line[20]
+                        org_lines.append(splitline)
     # for line in org_lines:
     #    print(line[20])
     # # if file is empty, raise an error
