@@ -590,7 +590,7 @@ def main():
                 gng.main(args, logger)
             except subprocess.CalledProcessError:
                 logger.error("Error downloading genome")
-                sys.exit(1)
+                
         else:
             pass
     else:
@@ -598,7 +598,7 @@ def main():
             gng.main(args, logger)
         except subprocess.CalledProcessError:
             logger.error("Error downloading genome")
-            sys.exit(1)
+
 
     if filtered_sras == []:
         logger.debug('No SRAs found on NCBI by sraFind')
