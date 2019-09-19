@@ -10,14 +10,14 @@ riboSeed to take an input of arguments listed below and produces a file containi
 
 ## Installation
 ###### Installing 16db
-```pip install 16db```
+TODO: get pip install worrking
+```
+pip install 16db
+```
 
 ###### Packages required for 16db:
 ```
-conda install seqtk sickle-trim sra-tools riboseed mash skesa barrnap parallel-fastq-dump
-git clone https://github.com/nickp60/open_utils.git #For extractRegion command
-pip install plentyofbugs
-pip install open_utils
+conda install python=3.5 seqtk sickle-trim sra-tools riboseed mash skesa barrnap parallel-fastq-dump iqtree
 ```
 
 
@@ -65,3 +65,14 @@ Note  that `generator.py` requires ART to generate synthetic.
 {https://www.niehs.nih.gov/research/resources/software/biostatistics/art/index.cfm}
 
 ### Running on test datasets
+
+
+
+
+## Bugs
+
+### OpenBlas on MacOS
+If you get a failure running riboSeed about `dependencies not installed:["numpy"]`, try running `python -c "import numpy as np"`. If you get an error about openblas, try upgrading the one chosen by conda with:
+```
+conda install openblas=0.2.19
+```

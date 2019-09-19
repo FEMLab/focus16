@@ -3,7 +3,7 @@ import re
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
-    
+
 VERSIONFILE = "py16db/_version.py"
 verstrline = open(VERSIONFILE, "rt").read()
 VSRE = r"^__version__ = ['\"]([^'\"]*)['\"]"
@@ -15,7 +15,7 @@ else:
 
 
 setup(name='16db',
-      description='Draft genome reassembly using riboSeed, for the construction ' + 
+      description='Draft genome reassembly using riboSeed, for the construction ' +
       'of high resolution 16S databases',
       version=verstr,
       url='http://github.com/BenNolann/16db',
@@ -24,39 +24,37 @@ setup(name='16db',
       license='MIT',
       keywords='bioinformatics, assembly, 16s, database',
       packages=['py16db'],
-      scripts=['py16db/run_all.py',
-               'py16db/test_alignment.py',
-               'py16db/test_ave_read_len.py',
-               'py16db/test_best_ref.py',
-               'py16db/test_check_rDNA_num.py',
-               'py16db/test_coverage.py',
-               'py16db/test_extract_16s_from_contigs.py',
-               'py16db/test_get_sra_for_organism.py',
-               'py16db/test_parse_status.py',
-               'py16db/test_run_sickle.py',
-               'py16db/test_sralist.py',
-               'py16db/get_n_genomes.py',
-               'py16db/fetch_sraFind_data.py'],
-      install_requires = ['biopython', 'open-utils'],
+      # scripts=['py16db/run_all.py',
+      #          'py16db/test_alignment.py',
+      #          'py16db/test_ave_read_len.py',
+      #          'py16db/test_best_ref.py',
+      #          'py16db/test_check_rDNA_num.py',
+      #          'py16db/test_coverage.py',
+      #          'py16db/test_extract_16s_from_contigs.py',
+      #          'py16db/test_get_sra_for_organism.py',
+      #          'py16db/test_parse_status.py',
+      #          'py16db/test_run_sickle.py',
+      #          'py16db/test_sralist.py',
+      #          'py16db/get_n_genomes.py',
+      #          'py16db/fetch_sraFind_data.py'],
+      install_requires = ['biopython', 'open-utils',  'plentyofbugs'],
       zip_safe=False,
       include_package_data=True,
       package_data={
-        'test_data':
-            ['ecoli/*',
-             'test_reads1.fq',
-             'test_reads1.fq',
-             'ribo16',
-             'status/*',
-             'test_16s_multilineSHORT.fasta',
-             'test_sraFind.txt',
-             'test_sralist.txt',
-             ],
-        },
-      entry_points={ 
-        'console_scripts': [
-            '16db = py16db.run_all:main',
-            ],
-        }
-      )
-                    
-          
+          'test_data': [
+              'ecoli/*',
+              'test_reads1.fq',
+              'test_reads1.fq',
+              'ribo16',
+              'status/*',
+              'test_16s_multilineSHORT.fasta',
+              'test_sraFind.txt',
+              'test_sralist.txt',
+          ],
+      },
+      entry_points={
+          'console_scripts': [
+              '16db = py16db.run_all:main',
+          ],
+      }
+)

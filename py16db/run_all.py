@@ -50,7 +50,9 @@ def get_args():
     parser.add_argument("-l", "--approx_length", help="Integer for approximate genome length",
                         required=False, type=int)
     parser.add_argument("-s", "--sraFind_path", dest="sra_path",
-                        help="path to sraFind file", required=False)
+                        help="path to sraFind file",
+                        default="sraFind-All-biosample-with-SRA-hits.txt",
+                        required=False)
     parser.add_argument("--single_SRA", default=None,
                         help="run pipeline on this SRA accession only",
                         required=False)
@@ -60,7 +62,7 @@ def get_args():
                         help="path_to_prokaryotes.txt", default="./prokaryotes.txt",
                         required=False)
     parser.add_argument("-S", "--nstrains", help="number of SRAs to be run",
-                        type=int, required=True)
+                        type=int, required=False)
     parser.add_argument("--get_all", help="get both SRAs if organism has two",
                         action="store_true", required=False)
     parser.add_argument("--cores", help="integer for how many cores you wish to use", default=1,
@@ -77,15 +79,20 @@ def get_args():
                         help="amount of RAM to be used",
                         default=4,
                         required=False, type=int)
-
-    return(parser.parse_args())
+    args = parser.parse_args()
+    if args.single_SRA is None:
+        if args.nstrains is None:
+            print("if not running with --single_SRA, then --nstrains must be provided!")
+            sys.exit(1)
+    return(args)
 
 
 def check_programs(logger):
     """exits if the following programs are not installed"""
 
-    required_programs = ["ribo", "barrnap",
-                         "fasterq-dump", "mash", "skesa", "plentyofbugs", "iqtree"]
+    required_programs = [
+        "ribo", "barrnap", "fasterq-dump", "mash",
+        "skesa", "plentyofbugs", "iqtree"]
     for program in required_programs:
         if shutil.which(program) is None:
             logger.error ( '%s is not installed: exiting.', program)
@@ -457,10 +464,15 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
                                 "final_long_reads", "riboSeedContigs.fasta")
 
     if not os.path.exists(ribo_contigs):
-        logger.critical("Assembled contigs are not long enough")
+        logger.critical(
+            "riboSeed was not successful; for details, see log file at %s",
+            os.path.join(this_output, "riboSeed", "run_riboSeed.log")
+        )
     else:
-        extract_16s_from_contigs(input_contigs=ribo_contigs,
-                                 barr_out=barr_out, output=extract16soutput, logger=logger)
+        extract_16s_from_contigs(
+            input_contigs=ribo_contigs,
+            barr_out=barr_out, output=extract16soutput,
+            logger=logger)
 
 
 def alignment(fasta, output, logger):
@@ -498,6 +510,9 @@ class extracting16sError(Exception):
 
 
 def parse_status_file(path):
+    # because downloading and assembling can fail for many reasons,
+    # we write out status to a file.  this allows for easier restarting of
+    # incomplete runs
     if not os.path.exists(path):
         return []
     status = []
@@ -507,32 +522,36 @@ def parse_status_file(path):
     return(status)
 
 
+def fetch_sraFind_data(dest_path):
+    sraFind_results = "https://raw.githubusercontent.com/nickp60/sraFind/master/results/sraFind-All-biosample-with-SRA-hits.txt"
+    # gets just the file name
+    if not os.path.exists(dest_path):
+        print("Downloading sraFind Dump")
+        download_sraFind_cmd = str("wget " + sraFind_results + " -O " + dest_path)
+        subprocess.run(
+            download_sraFind_cmd,
+            shell=sys.platform !="win32",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True)
+
+
 def main():
     args=get_args()
 
-    genomesdir = args.genomes_dir
+    genomesdir = os.path.join(args.genomes_dir, "")
 
-    if not args.genomes_dir.endswith("/"):
-        args.genomes_dir = args.genomes_dir + "/"
-
-    if os.path.exists(args.output_dir):
-        pass
-    else:
+    if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
 
     logger = setup_logging(args)
 
     check_programs(logger)
 
-
-    if args.sra_path is None:
-        args.sra_path  = os.path.join(args.output_dir, "sraFind", "sraFind-All-biosample-with-SRA-hits.txt")
-
-    if not os.path.exists(os.path.dirname(args.sra_path)):
-        args.sra_path = fsd.main(args, output_dir=os.path.dirname(args.sra_path))
+    fetch_sraFind_data(args.sra_path)
 
     if args.single_SRA is not None:
-        filtered_SRA = [args.single_SRA]
+        filtered_sras = [args.single_SRA]
 
     elif args.sra_list is not None:
         filtered_sras = sralist(list=args.sra_list)
@@ -544,9 +563,7 @@ def main():
             logger=logger,
             get_all=args.get_all)
 
-    sra_num = 0
-    for sra in filtered_sras:
-        sra_num += 1
+    sra_num = len(filtered_sras)
 
     logger.debug("%s SRAs found:", sra_num)
 
@@ -646,8 +663,11 @@ def main():
 
     if os.path.exists(alignoutput):
         shutil.rmtree(alignoutput)
-    alignment(fasta=extract16soutput, output=alignoutput, logger=logger)
-    logger.debug('Maximum-likelihood tree available at: %s', pathtotree)
+    if not os.path.exists(extract16soutput):
+        logger.warning("No 16s seqeunces recovered. exiting...")
+    else:
+        alignment(fasta=extract16soutput, output=alignoutput, logger=logger)
+        logger.debug('Maximum-likelihood tree available at: %s', pathtotree)
 
 
 if __name__ == '__main__':
