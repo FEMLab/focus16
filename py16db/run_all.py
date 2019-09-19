@@ -450,11 +450,11 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
     sickle_out = os.path.join(this_output, "sickle")
     read_length = get_and_check_ave_read_len_from_fastq(fastq1=rawreadsf,
                                                         logger=logger)
-
-    pob(genomes_dir=args.genomes_dir, readsf=rawreadsf,
-        output_dir=pob_dir, logger=logger)
-
     best_reference = os.path.join(pob_dir, "best_reference")
+    if not os.path.exists(best_reference):
+        pob(genomes_dir=args.genomes_dir, readsf=rawreadsf,
+            output_dir=pob_dir, logger=logger)
+
     with open(best_reference, "r") as infile:
         for line in infile:
             best_ref_fasta=line.split('\t')[0]
