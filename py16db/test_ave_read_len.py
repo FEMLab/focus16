@@ -12,25 +12,26 @@ class avereadlenTest(unittest.TestCase):
     def setUp(self):
         self.readsgunzipd = os.path.join(os.path.dirname(__file__), "test_data", "test_reads1.fq")
         self.readsgzipd = os.path.join(os.path.dirname(__file__), "test_data", "test_reads1.fq.gz")
-        
-        gunzip = "gunzip {self.readsgzipd}".format(**locals())
 
-        if os.path.exists(self.readsgzipd):
-            subprocess.run(gunzip,
-                           shell=sys.platform !="win32",
-                           stdout=subprocess.PIPE,
-                           stderr=subprocess.PIPE,
-                           check=True)
-            
+        # gunzip = "gunzip {self.readsgzipd}".format(**locals())
+
+        # if os.path.exists(self.readsgzipd):
+        #     subprocess.run(gunzip,
+        #                    shell=sys.platform !="win32",
+        #                    stdout=subprocess.PIPE,
+        #                    stderr=subprocess.PIPE,
+        #                    check=True)
+
     def tearDown(self):
-        if os.path.exists(self.readsgunzipd):
-            gzip = "gzip {self.readsgunzipd}".format(**locals())
+        pass
+        # if os.path.exists(self.readsgunzipd):
+        #     gzip = "gzip {self.readsgunzipd}".format(**locals())
 
-            subprocess.run(gzip,
-                           shell=sys.platform !="win32",
-                           stdout=subprocess.PIPE,
-                           stderr=subprocess.PIPE,
-                           check=True)
+        #     subprocess.run(gzip,
+        #                    shell=sys.platform !="win32",
+        #                    stdout=subprocess.PIPE,
+        #                    stderr=subprocess.PIPE,
+        #                    check=True)
 
     def test_get_ave(self):
         reads = self.readsgunzipd

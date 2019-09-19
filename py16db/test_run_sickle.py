@@ -25,34 +25,34 @@ class test_run_sickle(unittest.TestCase):
         self.readsgzipd1 = os.path.join(self.data_dir, "test_reads1.fq.gz")
 
         self.readsgunzipd2 = os.path.join(self.data_dir, "test_reads2.fq")
-        self.readsgzipd2 = os.path.join(self.data_dir, "test_reads2.fq.gz")                             
+        self.readsgzipd2 = os.path.join(self.data_dir, "test_reads2.fq.gz")
         if os.path.exists(self.test_dir):
             shutil.rmtree(self.test_dir)
-            
-        for readfile in [self.readsgzipd1, self.readsgzipd2]:
-            gunzip = "gunzip {readfile}".format(**locals())
-            if os.path.exists(readfile):
-                subprocess.run(gunzip,
-                               shell=sys.platform !="win32",
-                               stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE,
-                               check=True)
-        
-    
+
+        # for readfile in [self.readsgzipd1, self.readsgzipd2]:
+        #     gunzip = "gunzip {readfile}".format(**locals())
+        #     if os.path.exists(readfile):
+        #         subprocess.run(gunzip,
+        #                        shell=sys.platform !="win32",
+        #                        stdout=subprocess.PIPE,
+        #                        stderr=subprocess.PIPE,
+        #                        check=True)
+
+
     def tearDown(self):
         "tear down test fixtures"
         shutil.rmtree(self.test_dir)
-        
-        for readfile in [self.readsgunzipd1, self.readsgunzipd2]:
-            if os.path.exists(readfile):
-                gzip = "gzip {readfile}".format(**locals())
-                subprocess.run(gzip,
-                               shell=sys.platform !="win32",
-                               stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE,
-                               check=True)
 
-   
+        # for readfile in [self.readsgunzipd1, self.readsgunzipd2]:
+        #     if os.path.exists(readfile):
+        #         gzip = "gzip {readfile}".format(**locals())
+        #         subprocess.run(gzip,
+        #                        shell=sys.platform !="win32",
+        #                        stdout=subprocess.PIPE,
+        #                        stderr=subprocess.PIPE,
+        #                        check=True)
+
+
     @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
                      "skipping this test on travis.CI")
     def test_sickle_SE(self):

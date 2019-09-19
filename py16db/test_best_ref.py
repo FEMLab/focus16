@@ -18,33 +18,33 @@ class bestrefTest(unittest.TestCase):
         self.plasmids_dir = os.path.join(self.data_dir, "ecoli", "")
         self.readsgunzipd = os.path.join(self.data_dir, "test_reads1.fq")
         self.readsgzipd = os.path.join(self.data_dir, "test_reads1.fq.gz")
-        
+
         if os.path.exists(self.test_dir):
             shutil.rmtree(self.test_dir)
         if os.path.exists(os.path.join(self.plasmids_dir, "reference.msh")):
             os.remove(os.path.join(self.plasmids_dir, "reference.msh"))
 
-        gunzip = "gunzip {self.readsgzipd}".format(**locals())
+        # gunzip = "gunzip {self.readsgzipd}".format(**locals())
 
-        if os.path.exists(self.readsgzipd):
-            subprocess.run(gunzip,
-                           shell=sys.platform !="win32",
-                           stdout=subprocess.PIPE,
-                           stderr=subprocess.PIPE,
-                           check=True)        
-        
+        # if os.path.exists(self.readsgzipd):
+        #     subprocess.run(gunzip,
+        #                    shell=sys.platform !="win32",
+        #                    stdout=subprocess.PIPE,
+        #                    stderr=subprocess.PIPE,
+        #                    check=True)
+
     def tearDown(self):
         "tear down test fixtures"
         shutil.rmtree(self.test_dir)
-        
-        if os.path.exists(self.readsgunzipd):
-            gzip = "gzip {self.readsgunzipd}".format(**locals())
-            
-            subprocess.run(gzip,
-                           shell=sys.platform !="win32",
-                           stdout=subprocess.PIPE,
-                           stderr=subprocess.PIPE,
-                           check=True)
+
+        # if os.path.exists(self.readsgunzipd):
+        #     gzip = "gzip {self.readsgunzipd}".format(**locals())
+
+        #     subprocess.run(gzip,
+        #                    shell=sys.platform !="win32",
+        #                    stdout=subprocess.PIPE,
+        #                    stderr=subprocess.PIPE,
+        #                    check=True)
 
 
     @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
@@ -56,12 +56,6 @@ class bestrefTest(unittest.TestCase):
         output_dir= (self.out_dir)
         test_result = pob(genomes_dir=plasmids, readsf=reads, output_dir=output_dir, logger=logger)
         print(test_result)
-        assert "0.00719593" == test_result[1]
+        assert round(0.00719593, 3) == round(test_result[1], 3)
         assert os.path.basename(os.path.join(self.plasmids_dir, "NC_011750.1.fna")) == \
             os.path.basename(test_result[0])
-        return()
-
-    
-
-
-    

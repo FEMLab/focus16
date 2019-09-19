@@ -16,54 +16,57 @@ class coverageTests(unittest.TestCase):
                                      "riboSeed")
         self.data_dir = os.path.join(os.path.dirname(__file__), "test_data", "")
         self.readsgunzipd1 = os.path.join(self.data_dir, "test_reads1.fq")
-        self.readsgzipd1 = os.path.join(self.data_dir, "test_reads1.fq.gz")
+#        self.readsgzipd1 = os.path.join(self.data_dir, "test_reads1.fq.gz")
 
         self.readsgunzipd2 = os.path.join(self.data_dir, "test_reads2.fq")
-        self.readsgzipd2 = os.path.join(self.data_dir, "test_reads2.fq.gz")
+#        self.readsgzipd2 = os.path.join(self.data_dir, "test_reads2.fq.gz")
         self.sra = os.path.join(os.path.dirname(__file__), "test_data",
                                 "ecoli", "NC_011750.1.fna")
         if os.path.exists(self.test_dir):
             shutil.rmtree(self.test_dir)
 
-        for readfile in [self.readsgzipd1, self.readsgzipd2]:
-            gunzip = "gunzip {readfile}".format(**locals())
-            if os.path.exists(readfile):
-                subprocess.run(gunzip,
-                               shell=sys.platform !="win32",
-                               stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE,
-                               check=True)
-        
+        # for readfile in [self.readsgzipd1, self.readsgzipd2]:
+        #     gunzip = "gunzip {readfile}".format(**locals())
+        #     if os.path.exists(readfile):
+        #         subprocess.run(gunzip,
+        #                        shell=sys.platform !="win32",
+        #                        stdout=subprocess.PIPE,
+        #                        stderr=subprocess.PIPE,
+        #                        check=True)
+
 
     def tearDown(self):
         "tear down test fixtures"
         if os.path.exists(self.test_dir):
             shutil.rmtree(self.test_dir)
-        
-        for readfile in [self.readsgunzipd1, self.readsgunzipd2]:
-            if os.path.exists(readfile):
-                gzip = "gzip {readfile}".format(**locals())
-                subprocess.run(gzip,
-                               shell=sys.platform !="win32",
-                               stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE,
-                               check=True)
 
-    
+        # for readfile in [self.readsgunzipd1, self.readsgunzipd2]:
+        #     if os.path.exists(readfile):
+        #         gzip = "gzip {readfile}".format(**locals())
+        #         subprocess.run(gzip,
+        #                        shell=sys.platform !="win32",
+        #                        stdout=subprocess.PIPE,
+        #                        stderr=subprocess.PIPE,
+        #                        check=True)
+
+
     @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
-                     "skipping this test on travis.CI")    
+                     "skipping this test on travis.CI")
     def test_riboseed(self):
         readsf = self.readsgunzipd1
         readsr = self.readsgunzipd2
         output_dir = self.test_dir
         os.makedir = output_dir
-        sra = (self.sra)        
+        sra = (self.sra)
 
         test_result = run_riboseed(sra=sra, readsf=readsf,
                                    readsr=readsr, cores="4", threads="1",
                                    subassembler="spades",
                                    memory=8,
                                    output=output_dir, logger=logger)
-
-        assert test_result == "ribo run -r /Users/alexandranolan/Desktop/16db/py16db/test_data/ecoli/NC_011750.1.fna -F /Users/alexandranolan/Desktop/16db/py16db/test_data/test_reads1.fq -R /Users/alexandranolan/Desktop/16db/py16db/test_data/test_reads2.fq --cores 4 --threads 1 -v 1 --serialize -o /Users/alexandranolan/Desktop/16db/py16db/riboSeed --subassembler spades --stages score --memory 8"
-    
+        target_cmd = "ribo run -r /Users/alexandranolan/Desktop/16db/py16db/test_data/ecoli/NC_011750.1.fna -F /Users/alexandranolan/Desktop/16db/py16db/test_data/test_reads1.fq -R /Users/alexandranolan/Desktop/16db/py16db/test_data/test_reads2.fq --cores 4 --threads 1 -v 1 --serialize -o /Users/alexandranolan/Desktop/16db/py16db/riboSeed --subassembler spades --stages score --memory 8"
+        for part in range(len(target_cmd.split(" "))):
+            if part not in [3, 5, 7, 16]:
+                # print(test_result.split(" ")[part] )
+                # print(target_cmd.split(" ")[part] )
+                Assert test_result.split(" ")[part] == target_cmd.split(" ")[part]

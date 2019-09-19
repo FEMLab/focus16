@@ -14,9 +14,10 @@ riboSeed to take an input of arguments listed below and produces a file containi
 
 ###### Packages required for 16db:
 ```
-conda install seqtk sickle-trim sra-tools riboseed mash skesa barrnap prallel-fastq-dump
+conda install seqtk sickle-trim sra-tools riboseed mash skesa barrnap parallel-fastq-dump
 git clone https://github.com/nickp60/open_utils.git #For extractRegion command
 pip install plentyofbugs
+pip install open_utils
 ```
 
 
@@ -49,6 +50,13 @@ pip install plentyofbugs
 ```
 
 ## Test Data
+Ttesting is done with the `nose` package. Generate the test data with
+```
+nosetests  py16db/generator.py
+```
+and test the package with
+
+
 16db/py16db/generator.py is a script that generates the test data used for the
 various tests in this repo
 
