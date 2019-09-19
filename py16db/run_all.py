@@ -312,7 +312,7 @@ def downsample(read_length, approx_length, fastq1, fastq2, maxcoverage, destinat
         return(fastq1, fastq2)
 
 
-def run_riboseed(sra, readsf, readsr, cores, subassembler, threads, output, memory, logger):
+def make_riboseed_cmd(sra, readsf, readsr, cores, subassembler, threads, output, memory, logger):
     """Runs riboSeed to reassemble reads """
     cmd = "ribo run -r {sra} -F {readsf} -R {readsr} --cores {cores} --threads {threads} -v 1 --serialize -o {output} --subassembler {subassembler} --stages score --memory {memory}".format(**locals())
 
@@ -394,7 +394,7 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
         genome_length=os.path.join(pob_dir, "genome_length")
         with open(genome_length, "r") as infile:
             for line in infile:
-                approx_length=float(line.split()[0])
+                approx_length = float(line.split()[0])
                 logger.debug("Using genome length: %s", approx_length)
     else:
         approx_length = args.approx_length
@@ -420,7 +420,7 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
     logger.debug('Downsampled r reads: %s', downsampledr)
 
 
-    riboseed_cmd = run_riboseed(sra=best_ref_fasta, readsf=downsampledf,
+    riboseed_cmd = make_riboseed_cmd(sra=best_ref_fasta, readsf=downsampledf,
                                 readsr=downsampledr, cores=args.cores,
                                 memory=args.memory,
                                 subassembler=args.subassembler,
@@ -557,7 +557,7 @@ def main():
             shutil.rmtree(args.genomes_dir)
 
             try:
-                gng.main(args, logger)
+                gng.main(args)
             except subprocess.CalledProcessError:
                 logger.error("Error downloading genome")
 
@@ -565,7 +565,7 @@ def main():
             pass
     else:
         try:
-            gng.main(args, logger)
+            gng.main(args)
         except subprocess.CalledProcessError:
             logger.error("Error downloading genome")
 

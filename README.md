@@ -50,16 +50,18 @@ pip install open_utils
 ```
 
 ## Test Data
-Ttesting is done with the `nose` package. Generate the test data with
+### Unit tests
+Testing is done with the `nose` package. Generate the test data with
 ```
 nosetests  py16db/generator.py
 ```
-and test the package with
+and run the unit tests with
 
+```
+nosetests py16db/ -v
+```
 
-16db/py16db/generator.py is a script that generates the test data used for the
-various tests in this repo
-
-Required:
-ART - generates synthetic next-gen reads.
+Note  that `generator.py` requires ART to generate synthetic.
 {https://www.niehs.nih.gov/research/resources/software/biostatistics/art/index.cfm}
+
+### Running on test datasets

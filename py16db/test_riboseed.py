@@ -1,4 +1,4 @@
-from .run_all import run_riboseed
+from .run_all import make_riboseed_cmd
 import os
 import shutil
 import unittest
@@ -59,7 +59,7 @@ class coverageTests(unittest.TestCase):
         os.makedir = output_dir
         sra = (self.sra)
 
-        test_result = run_riboseed(sra=sra, readsf=readsf,
+        test_result = make_riboseed_cmd(sra=sra, readsf=readsf,
                                    readsr=readsr, cores="4", threads="1",
                                    subassembler="spades",
                                    memory=8,
@@ -69,4 +69,4 @@ class coverageTests(unittest.TestCase):
             if part not in [3, 5, 7, 16]:
                 # print(test_result.split(" ")[part] )
                 # print(target_cmd.split(" ")[part] )
-                Assert test_result.split(" ")[part] == target_cmd.split(" ")[part]
+                assert test_result.split(" ")[part] == target_cmd.split(" ")[part]
