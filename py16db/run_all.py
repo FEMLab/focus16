@@ -76,8 +76,8 @@ def get_args():
                         help="path to sraFind file",
                         default="sraFind-All-biosample-with-SRA-hits.txt",
                         required=False)
-    parser.add_argument("--single_SRA", default=None,
-                        help="run pipeline on this SRA accession only",
+    parser.add_argument("--SRAs", default=None, nargs="+",
+                        help="run pipeline on this (these) SRA(s) only",
                         required=False)
     parser.add_argument("-g", "--genomes_dir",
                         help="path to directory containing, or empty, " +
@@ -112,9 +112,9 @@ def get_args():
                         default=4,
                         required=False, type=int)
     args = parser.parse_args()
-    if args.single_SRA is None:
+    if args.SRAs is None:
         if args.nstrains is None:
-            print("if not running with --single_SRA, " +
+            print("if not running with --SRAs, " +
                   "then --nstrains must be provided!")
             sys.exit(1)
     return(args)
@@ -358,6 +358,7 @@ def downsample(read_length, approx_length, fastq1, fastq2,
             downpath2 = None
         for command in commands:
             try:
+                # logger.debug(command)
                 subprocess.run(command,
                                shell=sys.platform != "win32",
                                stdout=subprocess.PIPE,
@@ -365,7 +366,7 @@ def downsample(read_length, approx_length, fastq1, fastq2,
                                check=True)
             except:
                 raise downsamplingError("Error running following command ", command)
-            return(downpath1, downpath2)
+        return(downpath1, downpath2)
     else:
         logger.debug('Skipping downsampling as max coverage is < %s', maxcoverage)
         return(fastq1, fastq2)
@@ -606,8 +607,8 @@ def main():
 
     fetch_sraFind_data(args.sra_path)
 
-    if args.single_SRA is not None:
-        filtered_sras = [args.single_SRA]
+    if args.SRAs is not None:
+        filtered_sras = args.SRAs
 
     elif args.SRA_list is not None:
         filtered_sras = sralist(list=args.SRA_list)
