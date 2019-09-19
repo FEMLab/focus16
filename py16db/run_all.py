@@ -62,8 +62,9 @@ def get_args():
     parser.add_argument("-n", "--organism_name",
                         help="genus or genus species in quotes",
                         required=True)
-    parser.add_argument("--sra_list",
-                        help="Input a list of sras for assembly[one column]",
+    parser.add_argument("--SRA_list",
+                        help="path to file containing list of sras " +
+                        "for assembly[one column]",
                         required=False)
     parser.add_argument("--version", action='version',
                         version='%(prog)s {version}'.format(
@@ -166,13 +167,11 @@ def sralist(list):
     """ takes a file list of  of SRAs, return list
     for if you wish to use SRAs that are very recent and ahead of sraFind
     """
-    sralistn = []
+    sras = []
     with open(list, "r") as infile:
         for sra in infile:
-            sra.split()
-            sralistn.append(sra)
-            sralist = [sra.strip() for sra in sralistn]
-    return(sralist)
+            sras.append(sra.strip())
+    return sras
 
 
 def download_SRA(cores, SRA, destination, logger):
@@ -610,8 +609,8 @@ def main():
     if args.single_SRA is not None:
         filtered_sras = [args.single_SRA]
 
-    elif args.sra_list is not None:
-        filtered_sras = sralist(list=args.sra_list)
+    elif args.SRA_list is not None:
+        filtered_sras = sralist(list=args.SRA_list)
     else:
         filtered_sras = filter_SRA(
             sraFind=args.sra_path,
