@@ -56,6 +56,6 @@ class bestrefTest(unittest.TestCase):
         output_dir= (self.out_dir)
         test_result = pob(genomes_dir=plasmids, readsf=reads, output_dir=output_dir, logger=logger)
         print(test_result)
-        assert round(0.00719593, 3) == round(test_result[1], 3)
+        assert round(0.00719593, 2) == round(test_result[1], 2)
         assert os.path.basename(os.path.join(self.plasmids_dir, "NC_011750.1.fna")) == \
             os.path.basename(test_result[0])

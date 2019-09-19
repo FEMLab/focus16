@@ -11,7 +11,6 @@ import gzip
 import logging
 
 from plentyofbugs import get_n_genomes as gng
-from . import fetch_sraFind_data as fsd
 from py16db.run_sickle import run_sickle
 from Bio import SeqIO
 from . import __version__
