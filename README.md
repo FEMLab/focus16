@@ -19,7 +19,7 @@ pip install 16db
 ```
 conda install python=3.5 seqtk sickle-trim sra-tools riboseed mash skesa barrnap parallel-fastq-dump iqtree
 ```
-
+Optionally, to use the trimming alignment feature, TrimAl must be installed from github https://github.com/scapella/trimal
 
 
 ## Usage
@@ -27,7 +27,11 @@ conda install python=3.5 seqtk sickle-trim sra-tools riboseed mash skesa barrnap
 ```
 16db --output_dir ./escherichia/ -g ./escherichia_genomes/ --n_SRAs 5 --n_references 30 --memory 8 --cores 4 --organism_name "Escherichia coli"
 ```
-This will go through the process of getting the list of assemblies that are associated with SRAs, downloading up to 10 SRAs,  building
+This will go through the process of getting the list of assemblies that are associated with SRAs, downloading up to 5 SRAs,  finding the closes referece for each of the 5 SRAs, assembling, and extracting the 16S sequences.
+
+In order to build the species-specific database from Silva (or similar), use the silva_filter
+
+
 
 ###### Required Arguments
 ```
@@ -50,6 +54,14 @@ This will go through the process of getting the list of assemblies that are asso
 [--example_reads]: Input of user-given reads.
 [--subassembler]: Choice of mash or skesa for subassembly in riboSeed.
 ```
+
+### Included Utilities:
+#### `combine-focusdb-and-silva`
+Use this script to combine silva  and 16db seqeunces for a given organism name.
+#### `align-and-trim-focusdb`
+This script  uses mafft and TrimAl to provide a trimmed and aligned MSA.
+#### `calculate-shannon-entropy`
+
 
 ## Test Data
 ### Unit tests

@@ -19,8 +19,8 @@ setup(name='16db',
       'of high resolution 16S databases',
       version=verstr,
       url='http://github.com/BenNolann/16db',
-      author='Ben Nolan',
-      author_email='N.BEN1@nuigalway.ie',
+      author='Ben Nolan,Nick Waters',
+      author_email='N.BEN1@nuigalway.ie, nickp60@gmail.com',
       license='MIT',
       keywords='bioinformatics, assembly, 16s, database',
       packages=['py16db'],
@@ -55,6 +55,9 @@ setup(name='16db',
       entry_points={
           'console_scripts': [
               '16db = py16db.run_all:main',
+              'silva_filter = py16db.run_all:main',
+              'calculate-shannon-entropy = py16db.calculate-shannon-entropy.main',
+              'align-and-trim-focusdb = py16db.align-and-trim-focusdb.main'
           ],
       }
 )
