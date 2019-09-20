@@ -5,6 +5,11 @@ import subprocess
 import sys
 import shutil
 import os
+import subprocess
+import math
+from Bio import SeqIO
+from collections import Counter
+
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -12,7 +17,7 @@ def get_args():
     parser.add_argument("-d", "--silva", help="silva database", required=True)
     parser.add_argument("-o", "--silva_out", help="edited silva database", required=True)
     parser.add_argument("-n", "--org_name", help="organism name", required=True)
-    parser.add_argument("-S", "--db16_seqs", help="path to 16db sequences", required=False)
+    parser.add_argument("-S", "--focus_seqs", help="path to focus sequences", required=False)
     return(parser.parse_args())
 
 
@@ -50,12 +55,12 @@ def new_silvadb_for_org(count, org, silva, new_silva):
     print("Total sequences: {totalcount} ".format(**locals()))
       
 
-def add_16db_seqs(db16_file, new_silva, org):
+def add_16db_seqs(focus_file, new_silva, org):
     ''' given a file containing sequences, cats them to silva file
     '''
     seqs = "./tmp"
     #puts each sequence on single line
-    cmd = "seqtk seq -S {db16_file} > {seqs}".format(**locals())
+    cmd = "seqtk seq -S {focus_file} > {seqs}".format(**locals())
     subprocess.run(cmd,
                    shell=sys.platform !="win32",
                    stdout=subprocess.PIPE,
@@ -74,30 +79,69 @@ def add_16db_seqs(db16_file, new_silva, org):
     os.remove(seqs)
     return(count)
         
-def rename_headers(db16_file, org):
-    ''' for header line in file, rename to org name
-    '''
-    with open(db16_file, "r") as e:
-        lines = e.readlines()
-        for line in lines:
-            if line.startswith(">"):
-                headerline = line.replace(">" , ">{org}_".format(**locals()))
-                f.write(headerline)
-            else:
-                f.write(line)
-    print("Renaming sequences")
 
 def rename_header_line(line, org):
     ''' for header line in file, rename to org name
     '''
+    
     if line.startswith(">"):
-        headerline = line.replace(">" , ">{org}_".format(**locals())).replace(":","_").replace(" ","").replace("_","")
-        
+        headerline = line.replace(":","_").replace(" ","_")
         return headerline
     else:
         return(line)
+    print("Renaming sequences")
+
+def mafft(multifasta):
+    ''' performs default mafft alignment
+    '''
+    msa = os.path.join(multifasta + ".mafft")
+    cmd = "mafft --retree 2 --reorder {multifasta} > {msa}".format(**locals())
     
-            
+    subprocess.run(cmd,
+                   shell=sys.platform !="win32",
+                   stdout=subprocess.PIPE,
+                   stderr=subprocess.PIPE,
+                   check=True)
+    print("MSA complete")
+    return(msa)
+
+
+#calculate shannon entropy for a position
+def shannon_calc(values):
+    possible = set(values.split())
+    entropy = 0
+    for nuc in ["a", "t", "c", "g", "-"]:
+        n = values.count(nuc)
+        if n == 0:
+            continue
+        prob = n/len(values)
+        ent = prob * math.log(prob)
+        entropy = entropy + ent
+
+    return(entropy)
+
+#count occurances of each nucleotide in a sequence
+def read_in_msa(path):
+    seqs = []
+    leaddash = []
+    traildash = []
+    with open(path, "r") as inf:
+        for rec in SeqIO.parse(inf, "fasta"):
+            this_lead_dash = 0
+            this_trail_dash = 0
+            for n in rec.seq:
+                if n == "-":
+                    this_lead_dash += 1
+                
+                else:
+                    break
+            leaddash.append(this_lead_dash)
+            seqs.append(str(rec.seq).lower())
+
+    #print(Counter(leaddash))
+    
+    return seqs
+
 
 def main():
     args = get_args()
@@ -110,17 +154,29 @@ def main():
     count_orgs_silva(org=org, silva=silva)
 
     #Adds sequences from a 16db ribo16s file to new silva database
-    if args.db16_seqs is not None:
-        db16_seqs = args.db16_seqs
-        count = add_16db_seqs(db16_file=db16_seqs, new_silva=new_silva, org=org)
+    if args.focus_seqs is not None:
+        focus_seqs = args.focus_seqs
+        count = add_16db_seqs(focus_file=focus_seqs, new_silva=new_silva, org=org)
     else:
         count=0
         
     #Adds only sequences of that organism from silva database
     new_silvadb_for_org(org=org, silva=silva, new_silva=new_silva, count=count)
+    msa = mafft(multifasta = new_silva)
+    
+    entropies = []
+    seqs = read_in_msa(msa)
+    shannon_out = os.path.join(new_silva + ".shannon")
 
-    
-    
-    
+    for i in range(len(seqs[0])):
+        values_string = "".join([x[i] for x in seqs])
+        entropy = shannon_calc(values_string)
+        entropies.append(entropy)
+    for i, value in enumerate(entropies):
+        with open(shannon_out, "a") as f:
+            f.write("{i}\t{value}\n".format(**locals()))
+    print("Shannon entropy complete")
+
+
 if __name__ == '__main__':
     main()
