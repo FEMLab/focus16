@@ -19,16 +19,21 @@ pip install 16db
 ```
 conda install python=3.5 seqtk sickle-trim sra-tools riboseed mash skesa barrnap parallel-fastq-dump iqtree
 ```
-Optionally, to use the trimming alignment feature, TrimAl must be installed from github https://github.com/scapella/trimal
+Optionally, to use the trimming alignment feature, TrimAl must be installed from github https://github.com/scapella/trimal.  For re-generating test data, ART read simulator must also be installed.
 
 
 ## Usage
 ###### Example
 ```
 # reassemble SRAs and extract potentially novel 16S sequnces
-16db --output_dir ./escherichia/ -g ./escherichia_genomes/ --n_SRAs 5 --n_references 30 --memory 8 --cores 4 --organism_name "Escherichia coli"
+16db --output_dir ./focusdb_ecoli/ -g ./escherichia_genomes/ --n_SRAs 5 --n_references 30 --memory 8 --cores 4 --organism_name "Escherichia coli"
+## Optional downstream analyses
 # build E. coli specific DB from E colis in Silva and our new seqeunces
-combine-focusdb-and-silva
+combine-focusdb-and-silva  -d ~/Downloads/SILVA_132_SSUParc_tax_silva.fasta  -o ecolidb.fasta  -n "Escherichia coli" -S ./focusdb_ecoli/ribo16s.fasta
+# Align sequences and trim  the alignment
+align-and-trim-focusdb -i ecolidb.fasta --out_prefix aligned_ecolidb
+# Calculate the per-column shannon entropy of the trimmed allignment.
+calculate-shannon-entropy calculate-shannon-entropy.py -i aligned_ecolidb.mafft.trimmed > ecoli_entropy
 ```
 
 
@@ -64,9 +69,32 @@ This will go through the process of getting the list of assemblies that are asso
 #### `combine-focusdb-and-silva`
 Use this script to combine silva  and 16db seqeunces for a given organism name.
 #### `align-and-trim-focusdb`
-This script  uses mafft and TrimAl to provide a trimmed and aligned MSA.
-#### `calculate-shannon-entropy`
+```
+usage: align-and-trim-focusdb [-h] -i INPUT -o OUT_PREFIX
 
+Given a multiple sequence database (from combine-focusdb-and-silva, generate
+an alignment with mafft and trim to median sequence. Requires mafft and TrimAl
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i INPUT, --input INPUT
+                        multifasta input file
+  -o OUT_PREFIX, --out_prefix OUT_PREFIX
+                        prefix for msa and trimmed msa
+```
+
+#### `calculate-shannon-entropy`
+```
+usage: calculate-shannon-entropy [-h] -i INPUT
+
+Given a trimmed multiple sequence alignment (from align-and-trim-focusdb,
+calculate shannon entropy
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i INPUT, --input INPUT
+                        trimmed MSA
+```
 
 ## Test Data
 ### Unit tests
