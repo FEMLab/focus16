@@ -87,6 +87,7 @@ def get_args():
                         help="path to directory containing, or empty, " +
                         "candidate genomes for reference",
                         required=True)
+    #  Note that this agument doesn't get called, but is inheirited by get_n_genomes
     parser.add_argument("-p", "--prokaryotes", action="store",
                         help="path_to_prokaryotes.txt",
                         default="./prokaryotes.txt",
@@ -129,9 +130,9 @@ def get_args():
     # plentyofbugs uses args.nstrains, but wecall it args.n_references for clarity
     args.nstrains = args.n_references
     if args.SRAs is None:
-        if args.nstrains is None:
+        if args.n_SRAs is None:
             print("if not running with --SRAs, " +
-                  "then --nstrains must be provided!")
+                  "then --n_SRAs must be provided!")
             sys.exit(1)
     return(args)
 
