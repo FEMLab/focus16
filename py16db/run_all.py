@@ -546,8 +546,8 @@ def fetch_sraFind_data(dest_path):
             stderr=subprocess.PIPE,
             check=True)
 
-def extract_16s_from_assembly_list(all_assemblies, args, logger):
 
+def extract_16s_from_assembly_list(all_assemblies, args, logger):
     extract16soutput = os.path.join(args.output_dir, "ribo16s.fasta")
     if os.path.exists(extract16soutput):
         os.remove(extract16soutput)
@@ -556,35 +556,36 @@ def extract_16s_from_assembly_list(all_assemblies, args, logger):
     for assembly in all_assemblies:
         sra = assembly.split(os.path.sep)[1]
         barr_out = os.path.join(os.path.join(args.output_dir, sra, "barrnap"))
-        with open(assembly, "r") as inf:
-            barrnap = "barrnap {assembly} > {barr_out}".format(**locals())
-            logger.debug('Identifying 16S sequences with barnap: %s', barrnap)
-            try:
-                subprocess.run(barrnap,
-                               shell=sys.platform != "win32",
-                               stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE,
-                               check=True)
-            except:
-                raise extracting16sError("Error running the following command %s", barrnap)
-            with open(barr_out, "r") as rrn, open(assembly, "r")  as asmb, open(extract16soutput, "a") as outf:
-                rrn_num = 0
-                for rawline in rrn:
-                    line = rawline.strip().split('\t')
-                    if line[0].startswith("##"):
-                        continue
-                    if line[8].startswith("Name=16S"):
-                        rrn_num += 1
-                        if line[6] == "-":
-                            suffix = 'chromosome-RC@'
-                        else:
-                            suffix = ''
-                        chrom = line[0]
-                        ori = line[6]
-                        start = int(line[3])
-                        end = int(line[4])
-                        thisid = "{}_{}".format(sra, rrn_num)
-                        results16s[thisid] = [chrom, start, end, line[6]]
+        barrnap = "barrnap {assembly} > {barr_out}".format(**locals())
+        logger.debug('Identifying 16S sequences with barnap: %s', barrnap)
+        try:
+            subprocess.run(barrnap,
+                           shell=sys.platform != "win32",
+                           stdout=subprocess.PIPE,
+                           stderr=subprocess.PIPE,
+                           check=True)
+        except:
+            raise extracting16sError("Error running the following command %s", barrnap)
+        with open(barr_out, "r") as rrn, open(extract16soutput, "a") as outf:
+            rrn_num = 0
+            for rawline in rrn:
+                line = rawline.strip().split('\t')
+                # need this: catches index errors
+                if line[0].startswith("##"):
+                    pass
+                elif line[8].startswith("Name=16S"):
+                    rrn_num = rrn_num + 1
+                    if line[6] == "-":
+                        suffix = 'chromosome-RC@'
+                    else:
+                        suffix = ''
+                    chrom = line[0]
+                    ori = line[6]
+                    start = int(line[3])
+                    end = int(line[4])
+                    thisid = "{}_{}".format(sra, rrn_num)
+                    results16s[thisid] = [chrom, start, end, line[6]]
+                    with open(assembly, "r")  as asmb:
                         for rec in SeqIO.parse(asmb, "fasta"):
                             if rec.id  == chrom:
                                 seq = rec.seq[start + 1: end + 1]
@@ -592,7 +593,7 @@ def extract_16s_from_assembly_list(all_assemblies, args, logger):
                                     seq = seq.reverse_complement()
                                 thisdesc = "{chrom}:{start}:{end}({ori})".format(**locals())
                                 SeqIO.write(SeqRecord(seq, id=thisid, description=thisdesc), outf,  "fasta")
-                                nseqs += 1
+                                nseqs = nseqs  +  1
     return(nseqs, extract16soutput)
 
 
@@ -770,8 +771,8 @@ def main():
                 logger.error(e)
                 continue
 
-    alignoutput = os.path.join(args.output_dir, "allsequences",  "")
-    pathtotree = os.path.join(alignoutput, "MSA.fasta.tree")
+    # alignoutput = os.path.join(args.output_dir, "allsequences",  "")
+    # pathtotree = os.path.join(alignoutput, "MSA.fasta.tree")
     all_assemblies  =  glob.glob(
         os.path.join(args.output_dir, "*", "results", "riboSeed",
                      "seed", "final_long_reads", "riboSeedContigs.fasta"))
@@ -787,10 +788,10 @@ def main():
         sys.exit()
 
 
-    if os.path.exists(alignoutput):
-        shutil.rmtree(alignoutput)
-    #alignment(fasta=extract16soutput, output=alignoutput, logger=logger)
-    logger.debug('Maximum-likelihood tree available at: %s', pathtotree)
+    # if os.path.exists(alignoutput):
+    #    shutil.rmtree(alignoutput)
+    # alignment(fasta=extract16soutput, output=alignoutput, logger=logger)
+    # logger.debug('Maximum-likelihood tree available at: %s', pathtotree)
     write_pass_fail(args, status="PASS",
                     stage="global",
                     note="")
