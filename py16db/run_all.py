@@ -271,7 +271,9 @@ def check_rDNA_copy_number(ref, output, logger):
     """ensure reference has multiple rDNAs
     Using barrnap to check that there are multiple rDNA copies in the reference genome
     """
-    barroutput = os.path.join(output, "barrnap_reference")
+    os.makedirs(os.path.join(output, "barrnap_reference"), exist_ok=True)
+    barroutput = os.path.join(output, "barrnap_reference",
+                              os.path.basename(ref) + ".gff")
     cmd = "barrnap {ref} > {barroutput}".format(**locals())
     subprocess.run(cmd,
                    shell=sys.platform != "win32",
@@ -286,12 +288,13 @@ def check_rDNA_copy_number(ref, output, logger):
                 continue
             if line[8].startswith("Name=16S"):
                 rrn_num += 1
-    if rrn_num > 1:
-        logger.debug('%s rrn operons detected in reference genome', rrn_num)
-    else:
-        logger.critical('SRA does not have multiple rrn operons')
-        sys.exit(1)
-    return(rrn_num)
+    return rrn_num
+    # if rrn_num > 1:
+    #     logger.debug('%s rrn operons detected in reference genome', rrn_num)
+    # else:
+    #     logger.critical('SRA does not have multiple rrn operons')
+    #     sys.exit(1)
+    # return(rrn_num)
 
 
 def get_and_check_ave_read_len_from_fastq(fastq1, logger=None):
@@ -474,9 +477,6 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
     with open(best_reference, "r") as infile:
         for line in infile:
             best_ref_fasta=line.split('\t')[0]
-            check_rDNA_copy_number(ref=best_ref_fasta, output=this_output,
-                                   logger=logger)
-
 
     if args.approx_length is None:
         genome_length=os.path.join(pob_dir, "genome_length")
@@ -676,7 +676,6 @@ def main():
             get_all=args.get_all)
 
     sra_num = len(filtered_sras)
-
     logger.debug("%s SRAs found:", sra_num)
 
     if os.path.exists(args.genomes_dir):
@@ -684,7 +683,6 @@ def main():
             logger.debug('Warning: genome directory exists but is ' +
                          'empty: downloading genomes')
             shutil.rmtree(args.genomes_dir)
-
             try:
                 gng.main(args)
             except subprocess.CalledProcessError:
@@ -696,6 +694,15 @@ def main():
             gng.main(args)
         except subprocess.CalledProcessError:
             logger.error("Error downloading genome")
+    logger.debug("checking reference genomes for rDNA counts")
+    for potential_reference in glob.glob(os.path.join(args.genomes_dir, "*.fna")):
+        rDNAs = check_rDNA_copy_number(ref=potential_reference,
+                                       output=args.genomes_dir,
+                                       logger=logger)
+        if rDNAs < 2:
+            logger.warning(
+                "reference %s does not have multiple rDNAs; excluding", potential_reference)
+            os.remove(potential_reference)
 
     if filtered_sras == []:
         logger.debug('No SRAs found on NCBI by sraFind')

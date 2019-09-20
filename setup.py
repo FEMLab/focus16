@@ -37,7 +37,7 @@ setup(name='16db',
       #          'py16db/test_sralist.py',
       #          'py16db/get_n_genomes.py',
       #          'py16db/fetch_sraFind_data.py'],
-      install_requires = ['biopython', 'open-utils',  'plentyofbugs'],
+      install_requires = ['biopython',  'plentyofbugs'],
       zip_safe=False,
       include_package_data=True,
       package_data={
