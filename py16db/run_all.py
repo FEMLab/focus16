@@ -409,60 +409,6 @@ def make_riboseed_cmd(sra, readsf, readsr, cores, subassembler, threads,
     return(cmd)
 
 
-def extract_16s_from_contigs(input_contigs, barr_out, output, logger):
-    """append 16s's from assembly to file
-    Uses barrnap to identify rRNA operons within the riboSeed assembled
-    contigs, then uses extractRegion to extract the 16S sequences
-    """
-
-    barrnap = "barrnap {input_contigs} > {barr_out}".format(**locals())
-    logger.debug('Extracting 16S sequences: %s', barrnap)
-    try:
-        subprocess.run(barrnap,
-                       shell=sys.platform != "win32",
-                       stdout=subprocess.PIPE,
-                       stderr=subprocess.PIPE,
-                       check=True)
-    except:
-        raise extracting16sError("Error running the following command %s", barrnap)
-
-    results16s = []   # [chromosome, start, end, reverse complimented]
-    with open(barr_out, "r") as rrn:
-        rrn_num = 0
-        for rawline in rrn:
-            line = rawline.strip().split('\t')
-            if line[0].startswith("##"):
-                continue
-            if line[8].startswith("Name=16S"):
-                rrn_num += 1
-                if line[6] == "-":
-                    suffix = 'chromosome-RC@'
-                else:
-                    suffix = ''
-                chrom = line[0]
-                start = line[3]
-                end = line[4]
-                results16s = [chrom, start, end, suffix]
-
-                cmd = "extractRegion \'{results16s[3]}{results16s[0]} :{results16s[1]}:{results16s[2]}\' -f {input_contigs} -v 1 >> {output}".format(**locals())
-                try:
-                    subprocess.run(cmd,
-                                   shell=sys.platform != "win32",
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE,
-                                   check=True)
-                except:
-                    raise extracting16sError("Error running following command ", cmd)
-    if rrn_num == 1:
-        logger.debug('%s 16S sequence extracted from genome', rrn_num)
-    elif rrn_num > 1:
-        logger.debug('%s 16S sequences extracted from genome', rrn_num)
-    else:
-        logger.critical('NO 16S sequences extracted', rrn_num)
-
-    return(output)
-
-
 def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
     pob_dir = os.path.join(this_output, "plentyofbugs")
 
@@ -605,7 +551,7 @@ def extract_16s_from_assembly_list(all_assemblies, args, logger):
     extract16soutput = os.path.join(args.output_dir, "ribo16s.fasta")
     if os.path.exists(extract16soutput):
         os.remove(extract16soutput)
-        results16s = {}  # [sra_#, chromosome, start, end, reverse complimented]
+    results16s = {}  # [sra_#, chromosome, start, end, reverse complimented]
     nseqs = 0
     for assembly in all_assemblies:
         sra = assembly.split(os.path.sep)[1]
