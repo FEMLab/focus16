@@ -25,11 +25,16 @@ Optionally, to use the trimming alignment feature, TrimAl must be installed from
 ## Usage
 ###### Example
 ```
+# reassemble SRAs and extract potentially novel 16S sequnces
 16db --output_dir ./escherichia/ -g ./escherichia_genomes/ --n_SRAs 5 --n_references 30 --memory 8 --cores 4 --organism_name "Escherichia coli"
+# build E. coli specific DB from E colis in Silva and our new seqeunces
+combine-focusdb-and-silva
 ```
-This will go through the process of getting the list of assemblies that are associated with SRAs, downloading up to 5 SRAs,  finding the closes referece for each of the 5 SRAs, assembling, and extracting the 16S sequences.
 
-In order to build the species-specific database from Silva (or similar), use the silva_filter
+
+
+##### `16db`
+This will go through the process of getting the list of assemblies that are associated with SRAs, downloading up to 5 SRAs,  finding the closes referece for each of the 5 SRAs, assembling, and extracting the 16S sequences.
 
 
 

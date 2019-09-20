@@ -59,9 +59,7 @@ def read_in_msa(path):
 
 def main():
     args = get_args()
-
     seqs = read_in_msa(args.input)
-
     for i in range(len(seqs[0])):
         values_string = "".join([x[i] for x in seqs])
         entropy = shannon_calc(values_string)

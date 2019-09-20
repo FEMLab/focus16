@@ -55,9 +55,9 @@ setup(name='16db',
       entry_points={
           'console_scripts': [
               '16db = py16db.run_all:main',
-              'silva_filter = py16db.run_all:main',
-              'calculate-shannon-entropy = py16db.calculate-shannon-entropy.main',
-              'align-and-trim-focusdb = py16db.align-and-trim-focusdb.main'
+              'combine-focusdb-and-silva = py16db.combine_focusdb_and_silva:main',
+              'calculate-shannon-entropy = py16db.calculate_shannon_entropy:main',
+              'align-and-trim-focusdb = py16db.align_and_trim_focusdb:main'
           ],
       }
 )
