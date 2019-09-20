@@ -603,7 +603,7 @@ def write_pass_fail(args, stage, status, note):
     """
     path = os.path.join(args.output_dir, "SUMMARY")
     org = args.organism_name
-    with open(path, "w") as failfile:
+    with open(path, "a") as failfile:
         failfile.write("{}\t{}\t{}\t{}\n".format(org, status, stage, note))
 
 
@@ -737,7 +737,7 @@ def main():
                     logger.debug("Already processed: %s", accession)
                 write_pass_fail(args, status="PASS",
                                 stage=accession,
-                                note="")
+                                note="Processed strain")
 
             except subprocess.CalledProcessError:
                 write_pass_fail(args, status="FAIL",
@@ -789,7 +789,7 @@ def main():
 
     if os.path.exists(alignoutput):
         shutil.rmtree(alignoutput)
-    alignment(fasta=extract16soutput, output=alignoutput, logger=logger)
+    #alignment(fasta=extract16soutput, output=alignoutput, logger=logger)
     logger.debug('Maximum-likelihood tree available at: %s', pathtotree)
     write_pass_fail(args, status="PASS",
                     stage="global",
