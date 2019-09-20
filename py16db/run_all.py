@@ -649,6 +649,18 @@ def extract_16s_from_assembly_list(all_assemblies, args, logger):
                                 nseqs += 1
     return(nseqs, extract16soutput)
 
+
+def write_pass_fail(args, stage, status, note):
+    """
+    format fail messages in tabular fomat:
+    organism\tstage\tmessage
+    """
+    path = os.path.join(args.output_dir, "SUMMARY")
+    org = args.organism_name
+    with open(path, "w") as failfile:
+        failfile.write("{}\t{}\t{}\t{}\n".format(org, status, stage, note))
+
+
 def main():
     args = get_args()
 
@@ -656,6 +668,8 @@ def main():
 
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
+    if os.path.exists(os.path.join(args.output_dir, "SUMMARY")):
+        os.remove(os.path.join(args.output_dir, "SUMMARY"))
 
     logger = setup_logging(args)
 
@@ -664,8 +678,8 @@ def main():
     fetch_sraFind_data(args.sra_path)
 
     if args.SRAs is not None:
-        filtered_sras = args.SRAs
 
+        filtered_sras = args.SRAs
     elif args.SRA_list is not None:
         filtered_sras = sralist(list=args.SRA_list)
     else:
@@ -679,22 +693,29 @@ def main():
     sra_num = len(filtered_sras)
     logger.debug("%s SRAs found:", sra_num)
 
-    if os.path.exists(args.genomes_dir):
-        if len(os.listdir(args.genomes_dir)) == 0:
+    # check basic integrity of genomes dir
+    # it might exist, but making it here simplifies the control flow later
+    # it seems counter intuitive, but checking if the dir we might have just
+    # created is easier than checking if it exists/is intact twice
+    os.makedirs(args.genomes_dir, exist_ok=True)
+    try:
+        if len(glob.glob(os.path.join(args.genomes_dir, "*.fna"))) == 0:
             logger.debug('Warning: genome directory exists but is ' +
                          'empty: downloading genomes')
             shutil.rmtree(args.genomes_dir)
-            try:
-                gng.main(args)
-            except subprocess.CalledProcessError:
-                logger.error("Error downloading genome")
-        else:
-            pass
-    else:
-        try:
-            gng.main(args)
-        except subprocess.CalledProcessError:
-            logger.error("Error downloading genome")
+            gng.main(args)  # remake and fill with genomes
+        if len(glob.glob(os.path.join(args.genomes_dir, "*.fna.gz"))) != 0:
+            logger.debug('Warning: genome downloading may have been interupted; ' +
+                         'downloading fresh')
+            shutil.rmtree(args.genomes_dir)
+            gng.main(args)  # remake and fill with genomes
+    except Exception as e:
+        logger.error("Error downloading genomes")
+        logger.error(e)
+        write_pass_fail(args, status="FAIL",
+                        stage="global", note="Downloading_references")
+        sys.exit(1)
+
     logger.debug("checking reference genomes for rDNA counts")
     for potential_reference in glob.glob(os.path.join(args.genomes_dir, "*.fna")):
         rDNAs = check_rDNA_copy_number(ref=potential_reference,
@@ -704,9 +725,18 @@ def main():
             logger.warning(
                 "reference %s does not have multiple rDNAs; excluding", potential_reference)
             os.remove(potential_reference)
+    if len(glob.glob(os.path.join(args.genomes_dir, "*.fna"))) == 0:
+        logger.error("No usable reference genome found!")
+        write_pass_fail(args, status="FAIL",
+                        stage="global",
+                        note="filtering_references: no references had more than 1 rDNA")
 
     if filtered_sras == []:
-        logger.debug('No SRAs found on NCBI by sraFind')
+        if args.example_reads is None:
+            logger.error('No SRAs found on NCBI by sraFind')
+            write_pass_fail(args, status="FAIL",
+                            stage="global",
+                            note="identifying SRAs: double check SRAfind sheet to ensure data exists for your organism")
 
     if args.example_reads is not None:
         this_output = os.path.join(args.output_dir, "example", "")
@@ -746,7 +776,7 @@ def main():
             if not os.path.exists(rawreadsr):
                 rawreadsr = None
             if not os.path.exists(rawreadsf):
-                logger.critical('Forward reads not detected')
+                logger.info('Forward reads not detected')
                 continue
             try:
                 if "PROCESSED" not in parse_status_file(path=status):
@@ -759,20 +789,38 @@ def main():
 
                 else:
                     logger.debug("Already processed: %s", accession)
+                write_pass_fail(args, status="PASS",
+                                stage=accession,
+                                note="")
 
             except subprocess.CalledProcessError:
+                write_pass_fail(args, status="FAIL",
+                                stage=accession,
+                                note="unknown failure")
                 logger.error('Unknown subprocess error')
                 continue
             except bestreferenceError as e:
+                write_pass_fail(args, status="FAIL",
+                                stage=accession,
+                                note="unknown error selecting reference")
                 logger.error(e)
                 continue
             except downsamplingError as e:
+                write_pass_fail(args, status="FAIL",
+                                stage=accession,
+                                note="unknown error downsampling")
                 logger.error(e)
                 continue
             except riboSeedError as e:
+                write_pass_fail(args, status="FAIL",
+                                stage=accession,
+                                note="unknown failure running riboSeed")
                 logger.error(e)
                 continue
             except extracting16sError as e:
+                write_pass_fail(args, status="FAIL",
+                                stage=accession,
+                                note="unknown extracting 16s sequences")
                 logger.error(e)
                 continue
 
@@ -785,7 +833,11 @@ def main():
         all_assemblies, args, logger)
     logger.debug("Wrote out  %i  sequences", n_extracted_seqs)
     if n_extracted_seqs == 0:
+        write_pass_fail(args, status="FAIL",
+                        stage="global",
+                        note="no 16s sequences detected in re-assemblies")
         logger.warning("No  16s Sequences  recovered. exiting")
+
         sys.exit()
 
 
@@ -793,6 +845,9 @@ def main():
         shutil.rmtree(alignoutput)
     alignment(fasta=extract16soutput, output=alignoutput, logger=logger)
     logger.debug('Maximum-likelihood tree available at: %s', pathtotree)
+    write_pass_fail(args, status="PASS",
+                    stage="global",
+                    note="")
 
 
 if __name__ == '__main__':
