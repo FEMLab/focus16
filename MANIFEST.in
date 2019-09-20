@@ -1,9 +1,9 @@
-#data used for clustering
-recursive-include py16db/example_data *
-recursive-include py16db/test_data/plasmids *
-include py16db/test_data/test_reads1.fq
-include py16db/test_data/sraFind-Contig-biosample-with-SRA-hits.txt
-include py16db/test_data/NC_017659.1.fasta
+# data used for clustering
+# recursive-include py16db/example_data *
+recursive-exclude py16db/test_data *
+# include py16db/test_data/test_reads1.fq
+# include py16db/test_data/sraFind-Contig-biosample-with-SRA-hits.txt
+# include py16db/test_data/NC_017659.1.fasta
 
 #Misc
 include LICENSE.txt

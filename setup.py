@@ -39,19 +39,19 @@ setup(name='16db',
       #          'py16db/fetch_sraFind_data.py'],
       install_requires = ['biopython',  'plentyofbugs'],
       zip_safe=False,
-      include_package_data=True,
-      package_data={
-          'test_data': [
-              'ecoli/*',
-              'test_reads1.fq',
-              'test_reads1.fq',
-              'ribo16',
-              'status/*',
-              'test_16s_multilineSHORT.fasta',
-              'test_sraFind.txt',
-              'test_sralist.txt',
-          ],
-      },
+      # include_package_data=True,
+      # package_data={
+      #     'test_data': [
+      #         #'ecoli/*',
+      #         # 'test_reads1.fq',
+      #         # 'test_reads1.fq',
+      #         'ribo16',
+      #         'status/*',
+      #         'test_16s_multilineSHORT.fasta',
+      #         'test_sraFind.txt',
+      #         'test_sralist.txt',
+      #     ],
+      # },
       entry_points={
           'console_scripts': [
               '16db = py16db.run_all:main',
