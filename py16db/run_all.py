@@ -9,10 +9,14 @@ import shutil
 import re
 import gzip
 import logging
+import glob
 
 from plentyofbugs import get_n_genomes as gng
 from py16db.run_sickle import run_sickle
 from Bio import SeqIO
+from Bio.SeqRecord import SeqRecord
+
+#from Bio.Seq import Seq
 from . import __version__
 
 
@@ -87,9 +91,16 @@ def get_args():
                         help="path_to_prokaryotes.txt",
                         default="./prokaryotes.txt",
                         required=False)
-    parser.add_argument("-S", "--nstrains", help="number of SRAs to be run",
+    parser.add_argument("-S", "--n_SRAs", help="max number of SRAs to be run",
                         type=int, required=False)
-    parser.add_argument("--get_all", help="get both SRAs if organism has two",
+    parser.add_argument("-R", "--n_references",
+                        help="max number of reference strains to consider",
+                        type=int, required=False)
+    parser.add_argument("--get_all",
+                        help="if a biosample is associated with " +
+                        "multiple libraries, default behaviour is to " +
+                        "download the first only.  Use --get_all to " +
+                        "analyse each library",
                         action="store_true", required=False)
     parser.add_argument("--cores",
                         help="integer for how many cores you wish to use",
@@ -107,11 +118,16 @@ def get_args():
                         "use for sub assemblies",
                         choices=["spades", "skesa"],
                         required=False, default="spades")
+    # this is needed for plentyofbugs, should not be user set
+    parser.add_argument("--nstrains", help=argparse.SUPPRESS,
+                        type=int, required=False)
     parser.add_argument("--memory",
                         help="amount of RAM to be used",
                         default=4,
                         required=False, type=int)
     args = parser.parse_args()
+    # plentyofbugs uses args.nstrains, but wecall it args.n_references for clarity
+    args.nstrains = args.n_references
     if args.SRAs is None:
         if args.nstrains is None:
             print("if not running with --SRAs, " +
@@ -524,21 +540,12 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
     else:
         logger.debug("Skipping riboSeed")
 
-    barr_out = os.path.join(this_output, "barrnap")
-    extract16soutput = os.path.join(args.output_dir, "ribo16s")
-    ribo_contigs = os.path.join(this_output, "riboSeed", "seed",
-                                "final_long_reads", "riboSeedContigs.fasta")
 
     if not os.path.exists(ribo_contigs):
         logger.critical(
             "riboSeed was not successful; for details, see log file at %s",
             os.path.join(this_output, "riboSeed", "run_riboSeed.log")
         )
-    else:
-        extract_16s_from_contigs(
-            input_contigs=ribo_contigs,
-            barr_out=barr_out, output=extract16soutput,
-            logger=logger)
 
 
 def alignment(fasta, output, logger):
@@ -592,6 +599,54 @@ def fetch_sraFind_data(dest_path):
             stderr=subprocess.PIPE,
             check=True)
 
+def extract_16s_from_assembly_list(all_assemblies, args, logger):
+
+    extract16soutput = os.path.join(args.output_dir, "ribo16s.fasta")
+    if os.path.exists(extract16soutput):
+        os.remove(extract16soutput)
+        results16s = {}  # [sra_#, chromosome, start, end, reverse complimented]
+    nseqs = 0
+    for assembly in all_assemblies:
+        sra = assembly.split(os.path.sep)[1]
+        barr_out = os.path.join(os.path.join(args.output_dir, sra, "barrnap"))
+        with open(assembly, "r") as inf:
+            barrnap = "barrnap {assembly} > {barr_out}".format(**locals())
+            logger.debug('Identifying 16S sequences with barnap: %s', barrnap)
+            try:
+                subprocess.run(barrnap,
+                               shell=sys.platform != "win32",
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE,
+                               check=True)
+            except:
+                raise extracting16sError("Error running the following command %s", barrnap)
+            with open(barr_out, "r") as rrn, open(assembly, "r")  as asmb, open(extract16soutput, "a") as outf:
+                rrn_num = 0
+                for rawline in rrn:
+                    line = rawline.strip().split('\t')
+                    if line[0].startswith("##"):
+                        continue
+                    if line[8].startswith("Name=16S"):
+                        rrn_num += 1
+                        if line[6] == "-":
+                            suffix = 'chromosome-RC@'
+                        else:
+                            suffix = ''
+                        chrom = line[0]
+                        ori = line[6]
+                        start = int(line[3])
+                        end = int(line[4])
+                        thisid = "{}_{}".format(sra, rrn_num)
+                        results16s[thisid] = [chrom, start, end, line[6]]
+                        for rec in SeqIO.parse(asmb, "fasta"):
+                            if rec.id  == chrom:
+                                seq = rec.seq[start + 1: end + 1]
+                                if  ori == "-":
+                                    seq = seq.reverse_complement()
+                                thisdesc = "{chrom}:{start}:{end}({ori})".format(**locals())
+                                SeqIO.write(SeqRecord(seq, id=thisid, description=thisdesc), outf,  "fasta")
+                                nseqs += 1
+    return(nseqs, extract16soutput)
 
 def main():
     args = get_args()
@@ -616,7 +671,7 @@ def main():
         filtered_sras = filter_SRA(
             sraFind=args.sra_path,
             organism_name=args.organism_name,
-            strains=args.nstrains,
+            strains=args.n_SRAs,
             logger=logger,
             get_all=args.get_all)
 
@@ -634,7 +689,6 @@ def main():
                 gng.main(args)
             except subprocess.CalledProcessError:
                 logger.error("Error downloading genome")
-
         else:
             pass
     else:
@@ -714,17 +768,23 @@ def main():
                 logger.error(e)
                 continue
 
-    extract16soutput = os.path.join(args.output_dir, "ribo16s")
-    alignoutput = os.path.join(args.output_dir, "allsequences")
+    alignoutput = os.path.join(args.output_dir, "allsequences",  "")
     pathtotree = os.path.join(alignoutput, "MSA.fasta.tree")
+    all_assemblies  =  glob.glob(
+        os.path.join(args.output_dir, "*", "results", "riboSeed",
+                     "seed", "final_long_reads", "riboSeedContigs.fasta"))
+    n_extracted_seqs, extract16soutput  =  extract_16s_from_assembly_list(
+        all_assemblies, args, logger)
+    logger.debug("Wrote out  %i  sequences", n_extracted_seqs)
+    if n_extracted_seqs == 0:
+        logger.warning("No  16s Sequences  recovered. exiting")
+        sys.exit()
+
 
     if os.path.exists(alignoutput):
         shutil.rmtree(alignoutput)
-    if not os.path.exists(extract16soutput):
-        logger.warning("No 16s seqeunces recovered. exiting...")
-    else:
-        alignment(fasta=extract16soutput, output=alignoutput, logger=logger)
-        logger.debug('Maximum-likelihood tree available at: %s', pathtotree)
+    alignment(fasta=extract16soutput, output=alignoutput, logger=logger)
+    logger.debug('Maximum-likelihood tree available at: %s', pathtotree)
 
 
 if __name__ == '__main__':

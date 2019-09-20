@@ -25,8 +25,10 @@ conda install python=3.5 seqtk sickle-trim sra-tools riboseed mash skesa barrnap
 ## Usage
 ###### Example
 ```
-16db -o ./escherichia/ -g ./escherichia/genomes/ -S 10 --memory 8 --cores 4 -n "Escherichia coli"
+16db --output_dir ./escherichia/ -g ./escherichia_genomes/ --n_SRAs 5 --n_references 30 --memory 8 --cores 4 --organism_name "Escherichia coli"
 ```
+This will go through the process of getting the list of assemblies that are associated with SRAs, downloading up to 10 SRAs,  building
+
 ###### Required Arguments
 ```
 [--organism_name]: The species of interest, input within quotes.
