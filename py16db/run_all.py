@@ -715,8 +715,7 @@ def main():
             write_pass_fail(
                 args, status="FAIL",
                 stage="global",
-                note="identifying SRAs: double check SRAfind sheet " +
-                "to ensure data exists for your organism")
+                note="No SRAs found for your organism")
             sys.exit(1)
 
     pob_result = decide_skip_or_download_genomes(args, logger)
