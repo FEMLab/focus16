@@ -123,3 +123,7 @@ If you get a failure running riboSeed about `dependencies not installed:["numpy"
 ```
 conda install openblas=0.2.19
 ```
+
+
+### Fuzzy matching organisms for `plentyofbugs`
+The default behavior for identifying organisms of interest from NCBI's `prokaryotes.txt` is to find lines starting with `--organism_name`.  This is intentional, as the names are poorly defined in the file, and  this allows us to capture a whole genus if desired.  We have never come across a case where this happens, but this could have the consequence of including undesired organisms, if they start with the same characters. For instance, an `--organism_name` of `dog` would also match `dogfish`.  If you notice undesired organisms included in the log file in our output directory,  you will have to manually select the lines of interest from `prokaryotes.txt`, save that as an alterative file, and use the `--prokaryotes` argument to provide this edited version to 16db.

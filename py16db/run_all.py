@@ -95,8 +95,9 @@ def get_args():
     parser.add_argument("-S", "--n_SRAs", help="max number of SRAs to be run",
                         type=int, required=False)
     parser.add_argument("-R", "--n_references",
-                        help="max number of reference strains to consider",
-                        type=int, required=False)
+                        help="max number of reference strains to consider. " +
+                        "default (0) is download all",
+                        type=int, required=False, default=0)
     parser.add_argument("--get_all",
                         help="if a biosample is associated with " +
                         "multiple libraries, default behaviour is to " +
@@ -608,6 +609,75 @@ def write_pass_fail(args, stage, status, note):
         failfile.write("{}\t{}\t{}\t{}\n".format(org, status, stage, note))
 
 
+def our_get_n_genomes(args, logger):
+    # taken from the main function of get_n_genomes
+    if not os.path.exists(args.prokaryotes):
+        fetch_prokaryotes(dest=args.prokaryotes)
+    org_lines = gng.get_lines_of_interest_from_proks(path=args.prokaryotes,
+                                                     org=args.organism_name)
+    if len(org_lines) == 0:
+        return 1
+    if args.nstrains == 0:
+        nstrains = len(org_lines)
+    else:
+        nstrains = args.nstrains
+    cmds = gng.make_fetch_cmds(
+        org_lines,
+        nstrains=args.nstrains,
+        genomes_dir=args.genomes_dir,
+        SHUFFLE=True)
+    try:
+        for i, cmd in enumerate(cmds):
+            sys.stderr.write("Downloading genome %i of %i\n%s\n" %(i + 1, len(cmds), cmd))
+            subprocess.run(
+                cmd,
+                shell=sys.platform != "win32",
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True)
+    except Exception as e:
+        logger.error(e)
+        return 2
+
+    unzip_cmd = "gunzip " + os.path.join(args.genomes_dir, "*.gz")
+    sys.stderr.write(unzip_cmd + "\n")
+    try:
+        subprocess.run(
+            unzip_cmd,
+            shell=sys.platform != "win32",
+            check=True)
+    except Exception as e:
+        logger.error(e)
+        return 3
+    return 0
+
+
+def decide_skip_or_download_genomes(args, logger):
+    """ checks the genomes dir
+    returns
+    - 0 if all is well
+    - 1 if no matching genomes in prokaryotes.txt
+    - 2 if error downloading
+    - 3 if error unzipping
+    """
+    # check basic integrity of genomes dir
+    # it might exist, but making it here simplifies the control flow later
+    # it seems counter intuitive, but checking if the dir we might have just
+    # created is easier than checking if it exists/is intact twice
+    os.makedirs(args.genomes_dir, exist_ok=True)
+    if len(glob.glob(os.path.join(args.genomes_dir, "*.fna"))) == 0:
+        logger.debug('Warning: genome directory exists but is ' +
+                     'empty: downloading genomes')
+        return(our_get_n_genomes(args, logger))
+    if len(glob.glob(os.path.join(args.genomes_dir, "*.fna.gz"))) != 0:
+        logger.debug('Warning: genome downloading may have been interupted; ' +
+                     'downloading fresh')
+        shutil.rmtree(args.genomes_dir)
+        os.makedirs(args.genomes_dir)
+        return(our_get_n_genomes(args, logger))
+    return 0
+
+
 def main():
     args = get_args()
 
@@ -639,29 +709,43 @@ def main():
 
     sra_num = len(filtered_sras)
     logger.debug("%s SRAs found:", sra_num)
+    if filtered_sras == []:
+        if args.example_reads is None:
+            logger.error('No SRAs found on NCBI by sraFind')
+            write_pass_fail(
+                args, status="FAIL",
+                stage="global",
+                note="identifying SRAs: double check SRAfind sheet " +
+                "to ensure data exists for your organism")
+            sys.exit(1)
 
-    # check basic integrity of genomes dir
-    # it might exist, but making it here simplifies the control flow later
-    # it seems counter intuitive, but checking if the dir we might have just
-    # created is easier than checking if it exists/is intact twice
-    os.makedirs(args.genomes_dir, exist_ok=True)
-    try:
-        if len(glob.glob(os.path.join(args.genomes_dir, "*.fna"))) == 0:
-            logger.debug('Warning: genome directory exists but is ' +
-                         'empty: downloading genomes')
-            shutil.rmtree(args.genomes_dir)
-            gng.main(args)  # remake and fill with genomes
-        if len(glob.glob(os.path.join(args.genomes_dir, "*.fna.gz"))) != 0:
-            logger.debug('Warning: genome downloading may have been interupted; ' +
-                         'downloading fresh')
-            shutil.rmtree(args.genomes_dir)
-            gng.main(args)  # remake and fill with genomes
-    except Exception as e:
-        logger.error("Error downloading genomes")
-        logger.error(e)
-        write_pass_fail(args, status="FAIL",
-                        stage="global", note="Downloading_references")
+    pob_result = decide_skip_or_download_genomes(args, logger)
+    if pob_result != 0:
+        if pob_result == 1:
+            message = "No available complete genome for organism"
+            logger.critical(message)
+            write_pass_fail(
+                args, status="FAIL",
+                stage="global",
+                note=message)
+        elif pob_result == 2:
+            message ="Error downloading genome from NCBI"
+            logger.critical(message)
+            write_pass_fail(
+                args, status="FAIL",
+                stage="global",
+                note="message")
+        elif pob_result == 3:
+            message ="Error unzipping genomes; delete directory and try again"
+            logger.critical(message)
+            write_pass_fail(
+                args, status="FAIL",
+                stage="global",
+                note=message)
+        else:
+            pass
         sys.exit(1)
+
 
     logger.debug("checking reference genomes for rDNA counts")
     for potential_reference in glob.glob(os.path.join(args.genomes_dir, "*.fna")):
@@ -678,12 +762,6 @@ def main():
                         stage="global",
                         note="filtering_references: no references had more than 1 rDNA")
 
-    if filtered_sras == []:
-        if args.example_reads is None:
-            logger.error('No SRAs found on NCBI by sraFind')
-            write_pass_fail(args, status="FAIL",
-                            stage="global",
-                            note="identifying SRAs: double check SRAfind sheet to ensure data exists for your organism")
 
     if args.example_reads is not None:
         this_output = os.path.join(args.output_dir, "example", "")
