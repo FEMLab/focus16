@@ -689,7 +689,11 @@ def main():
         os.remove(os.path.join(args.output_dir, "SUMMARY"))
 
     logger = setup_logging(args)
-
+    logger.debug("Processing %s", args.organism_name)
+    logger.info("Usage:\n{0}\n".format(" ".join([x for x in sys.argv])))
+    # logger.debug("All settings used:")
+    # for k,v in sorted(vars(args).items()):
+    #     logger.debug("{0}: {1}".format(k,v))
     check_programs(logger)
 
     fetch_sraFind_data(args.sra_path)
