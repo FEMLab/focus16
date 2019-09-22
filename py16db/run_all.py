@@ -553,7 +553,7 @@ def fetch_sraFind_data(dest_path):
 def extract_16s_from_assembly_list(all_assemblies, args, logger):
     extract16soutput = os.path.join(
         args.output_dir,
-        "{}_ribo16s.fasta".format(args.organism_name.srplace(" ", "_")))
+        "{}_ribo16s.fasta".format(args.organism_name.replace(" ", "_")))
     if os.path.exists(extract16soutput):
         os.remove(extract16soutput)
     results16s = {}  # [sra_#, chromosome, start, end, reverse complimented]
