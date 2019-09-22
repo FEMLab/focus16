@@ -29,6 +29,15 @@ class downsamplingError(Exception):
 
 
 class riboSeedError(Exception):
+    """ for issues with running riboSeed
+    """
+    pass
+
+
+class riboSeedUnsuccessfulError(Exception):
+    """ its not magic, this "error" is for when riboSeed
+    finishes, but cant improve on assembly
+    """
     pass
 
 
@@ -301,7 +310,7 @@ def check_rDNA_copy_number(ref, output, logger):
     # return(rrn_num)
 
 
-def get_and_check_ave_read_len_from_fastq(fastq1, logger=None):
+def get_and_check_ave_read_len_from_fastq(fastq1, minlen, maxlen, logger=None):
     """return average read length in fastq1 file from first N reads
     from LP: taken from github.com/nickp60/riboSeed/riboSeed/classes.py;
     """
@@ -321,14 +330,14 @@ def get_and_check_ave_read_len_from_fastq(fastq1, logger=None):
                 break
 
     ave_read_len = float(tot / 30)
-    if ave_read_len < 65:
+    if ave_read_len < minlen:
         logger.critical("Average read length is too short: %s", ave_read_len)
-        sys.exit(1)
-    if ave_read_len > 300:
+        return (1, ave_read_len)
+    if ave_read_len > maxlen:
         logger.critical("Average read length is too long: %s", ave_read_len)
-        sys.exit(1)
+        return (2, ave_read_len)
     logger.debug("Average read length: %s", ave_read_len)
-    return(ave_read_len)
+    return (0, ave_read_len)
 
 
 def get_coverage(read_length, approx_length, fastq1, fastq2, logger):
@@ -412,13 +421,12 @@ def make_riboseed_cmd(sra, readsf, readsr, cores, subassembler, threads,
     return(cmd)
 
 
-def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
+def process_strain(rawreadsf, rawreadsr, read_length, this_output, args, logger):
     pob_dir = os.path.join(this_output, "plentyofbugs")
 
     ribo_dir = os.path.join(this_output, "riboSeed")
     sickle_out = os.path.join(this_output, "sickle")
-    read_length = get_and_check_ave_read_len_from_fastq(fastq1=rawreadsf,
-                                                        logger=logger)
+
     best_reference = os.path.join(pob_dir, "best_reference")
     if not os.path.exists(best_reference):
         pob(genomes_dir=args.genomes_dir, readsf=rawreadsf,
@@ -496,7 +504,7 @@ def process_strain(rawreadsf, rawreadsr, this_output, args, logger):
             "riboSeed was not successful; for details, see log file at %s",
             os.path.join(this_output, "riboSeed", "run_riboSeed.log")
         )
-
+        raise riboSeedUnsuccessfulError("riboSeed finished running but was unsuccessful")
 
 def alignment(fasta, output, logger):
     """ Performs multiple sequence alignment with mafft and contructs a tree with iqtree
@@ -749,14 +757,19 @@ def main():
         sys.exit(1)
 
     logger.debug("checking reference genomes for rDNA counts")
-    for potential_reference in glob.glob(os.path.join(args.genomes_dir, "*.fna")):
-        rDNAs = check_rDNA_copy_number(ref=potential_reference,
-                                       output=args.genomes_dir,
-                                       logger=logger)
-        if rDNAs < 2:
-            logger.warning(
-                "reference %s does not have multiple rDNAs; excluding", potential_reference)
-            os.remove(potential_reference)
+    if os.path.exists(os.path.join(args.genomes_dir, ".references_passed_checks")):
+        for potential_reference in glob.glob(os.path.join(args.genomes_dir, "*.fna")):
+            rDNAs = check_rDNA_copy_number(ref=potential_reference,
+                                           output=args.genomes_dir,
+                                           logger=logger)
+            if rDNAs < 2:
+                logger.warning(
+                    "reference %s does not have multiple rDNAs; excluding", potential_reference)
+                os.remove(potential_reference)
+        with open(os.path.join(args.genomes_dir, ".references_passed_checks"), "w") as statusfile:
+            statusfile.write("References have been checked\n")
+    else:
+        logger.debug("Already checked reference genomes")
     if len(glob.glob(os.path.join(args.genomes_dir, "*.fna"))) == 0:
         logger.error("No usable reference genome found!")
         write_pass_fail(args, status="FAIL",
@@ -771,7 +784,22 @@ def main():
             rawreadsr = args.example_reads[1]
         except IndexError:
             rawreadsr = None
-        process_strain(rawreadsf, rawreadsr, this_output, args, logger)
+        read_len_status, read_length = get_and_check_ave_read_len_from_fastq(
+            minlen=65,
+            maxlen=301,
+            fastq1=rawreadsf,
+            logger=logger)
+        if read_len_status != 0:
+            if read_len_status == 1:
+                message = "Reads were shorter than 65bp threshold"
+            else:
+                message = "Reads were longer than 300bp threshold"
+            write_pass_fail(args, status="FAIL",
+                            stage="examplereads",
+                            note=message)
+            logger.error(message)
+            sys.exit(1)
+        process_strain(rawreadsf, rawreadsr, read_length,this_results, args, logger)
 
     else:
         for i, accession in enumerate(filtered_sras):
@@ -800,23 +828,43 @@ def main():
             rawreadsr = os.path.join(this_data, accession + "_2.fastq")
             if not os.path.exists(rawreadsr):
                 rawreadsr = None
+            # Double check the download worked.  If its a single lib,
+            # it wont have a _1 prefix, so we check if that exists
+            # and if so, adjust expeactations
             if not os.path.exists(rawreadsf):
-                logger.info('Forward reads not detected')
-                continue
+                # check if its a single library situation
+                rawreadsf = os.path.join(this_data, accession + ".fastq")
+                if not os.path.exists(rawreadsf):
+                    message =  'Error downloading  %s'  % accession
+                    write_pass_fail(args, status="FAIL", stage=accession, note=message)
+                    logger.error(message)
+                    continue
             try:
                 if "PROCESSED" not in parse_status_file(path=status):
                     if os.path.exists(this_results):
                         shutil.rmtree(this_results)
-                    process_strain(rawreadsf, rawreadsr, this_results,
-                                   args, logger)
+                    read_len_status, read_length = get_and_check_ave_read_len_from_fastq(
+                        minlen=65,
+                        maxlen=301,
+                        fastq1=rawreadsf, logger=logger)
+                    if read_len_status != 0:
+                        if read_len_status == 1:
+                            message = "Reads were shorter than 65bp threshold"
+                        else:
+                            message = "Reads were longer than 300bp threshold"
+                        write_pass_fail(args, status="FAIL", stage=accession, note=message)
+                        logger.error(message)
+                        continue
+
+                    process_strain(rawreadsf, rawreadsr, read_length,this_results, args,  logger)
                     with open(status, "a") as statusfile:
                         statusfile.write("PROCESSED\n")
 
                 else:
                     logger.debug("Already processed: %s", accession)
-                write_pass_fail(args, status="PASS",
-                                stage=accession,
-                                note="Processed strain")
+                    write_pass_fail(args, status="PASS",
+                                    stage=accession,
+                                    note="Processed strain")
 
             except subprocess.CalledProcessError:
                 write_pass_fail(args, status="FAIL",
@@ -842,6 +890,13 @@ def main():
                                 note="unknown failure running riboSeed")
                 logger.error(e)
                 continue
+            except riboSeedUnsuccessfulError as e:
+                write_pass_fail(args, status="FAIL",
+                                stage=accession,
+                                note="riboSeed unsuccessful")
+                logger.error(e)
+                continue
+
             except extracting16sError as e:
                 write_pass_fail(args, status="FAIL",
                                 stage=accession,
