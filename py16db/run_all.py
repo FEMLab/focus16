@@ -36,7 +36,7 @@ class extracting16sError(Exception):
     pass
 
 
-def setup_logging(args):
+def setup_logging(args):  # pragma: nocover
     logging.basicConfig(
         level=logging.DEBUG,
         filename=os.path.join(args.output_dir, "16db.log"),
@@ -127,6 +127,9 @@ def get_args():
                         help="amount of RAM to be used",
                         default=4,
                         required=False, type=int)
+    parser.add_argument("--seed",
+                        help="random seed for subsampling referencese",
+                        type=int, default=12345)
     args = parser.parse_args()
     # plentyofbugs uses args.nstrains, but wecall it args.n_references for clarity
     args.nstrains = args.n_references
@@ -150,7 +153,7 @@ def check_programs(logger):
             sys.exit(1)
 
 
-def filter_SRA(sraFind, organism_name, strains, get_all, logger):
+def filter_SRA(sraFind, organism_name, strains, get_all, thisseed, logger):
     """sraFind [github.com/nickp60/srafind], contains"""
     results = []
     with open(sraFind, "r") as infile:
@@ -161,8 +164,7 @@ def filter_SRA(sraFind, organism_name, strains, get_all, logger):
                 if split_line[8].startswith("ILLUMINA"):
                     results.append(split_line[17])
     #  arbitrary seed number
-    SEED = 8
-    random.seed(SEED)
+    random.seed(thisseed)
     random.shuffle(results)
 
     if strains != 0:
@@ -549,7 +551,9 @@ def fetch_sraFind_data(dest_path):
 
 
 def extract_16s_from_assembly_list(all_assemblies, args, logger):
-    extract16soutput = os.path.join(args.output_dir, "ribo16s.fasta")
+    extract16soutput = os.path.join(
+        args.output_dir,
+        "{}_ribo16s.fasta".format(args.organism_name.srplace(" ", "_")))
     if os.path.exists(extract16soutput):
         os.remove(extract16soutput)
     results16s = {}  # [sra_#, chromosome, start, end, reverse complimented]
@@ -612,7 +616,7 @@ def write_pass_fail(args, stage, status, note):
 def our_get_n_genomes(args, logger):
     # taken from the main function of get_n_genomes
     if not os.path.exists(args.prokaryotes):
-        fetch_prokaryotes(dest=args.prokaryotes)
+        gng.fetch_prokaryotes(dest=args.prokaryotes)
     org_lines = gng.get_lines_of_interest_from_proks(path=args.prokaryotes,
                                                      org=args.organism_name)
     if len(org_lines) == 0:
@@ -621,14 +625,23 @@ def our_get_n_genomes(args, logger):
         nstrains = len(org_lines)
     else:
         nstrains = args.nstrains
+    print(nstrains)
     cmds = gng.make_fetch_cmds(
         org_lines,
-        nstrains=args.nstrains,
+        nstrains=nstrains,
+        thisseed=args.seed,
         genomes_dir=args.genomes_dir,
         SHUFFLE=True)
+    print(cmds)
+    # this can happen if tabs end up in metadata (see
+    # AP019724.1 B. unifomis, and others
+    # I updated plentyofbugs to try to catch it, but still might happen
+    if len(cmds) == 0:
+        return 1
     try:
         for i, cmd in enumerate(cmds):
             sys.stderr.write("Downloading genome %i of %i\n%s\n" %(i + 1, len(cmds), cmd))
+            logger.debug(cmd)
             subprocess.run(
                 cmd,
                 shell=sys.platform != "win32",
@@ -666,8 +679,7 @@ def decide_skip_or_download_genomes(args, logger):
     # created is easier than checking if it exists/is intact twice
     os.makedirs(args.genomes_dir, exist_ok=True)
     if len(glob.glob(os.path.join(args.genomes_dir, "*.fna"))) == 0:
-        logger.debug('Warning: genome directory exists but is ' +
-                     'empty: downloading genomes')
+        logger.debug('Downloading genomes')
         return(our_get_n_genomes(args, logger))
     if len(glob.glob(os.path.join(args.genomes_dir, "*.fna.gz"))) != 0:
         logger.debug('Warning: genome downloading may have been interupted; ' +
@@ -699,7 +711,6 @@ def main():
     fetch_sraFind_data(args.sra_path)
 
     if args.SRAs is not None:
-
         filtered_sras = args.SRAs
     elif args.SRA_list is not None:
         filtered_sras = sralist(list=args.SRA_list)
@@ -708,6 +719,7 @@ def main():
             sraFind=args.sra_path,
             organism_name=args.organism_name,
             strains=args.n_SRAs,
+            thisseed=args.seed,
             logger=logger,
             get_all=args.get_all)
 
@@ -726,29 +738,15 @@ def main():
     if pob_result != 0:
         if pob_result == 1:
             message = "No available complete genome for organism"
-            logger.critical(message)
-            write_pass_fail(
-                args, status="FAIL",
-                stage="global",
-                note=message)
         elif pob_result == 2:
             message ="Error downloading genome from NCBI"
-            logger.critical(message)
-            write_pass_fail(
-                args, status="FAIL",
-                stage="global",
-                note="message")
         elif pob_result == 3:
             message ="Error unzipping genomes; delete directory and try again"
-            logger.critical(message)
-            write_pass_fail(
-                args, status="FAIL",
-                stage="global",
-                note=message)
         else:
             pass
+        logger.critical(message)
+        write_pass_fail(args, status="FAIL", stage="global", note=message)
         sys.exit(1)
-
 
     logger.debug("checking reference genomes for rDNA counts")
     for potential_reference in glob.glob(os.path.join(args.genomes_dir, "*.fna")):
@@ -764,7 +762,6 @@ def main():
         write_pass_fail(args, status="FAIL",
                         stage="global",
                         note="filtering_references: no references had more than 1 rDNA")
-
 
     if args.example_reads is not None:
         this_output = os.path.join(args.output_dir, "example", "")
@@ -864,18 +861,10 @@ def main():
         write_pass_fail(args, status="FAIL",
                         stage="global",
                         note="no 16s sequences detected in re-assemblies")
-        logger.warning("No  16s Sequences  recovered. exiting")
-
+        logger.warning("No 16s Sequences  recovered. exiting")
         sys.exit()
-
-
-    # if os.path.exists(alignoutput):
-    #    shutil.rmtree(alignoutput)
-    # alignment(fasta=extract16soutput, output=alignoutput, logger=logger)
-    # logger.debug('Maximum-likelihood tree available at: %s', pathtotree)
-    write_pass_fail(args, status="PASS",
-                    stage="global",
-                    note="")
+    write_pass_fail(args, status="PASS", stage="global", note="")
+    sys.exit()
 
 
 if __name__ == '__main__':

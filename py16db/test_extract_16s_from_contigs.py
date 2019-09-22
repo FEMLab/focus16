@@ -6,10 +6,10 @@ import unittest
 import logging as logger
 
 class extractTest(unittest.TestCase):
-   """ test for extract_16s_from_contigs 
+   """ test for extract_16s_from_contigs
    """
    def setUp(self):
-      self.test_dir = os.path.join(os.path.dirname(__file__),                     
+      self.test_dir = os.path.join(os.path.dirname(__file__),
                                    "extract_test")
       self.contigs = os.path.join(os.path.dirname(__file__),
                                   "test_data", "ecoli", "NC_011750.1.fna")
@@ -17,7 +17,7 @@ class extractTest(unittest.TestCase):
       self.out_dir = os.path.join(self.test_dir, "ribo16")
       if os.path.exists(self.test_dir):
          shutil.rmtree(self.test_dir)
-      
+
    def tearDown(self):
       """tear down test fixtures
       """
@@ -34,13 +34,13 @@ class extractTest(unittest.TestCase):
                                            barr_out=barr_out, output=output,
                                            logger=logger)
       assert os.path.exists(test_result)
-       
+
 
 class extractTestLong(unittest.TestCase):
-   """ test for extract_16s_from_contigs 
+   """ test for extract_16s_from_contigs
    """
    def setUp(self):
-      self.test_dir = os.path.join(os.path.dirname(__file__),                     
+      self.test_dir = os.path.join(os.path.dirname(__file__),
                                    "extract_test")
       self.contigs = os.path.join(os.path.dirname(__file__),
                                   "test_data", "ecoli", "")
@@ -50,25 +50,23 @@ class extractTestLong(unittest.TestCase):
          shutil.rmtree(self.test_dir)
       if os.path.exists(os.path.join(self.contigs, "reference.msh")):
          os.remove(os.path.join(self.contigs, "reference.msh"))
-      
+
    def tearDown(self):
       """tear down test fixtures
       """
       shutil.rmtree(self.test_dir)
 
-   @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
-                    "skipping this test on travis.CI")
-   
-   def test_extractLong(self):
-      os.makedirs(self.test_dir)
-      barr_out = (self.barrnap)
-      output = (self.out_dir)
+   # @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
+   #                  "skipping this test on travis.CI")
 
-      for file in os.listdir(self.contigs):
-         contig = os.path.join(self.contigs, file)
-         test_result = extract_16s_from_contigs(input_contigs=contig,
-                                                barr_out=barr_out, output=output,
-                                                logger=logger)
-         assert os.path.exists(output)
+   # def test_extractLong(self):
+   #    os.makedirs(self.test_dir)
+   #    barr_out = (self.barrnap)
+   #    output = (self.out_dir)
 
-
+   #    for file in os.listdir(self.contigs):
+   #       contig = os.path.join(self.contigs, file)
+   #       test_result = extract_16s_from_contigs(input_contigs=contig,
+   #                                              barr_out=barr_out, output=output,
+   #                                              logger=logger)
+   #       assert os.path.exists(output)
