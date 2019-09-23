@@ -162,6 +162,36 @@ def check_programs(logger):
             sys.exit(1)
 
 
+
+def parse_status_file(path):
+    # because downloading and assembling can fail for many reasons,
+    # we write out status to a file.  this allows for easier restarting of
+    # incomplete runs
+    if not os.path.exists(path):
+        return []
+    statuses = []
+    with open(path, "r") as statusfile:
+        for line in statusfile:
+            statuses.append(line.strip())
+    return(statuses)
+
+
+def update_status_file(path, to_remove=[], message=None):
+    assert isinstance(to_remove, list)
+    statuses = parse_status_file(path)
+    # dont try to remove empty files
+    if statuses != []:
+        os.remove(path)
+    # just for cleaning up status file
+    if message is not None:
+        statuses.append(message)
+    # write out non-duplicated statuses
+    with open(path, "w") as statusfile:
+        for status in set(statuses):
+            if status not in to_remove:
+                statusfile.write(status + "\n")
+
+
 def filter_SRA(sraFind, organism_name, strains, get_all, thisseed, logger):
     """sraFind [github.com/nickp60/srafind], contains"""
     results = []
@@ -240,7 +270,7 @@ def pob(genomes_dir, readsf, output_dir, logger):
                            check=True)
             best_ref = os.path.join(output_dir, "best_reference")
         except:
-            raise bestreferenceError("Error running the following command: %s",
+            raise bestreferenceError("Error running the following command: %s" %
                                      command)
 
     with open(best_ref, "r") as infile:
@@ -260,24 +290,6 @@ def pob(genomes_dir, readsf, output_dir, logger):
                            stderr=subprocess.PIPE,
                            check=True)
             return(ref, sim)
-
-
-def download_SRA(cores, SRA, destination, logger):
-    """Download SRAs, downsample forward reads to 1000000"""
-    suboutput_dir_raw = os.path.join(destination, "")
-    os.makedirs(suboutput_dir_raw)
-
-    cmd = str("fasterq-dump {SRA} --threads {cores} -O " +
-              "{suboutput_dir_raw} --split-files ").format(**locals())
-
-    try:
-        subprocess.run(cmd,
-                       shell=sys.platform != "win32",
-                       stdout=subprocess.PIPE,
-                       stderr=subprocess.PIPE,
-                       check=True)
-    except subprocess.CalledProcessError:
-        logger.critical("Error with fasterq-dump")
 
 
 def check_rDNA_copy_number(ref, output, logger):
@@ -428,11 +440,11 @@ def process_strain(rawreadsf, rawreadsr, read_length, this_output, args, logger,
     sickle_out = os.path.join(this_output, "sickle")
     best_reference = os.path.join(pob_dir, "best_reference")
 
-    # run from here is set to true seqeuntially if a step has not been complete.
+    # Note thhat the status file is checked before each step.
+    # If a failure occured, all future steps are rerrun
     # for instance, if trimming has been done, but downsample hasn't,
-    # setting RUN_FROM_HERE to true means that downsampling and assembly will
-    # be run.  This is to protectt against files sticking around when they shouldn't
-    RUN_FROM_HERE = False
+    # downsampling and assembly will be run. This is to protectt against
+    # files sticking around when they shouldn't
     if not os.path.exists(best_reference):
         pob(genomes_dir=args.genomes_dir, readsf=rawreadsf,
             output_dir=pob_dir, logger=logger)
@@ -461,7 +473,7 @@ def process_strain(rawreadsf, rawreadsr, read_length, this_output, args, logger,
         fastq2=rawreadsr,
         output_dir=sickle_out,
         run="TRIMMED" not in parse_status_file(status_file))
-    update_status_file(status_file, "TRIMMED")
+    update_status_file(status_file, message="TRIMMED")
     logger.debug('Quality trimmed f reads: %s', trimmed_fastq1)
     logger.debug('Quality trimmed r reads: %s', trimmed_fastq2)
 
@@ -479,7 +491,7 @@ def process_strain(rawreadsf, rawreadsr, read_length, this_output, args, logger,
         read_length=read_length,
         logger=logger,
         run="DOWNSAMPLED" not in parse_status_file(status_file))
-    update_status_file(status_file, "DOWNSAMPLED")
+    update_status_file(status_file, message="DOWNSAMPLED")
     logger.debug('Downsampled f reads: %s', downsampledf)
     logger.debug('Downsampled r reads: %s', downsampledr)
 
@@ -502,73 +514,18 @@ def process_strain(rawreadsf, rawreadsr, read_length, this_output, args, logger,
                            stderr=subprocess.PIPE,
                            check=True)
 
-            update_status_file("RIBOSEED COMPLETE")
+            update_status_file(status_file, message="RIBOSEED COMPLETE")
         except:
-            raise riboSeedError("Error running the following command: %s",
+            raise riboSeedError("Error running the following command: %s" %
                                 riboseed_cmd)
     else:
         logger.debug("Skipping riboSeed")
 
 
     if not os.path.exists(ribo_contigs):
-        logger.warning(
-            "riboSeed was not successful; for details, see log file at %s",
-            os.path.join(this_output, "riboSeed", "run_riboSeed.log")
-        )
-        raise riboSeedUnsuccessfulError("riboSeed finished running but was unsuccessful")
-
-
-def alignment(fasta, output, logger):
-    """ Performs multiple sequence alignment with mafft and contructs a tree with iqtree
-    """
-    output = os.path.join(output, "alignment")
-    os.makedirs(output)
-    seqout = os.path.join(output, "16soneline.fasta")
-    mafftout = os.path.join(output, "MSA.fasta")
-    iqtreeout = os.path.join(output, "iqtree")
-    seqcmd = "seqtk seq -S {fasta} > {seqout}".format(**locals())
-    mafftcmd = "mafft {seqout} > {mafftout}".format(**locals())
-    iqtreecmd = "iqtree -s {mafftout} -nt AUTO > {iqtreeout}".format(**locals())
-    logger.debug("Running the following commands: ")
-
-    for cmd in [seqcmd, mafftcmd, iqtreecmd]:
-        logger.debug("   " + cmd)
-        subprocess.run(cmd,
-                       shell=sys.platform != "win32",
-                       stdout=subprocess.PIPE,
-                       stderr=subprocess.PIPE,
-                       check=True)
-    logger.debug('Performing alignment with mafft')
-    logger.debug('Building tree with iqtree')
-    return(output)
-
-
-def parse_status_file(path):
-    # because downloading and assembling can fail for many reasons,
-    # we write out status to a file.  this allows for easier restarting of
-    # incomplete runs
-    if not os.path.exists(path):
-        return []
-    statuses= []
-    with open(path, "r") as statusfile:
-        for line in statusfile:
-            statuses.append(line.strip())
-    return(statuses)
-
-
-def update_status_file(path, to_remove=[], message=None):
-    statuses = parse_status_file(path)
-    # dont try to remove emepty filesrun from
-    if statuses != []:
-        os.remove(path)
-    # just for cleaning up status file
-    if message is not None:
-        statuses.append(message)
-    # write out non-duplicated statuses
-    with open(path, "w") as statusfile:
-        for status in set(statuses):
-            if status not in to_remove:
-                statusfile.write(message + "\n")
+        raise riboSeedUnsuccessfulError(
+            "riboSeed completed but was not successful; for details, see log file at %s" %
+            os.path.join(this_output, "riboSeed", "run_riboSeed.log"))
 
 
 def fetch_sraFind_data(dest_path):
@@ -605,7 +562,7 @@ def extract_16s_from_assembly_list(all_assemblies, args, logger):
                            stderr=subprocess.PIPE,
                            check=True)
         except:
-            raise extracting16sError("Error running the following command %s", barrnap)
+            raise extracting16sError("Error running the following command %s" % barrnap)
         with open(barr_out, "r") as rrn, open(extract16soutput, "a") as outf:
             rrn_num = 0
             for rawline in rrn:
@@ -759,7 +716,6 @@ def main():
             get_all=args.get_all)
 
     sra_num = len(filtered_sras)
-    logger.debug("%s SRAs found:", sra_num)
     if filtered_sras == []:
         if args.example_reads is None:
             logger.error('No SRAs found on NCBI by sraFind')
@@ -783,7 +739,7 @@ def main():
         write_pass_fail(args, status="FAIL", stage="global", note=message)
         sys.exit(1)
 
-    if os.path.exists(os.path.join(args.genomes_dir, ".references_passed_checks")):
+    if not os.path.exists(os.path.join(args.genomes_dir, ".references_passed_checks")):
         logger.debug("checking reference genomes for rDNA counts")
         for potential_reference in glob.glob(os.path.join(args.genomes_dir, "*.fna")):
             rDNAs = check_rDNA_copy_number(ref=potential_reference,
@@ -849,7 +805,7 @@ def main():
                     shutil.rmtree(this_data)
                 download_SRA(cores=args.cores, SRA=accession,
                              destination=this_data, logger=logger)
-                update_status_file(status_file,"SRA DOWNLOAD COMPLETE")
+                update_status_file(status_file, message="SRA DOWNLOAD COMPLETE")
             else:
                 logger.debug("Skipping SRA download: %s", accession)
 

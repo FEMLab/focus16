@@ -11,3 +11,4 @@ py16db/sralist.py
 .eggs/
 16db.egg-info/
 prokaryotes.txt
+py16db/sample_status_file
