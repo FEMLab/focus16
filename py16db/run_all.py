@@ -362,42 +362,43 @@ def get_coverage(read_length, approx_length, fastq1, fastq2, logger):
 
 
 def downsample(read_length, approx_length, fastq1, fastq2,
-               maxcoverage, destination, logger):
+               maxcoverage, destination, logger, run):
     """downsample for optimal assembly
     Given the coverage from coverage(), downsamples the reads if over
     the max coverage set by args.maxcov. Default 50.
     """
 
     suboutput_dir_downsampled = destination
-    os.makedirs(suboutput_dir_downsampled)
     downpath1 = os.path.join(suboutput_dir_downsampled,
                              "downsampledreadsf.fastq")
-    downpath2 = os.path.join(suboutput_dir_downsampled,
-                             "downsampledreadsr.fastq")
+    downpath2 = None
+    if fastq2 is not None:
+        downpath2 = os.path.join(suboutput_dir_downsampled,
+                                 "downsampledreadsr.fastq")
     coverage = get_coverage(read_length, approx_length,
                             fastq1, fastq2, logger=logger)
     covfraction = round(float(maxcoverage / coverage), 3)
-    downcmd = "seqtk sample -s100 {fastq1} {covfraction} > {downpath1}".format(**locals())
+    downcmd =  "seqtk sample -s100 {fastq1} {covfraction} > {downpath1}".format(**locals())
     downcmd2 = "seqtk sample -s100 {fastq2} {covfraction} > {downpath2}".format(**locals())
     # at least downsample the forward/single reads, but add the
     # other command if using paired reads
     commands = [downcmd]
     if (coverage > maxcoverage):
-        logger.debug('Downsampling to %s X coverage', maxcoverage)
-        if fastq2 is not None:
-            commands.append(downcmd2)
-        else:
-            downpath2 = None
-        for command in commands:
-            try:
-                # logger.debug(command)
-                subprocess.run(command,
-                               shell=sys.platform != "win32",
-                               stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE,
-                               check=True)
-            except:
-                raise downsamplingError("Error running following command ", command)
+        if run:
+            os.makedirs(suboutput_dir_downsampled)
+            logger.debug('Downsampling to %s X coverage', maxcoverage)
+            if fastq2 is not None:
+                commands.append(downcmd2)
+            for command in commands:
+                try:
+                    # logger.debug(command)
+                    subprocess.run(command,
+                                   shell=sys.platform != "win32",
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE,
+                                   check=True)
+                except:
+                    raise downsamplingError("Error running following command ", command)
         return(downpath1, downpath2)
     else:
         logger.debug('Skipping downsampling as max coverage is < %s', maxcoverage)
@@ -421,13 +422,17 @@ def make_riboseed_cmd(sra, readsf, readsr, cores, subassembler, threads,
     return(cmd)
 
 
-def process_strain(rawreadsf, rawreadsr, read_length, this_output, args, logger):
+def process_strain(rawreadsf, rawreadsr, read_length, this_output, args, logger, status_file):
     pob_dir = os.path.join(this_output, "plentyofbugs")
-
     ribo_dir = os.path.join(this_output, "riboSeed")
     sickle_out = os.path.join(this_output, "sickle")
-
     best_reference = os.path.join(pob_dir, "best_reference")
+
+    # run from here is set to true seqeuntially if a step has not been complete.
+    # for instance, if trimming has been done, but downsample hasn't,
+    # setting RUN_FROM_HERE to true means that downsampling and assembly will
+    # be run.  This is to protectt against files sticking around when they shouldn't
+    RUN_FROM_HERE = False
     if not os.path.exists(best_reference):
         pob(genomes_dir=args.genomes_dir, readsf=rawreadsf,
             output_dir=pob_dir, logger=logger)
@@ -444,17 +449,27 @@ def process_strain(rawreadsf, rawreadsr, read_length, this_output, args, logger)
                 logger.debug("Using genome length: %s", approx_length)
     else:
         approx_length = args.approx_length
-
     logger.debug('Quality trimming reads')
-    trimmed_fastq1, trimmed_fastq2 = run_sickle(fastq1=rawreadsf,
-                                                fastq2=rawreadsr,
-                                                output_dir=sickle_out)
+    #  this shouldn't happen, but might
+    if "TRIMMED" not in parse_status_file(status_file):
+        update_status_file(status_file,
+                           to_remove=["DOWNSAMPLED", "RIBOSEED COMPLETE"])
+        if os.path.exists(sickle_out):
+            shutil.rmtree(sickle_out)
+    trimmed_fastq1, trimmed_fastq2 = run_sickle(
+        fastq1=rawreadsf,
+        fastq2=rawreadsr,
+        output_dir=sickle_out,
+        run="TRIMMED" not in parse_status_file(status_file))
+    update_status_file(status_file, "TRIMMED")
     logger.debug('Quality trimmed f reads: %s', trimmed_fastq1)
     logger.debug('Quality trimmed r reads: %s', trimmed_fastq2)
 
-
     logger.debug('Downsampling reads')
-
+    if "DOWNSAMPLED" not in parse_status_file(status_file):
+        update_status_file(status_file, to_remove=["RIBOSEED COMPLETE"])
+        if os.path.exists(os.path.join(this_output, "downsampled")):
+            shutil.rmtree(os.path.join(this_output, "downsampled"))
     downsampledf, downsampledr = downsample(
         approx_length=approx_length,
         fastq1=trimmed_fastq1,
@@ -462,10 +477,11 @@ def process_strain(rawreadsf, rawreadsr, read_length, this_output, args, logger)
         maxcoverage=args.maxcov,
         destination=os.path.join(this_output, "downsampled"),
         read_length=read_length,
-        logger=logger)
+        logger=logger,
+        run="DOWNSAMPLED" not in parse_status_file(status_file))
+    update_status_file(status_file, "DOWNSAMPLED")
     logger.debug('Downsampled f reads: %s', downsampledf)
     logger.debug('Downsampled r reads: %s', downsampledr)
-
 
     riboseed_cmd = make_riboseed_cmd(sra=best_ref_fasta, readsf=downsampledf,
                                      readsr=downsampledr, cores=args.cores,
@@ -473,12 +489,12 @@ def process_strain(rawreadsf, rawreadsr, read_length, this_output, args, logger)
                                      subassembler=args.subassembler,
                                      threads=1, output=ribo_dir, logger=logger)
 
-    status = os.path.join(this_output, "status")
-
     # file that will contain riboseed contigs
     ribo_contigs = os.path.join(this_output, "riboSeed", "seed",
                                 "final_long_reads", "riboSeedContigs.fasta")
-    if "RIBOSEED COMPLETE" not in parse_status_file(status):
+    if "RIBOSEED COMPLETE" not in parse_status_file(status_file):
+        if os.path.exists(ribo_dir):
+            shutil.rmtree(ribo_dir)
         try:
             subprocess.run(riboseed_cmd,
                            shell=sys.platform != "win32",
@@ -486,25 +502,21 @@ def process_strain(rawreadsf, rawreadsr, read_length, this_output, args, logger)
                            stderr=subprocess.PIPE,
                            check=True)
 
-            with open(status, "a") as statusfile:
-                statusfile.write("RIBOSEED COMPLETE")
-
+            update_status_file("RIBOSEED COMPLETE")
         except:
-            if os.path.exists(ribo_contigs):
-                pass
-            else:
-                raise riboSeedError("Error running the following command: %s",
-                                    riboseed_cmd)
+            raise riboSeedError("Error running the following command: %s",
+                                riboseed_cmd)
     else:
         logger.debug("Skipping riboSeed")
 
 
     if not os.path.exists(ribo_contigs):
-        logger.critical(
+        logger.warning(
             "riboSeed was not successful; for details, see log file at %s",
             os.path.join(this_output, "riboSeed", "run_riboSeed.log")
         )
         raise riboSeedUnsuccessfulError("riboSeed finished running but was unsuccessful")
+
 
 def alignment(fasta, output, logger):
     """ Performs multiple sequence alignment with mafft and contructs a tree with iqtree
@@ -537,11 +549,26 @@ def parse_status_file(path):
     # incomplete runs
     if not os.path.exists(path):
         return []
-    status = []
+    statuses= []
     with open(path, "r") as statusfile:
         for line in statusfile:
-            status.append(line.strip())
-    return(status)
+            statuses.append(line.strip())
+    return(statuses)
+
+
+def update_status_file(path, to_remove=[], message=None):
+    statuses = parse_status_file(path)
+    # dont try to remove emepty filesrun from
+    if statuses != []:
+        os.remove(path)
+    # just for cleaning up status file
+    if message is not None:
+        statuses.append(message)
+    # write out non-duplicated statuses
+    with open(path, "w") as statusfile:
+        for status in set(statuses):
+            if status not in to_remove:
+                statusfile.write(message + "\n")
 
 
 def fetch_sraFind_data(dest_path):
@@ -756,8 +783,8 @@ def main():
         write_pass_fail(args, status="FAIL", stage="global", note=message)
         sys.exit(1)
 
-    logger.debug("checking reference genomes for rDNA counts")
     if os.path.exists(os.path.join(args.genomes_dir, ".references_passed_checks")):
+        logger.debug("checking reference genomes for rDNA counts")
         for potential_reference in glob.glob(os.path.join(args.genomes_dir, "*.fna")):
             rDNAs = check_rDNA_copy_number(ref=potential_reference,
                                            output=args.genomes_dir,
@@ -778,6 +805,9 @@ def main():
 
     if args.example_reads is not None:
         this_output = os.path.join(args.output_dir, "example", "")
+        status_file = os.path.join(this_output, "example", "")
+        if os.path.exists(this_output):
+            logger.warning("using existing output directory")
         os.makedirs(this_output)
         rawreadsf = args.example_reads[0]
         try:
@@ -799,7 +829,8 @@ def main():
                             note=message)
             logger.error(message)
             sys.exit(1)
-        process_strain(rawreadsf, rawreadsr, read_length,this_results, args, logger)
+
+        process_strain(rawreadsf, rawreadsr, read_length,this_results, args, logger, status_file)
 
     else:
         for i, accession in enumerate(filtered_sras):
@@ -807,20 +838,18 @@ def main():
             this_data = os.path.join(this_output, "data")
             this_results = os.path.join(this_output, "results")
             os.makedirs(this_output, exist_ok=True)
-            status = os.path.join(this_output, "status")
+            status_file = os.path.join(this_output, "status")
             logger.debug("Organism: %s", args.organism_name)
             # check status file for SRA COMPLETE
 
-            if "SRA COMPLETE" not in parse_status_file(path=status):
+            if "SRA DOWNLOAD COMPLETE" not in parse_status_file(status_file):
                 logger.debug('Downloading SRA: %s', accession)
                 # a fresh start
                 if os.path.exists(this_data):
                     shutil.rmtree(this_data)
-
                 download_SRA(cores=args.cores, SRA=accession,
                              destination=this_data, logger=logger)
-                with open(status, "a") as statusfile:
-                    statusfile.write("SRA COMPLETE\n")
+                update_status_file(status_file,"SRA DOWNLOAD COMPLETE")
             else:
                 logger.debug("Skipping SRA download: %s", accession)
 
@@ -839,32 +868,21 @@ def main():
                     write_pass_fail(args, status="FAIL", stage=accession, note=message)
                     logger.error(message)
                     continue
-            try:
-                if "PROCESSED" not in parse_status_file(path=status):
-                    if os.path.exists(this_results):
-                        shutil.rmtree(this_results)
-                    read_len_status, read_length = get_and_check_ave_read_len_from_fastq(
-                        minlen=65,
-                        maxlen=301,
-                        fastq1=rawreadsf, logger=logger)
-                    if read_len_status != 0:
-                        if read_len_status == 1:
-                            message = "Reads were shorter than 65bp threshold"
-                        else:
-                            message = "Reads were longer than 300bp threshold"
-                        write_pass_fail(args, status="FAIL", stage=accession, note=message)
-                        logger.error(message)
-                        continue
-
-                    process_strain(rawreadsf, rawreadsr, read_length,this_results, args,  logger)
-                    with open(status, "a") as statusfile:
-                        statusfile.write("PROCESSED\n")
-
+            read_len_status, read_length = get_and_check_ave_read_len_from_fastq(
+                minlen=65,
+                maxlen=301,
+                fastq1=rawreadsf, logger=logger)
+            if read_len_status != 0:
+                if read_len_status == 1:
+                    message = "Reads were shorter than 65bp threshold"
                 else:
-                    logger.debug("Already processed: %s", accession)
-                    write_pass_fail(args, status="PASS",
-                                    stage=accession,
-                                    note="Processed strain")
+                    message = "Reads were longer than 300bp threshold"
+                write_pass_fail(args, status="FAIL", stage=accession, note=message)
+                logger.error(message)
+                continue
+
+            try:
+                process_strain(rawreadsf, rawreadsr, read_length,this_results, args,  logger, status_file)
 
             except subprocess.CalledProcessError:
                 write_pass_fail(args, status="FAIL",
@@ -915,8 +933,8 @@ def main():
     if n_extracted_seqs == 0:
         write_pass_fail(args, status="FAIL",
                         stage="global",
-                        note="no 16s sequences detected in re-assemblies")
-        logger.warning("No 16s Sequences  recovered. exiting")
+                        note="No 16s sequences detected in re-assemblies")
+        logger.warning("No 16s sequences recovered. exiting")
         sys.exit()
     write_pass_fail(args, status="PASS", stage="global", note="")
     sys.exit()
