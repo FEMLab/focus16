@@ -832,23 +832,23 @@ def main():
                 # a fresh start
                 # shutil.rmtree(this_data)
 
-                ######   Delete this after rerunning on cluster; this helps rescue runs but should
-                # not be used in production
-                if os.path.exists(this_data):
-                    logger.info("SRA directory for %s exists, checking for files")
-                    candidates =  glob.glob(os.path.join(this_data, accession + "*fastq"))
-                    if any([os.path.getsize(x) == 0 for x in candidates]):
-                        logger.info("Empty files found; redownloading")
-                        shutil.rmtree(this_data)
-                        DOWNLOAD_SRA = True
-                    else:
-                        DOWNLOAD_SRA = False
-                else:
-                    DOWNLOAD_SRA = False
-                if DOWNLOAD_SRA:
+                # ######   Delete this after rerunning on cluster; this helps rescue runs but should
+                # # not be used in production
+                # if os.path.exists(this_data):
+                #     logger.info("SRA directory for %s exists, checking for files")
+                #     candidates =  glob.glob(os.path.join(this_data, accession + "*fastq"))
+                #     if any([os.path.getsize(x) == 0 for x in candidates]):
+                #         logger.info("Empty files found; redownloading")
+                #         shutil.rmtree(this_data)
+                #         DOWNLOAD_SRA = True
+                #     else:
+                #         DOWNLOAD_SRA = False
+                # else:
+                #     DOWNLOAD_SRA = False
+                # if DOWNLOAD_SRA:
                     #####################################################33333
-                    download_SRA(cores=args.cores, SRA=accession,
-                                 destination=this_data, logger=logger)
+                download_SRA(cores=args.cores, SRA=accession,
+                             destination=this_data, logger=logger)
                 update_status_file(status_file, message="SRA DOWNLOAD COMPLETE")
             else:
                 logger.debug("Skipping SRA download: %s", accession)
