@@ -119,6 +119,15 @@ def get_args():
                         help="integer for how many cores you wish to use",
                         default=1,
                         required=False, type=int)
+    parser.add_argument("--threads",
+                        action="store",
+                        default=1, type=int,
+                        choices=[1, 2, 4],
+                        help="if your cores are hyperthreaded, set number" +
+                        " threads to the number of threads per processer." +
+                        "If unsure, see 'cat /proc/cpuinfo' under 'cpu " +
+                        "cores', or 'lscpu' under 'Thread(s) per core'." +
+                        ": %(default)s")
     parser.add_argument("--maxcov",
                         help="integer for maximum coverage of reads",
                         default=50,
@@ -126,6 +135,8 @@ def get_args():
     parser.add_argument("--example_reads",
                         help="input of example reads", nargs='+',
                         required=False, type=str)
+    parser.add_argument("--redo_assembly", action="store_true",
+                        help="redo the assembly step, ignoring status file")
     parser.add_argument("--subassembler",
                         help="which program should riboseed " +
                         "use for sub assemblies",
@@ -431,9 +442,13 @@ def downsample(read_length, approx_length, fastq1, fastq2,
 def make_riboseed_cmd(sra, readsf, readsr, cores, subassembler, threads,
                       output, memory, logger):
     """Runs riboSeed to reassemble reads """
+    if memory < 10:
+        serialize = "--serialize "
+    else:
+        serialize = ""
     cmd = str("ribo run -r {sra} -F {readsf} -R {readsr} --cores {cores} " +
-              "--threads {threads} -v 1 --serialize -o {output} " +
-              "--subassembler {subassembler} --stages score " +
+              "--threads {threads} -v 1 -o {output} {serialize}" +
+              "--subassembler {subassembler} --just_seed " +
               "--memory {memory}").format(**locals())
 
     if readsr is None:
@@ -511,8 +526,11 @@ def process_strain(rawreadsf, rawreadsr, read_length, this_output, args, logger,
                                      readsr=downsampledr, cores=args.cores,
                                      memory=args.memory,
                                      subassembler=args.subassembler,
-                                     threads=1, output=ribo_dir, logger=logger)
-
+                                     threads=args.threads, output=ribo_dir,
+                                     logger=logger)
+    # do we want to redo the assembly?
+    if args.redo_assembly:
+        update_status_file(status_file, to_remove=["RIBOSEED COMPLETE"])
     # file that will contain riboseed contigs
     ribo_contigs = os.path.join(this_output, "riboSeed", "seed",
                                 "final_long_reads", "riboSeedContigs.fasta")
@@ -734,13 +752,13 @@ def main():
             write_pass_fail(
                 args, status="FAIL",
                 stage="global",
-                note="No SRAs found for your organism")
+                note="No SRAs available")
             sys.exit(1)
 
     pob_result = decide_skip_or_download_genomes(args, logger)
     if pob_result != 0:
         if pob_result == 1:
-            message = "No available complete genome for organism"
+            message = "No available references"
         elif pob_result == 2:
             message ="Error downloading genome from NCBI"
         elif pob_result == 3:
@@ -769,7 +787,7 @@ def main():
         logger.critical("No usable reference genome found!")
         write_pass_fail(args, status="FAIL",
                         stage="global",
-                        note="filtering_references: no references had more than 1 rDNA")
+                        note="No references had more than 1 rDNA")
 
     if args.example_reads is not None:
         this_output = os.path.join(args.output_dir, "example", "")
@@ -875,19 +893,19 @@ def main():
             except bestreferenceError as e:
                 write_pass_fail(args, status="FAIL",
                                 stage=accession,
-                                note="unknown error selecting reference")
+                                note="Unknown error selecting reference")
                 logger.error(e)
                 continue
             except downsamplingError as e:
                 write_pass_fail(args, status="FAIL",
                                 stage=accession,
-                                note="unknown error downsampling")
+                                note="Unknown error downsampling")
                 logger.error(e)
                 continue
             except riboSeedError as e:
                 write_pass_fail(args, status="FAIL",
                                 stage=accession,
-                                note="unknown failure running riboSeed")
+                                note="Unknown failure running riboSeed")
                 logger.error(e)
                 continue
             except riboSeedUnsuccessfulError as e:
@@ -900,7 +918,7 @@ def main():
             except extracting16sError as e:
                 write_pass_fail(args, status="FAIL",
                                 stage=accession,
-                                note="unknown extracting 16s sequences")
+                                note="unknown error extracting 16s sequences")
                 logger.error(e)
                 continue
 
