@@ -87,12 +87,12 @@ class test_alignmentData(unittest.TestCase):
                                    shell=sys.platform != "win32",
                                    check=True)
 
-        ## generates 16s sequences from 5 ecoli genomes
-        ra.extract_16s_from_contigs(input_contigs=self.ecolis[4][0], barr_out=ecolibarrnap, output=ribo16, logger=logger)
+        # ## generates 16s sequences from 5 ecoli genomes
+        # ra.extract_16s_from_contigs(input_contigs=self.ecolis[4][0], barr_out=ecolibarrnap, output=ribo16, logger=logger)
 
 
-        ## generates 16s sequences for 1 ecoli genome
-        ra.extract_16s_from_contigs(input_contigs=accS, barr_out=shortbarrnap, output=shortoutput, logger=logger)
+        # ## generates 16s sequences for 1 ecoli genome
+        # ra.extract_16s_from_contigs(input_contigs=accS, barr_out=shortbarrnap, output=shortoutput, logger=logger)
 
 
         return()
@@ -130,7 +130,7 @@ class test_generate_reads(unittest.TestCase):
         reads = self.artreads
         genome = self.genome = os.path.join(os.path.dirname(__file__), "test_data", "ecoli", "NC_011750.1.fna")
 
-        cmd = "{artdir} -ss HS25 -i {genome} -p -l 150 -f 10 -m 400 -qs 10 -s 10 -o {reads}".format(**locals())
+        cmd = "{artdir} -ss HS25 -i {genome} -p -l 150 -f 10 -rs 12345  -m 400 -qs 10 -s 10 -o {reads}".format(**locals())
 
         subprocess.run(
             cmd,

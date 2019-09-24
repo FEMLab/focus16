@@ -46,6 +46,8 @@ class extracting16sError(Exception):
 
 
 def setup_logging(args):  # pragma: nocover
+    if (args.verbosity * 10) not in range(10, 60, 10):
+        raise ValueError('Invalid log level: %s' % args.verbosity)
     logging.basicConfig(
         level=logging.DEBUG,
         filename=os.path.join(args.output_dir, "16db.log"),
@@ -53,7 +55,7 @@ def setup_logging(args):  # pragma: nocover
         )
     logger = logging.getLogger(__name__)
     console_err = logging.StreamHandler(sys.stderr)
-    console_err.setLevel(logging.DEBUG)
+    console_err.setLevel(level=(args.verbosity * 10))
     console_err_format = logging.Formatter(
         str("%(asctime)s \u001b[3%(levelname)s\033[1;0m  %(message)s"),
         "%H:%M:%S")
@@ -139,6 +141,14 @@ def get_args():
     parser.add_argument("--seed",
                         help="random seed for subsampling referencese",
                         type=int, default=12345)
+    parser.add_argument("-v", "--verbosity", dest='verbosity',
+                        action="store",
+                        default=2, type=int, choices=[1, 2, 3, 4, 5],
+                        help="Logger writes debug to file in output dir; " +
+                        "this sets verbosity level sent to stderr. " +
+                        " 1 = debug(), 2 = info(), 3 = warning(), " +
+                        "4 = error() and 5 = critical(); " +
+                        "default: %(default)s")
     args = parser.parse_args()
     # plentyofbugs uses args.nstrains, but wecall it args.n_references for clarity
     args.nstrains = args.n_references
@@ -158,7 +168,7 @@ def check_programs(logger):
         "skesa", "plentyofbugs", "iqtree"]
     for program in required_programs:
         if shutil.which(program) is None:
-            logger.error('%s is not installed: exiting.', program)
+            logger.critical('%s is not installed: exiting.', program)
             sys.exit(1)
 
 
@@ -237,10 +247,10 @@ def download_SRA(cores, SRA, destination, logger):
     """Download SRAs, downsample forward reads to 1000000"""
     suboutput_dir_raw = os.path.join(destination, "")
     os.makedirs(suboutput_dir_raw)
-
     cmd = str("fasterq-dump {SRA} --threads {cores} -O " +
               "{suboutput_dir_raw} --split-files").format(**locals())
-
+    logger.info("Downloading %s", SRA)
+    logger.debug(cmd)
     try:
         subprocess.run(cmd,
                        shell=sys.platform != "win32",
@@ -259,9 +269,10 @@ def pob(genomes_dir, readsf, output_dir, logger):
 
     pobcmd = str("plentyofbugs -g {genomes_dir} -f {readsf} -o {output_dir} " +
                  "--downsampling_ammount 1000000").format(**locals())
-    logger.debug('Finding best reference genome: %s', pobcmd)
+    logger.info('Finding best reference genome: %s', pobcmd)
 
     for command in [pobcmd]:
+        logger.debug(command)
         try:
             subprocess.run(command,
                            shell=sys.platform != "win32",
@@ -278,9 +289,7 @@ def pob(genomes_dir, readsf, output_dir, logger):
             sraacc = line.strip().split('\t')
             sim = float(sraacc[1])
             ref = sraacc[0]
-            percentSim = float(100.0 - sim)
-            #  this isn't really true, but is sort of helpful
-            logger.debug("Reference genome similarity: %s", percentSim)
+            logger.debug("Reference genome mash distance: %s", sim)
 
             length_path = os.path.join(output_dir, "genome_length")
             cmd = "wc -c {ref} > {length_path}".format(**locals())
@@ -343,10 +352,12 @@ def get_and_check_ave_read_len_from_fastq(fastq1, minlen, maxlen, logger=None):
 
     ave_read_len = float(tot / 30)
     if ave_read_len < minlen:
-        logger.critical("Average read length is too short: %s", ave_read_len)
+        logger.error("Average read length is too short: %s; skipping...",
+                     ave_read_len)
         return (1, ave_read_len)
     if ave_read_len > maxlen:
-        logger.critical("Average read length is too long: %s", ave_read_len)
+        logger.critical("Average read length is too long: %s; skipping...",
+                        ave_read_len)
         return (2, ave_read_len)
     logger.debug("Average read length: %s", ave_read_len)
     return (0, ave_read_len)
@@ -359,7 +370,7 @@ def get_coverage(read_length, approx_length, fastq1, fastq2, logger):
         open_fun = gzip.open
     else:
         open_fun = open
-    logger.debug("Counting reads")
+    logger.info("Counting reads")
 
     with open_fun(fastq1, "rt") as data:
         for count, line in enumerate(data):
@@ -369,7 +380,7 @@ def get_coverage(read_length, approx_length, fastq1, fastq2, logger):
         read_length = read_length * 2
 
     coverage = float((count * read_length) / (approx_length * 4))
-    logger.debug('Read coverage is : %s', coverage)
+    logger.info('Read coverage is : %s', coverage)
     return(coverage)
 
 
@@ -398,12 +409,12 @@ def downsample(read_length, approx_length, fastq1, fastq2,
     if (coverage > maxcoverage):
         if run:
             os.makedirs(suboutput_dir_downsampled)
-            logger.debug('Downsampling to %s X coverage', maxcoverage)
+            logger.info('Downsampling to %s X coverage', maxcoverage)
             if fastq2 is not None:
                 commands.append(downcmd2)
             for command in commands:
                 try:
-                    # logger.debug(command)
+                    logger.debug(command)
                     subprocess.run(command,
                                    shell=sys.platform != "win32",
                                    stdout=subprocess.PIPE,
@@ -413,7 +424,7 @@ def downsample(read_length, approx_length, fastq1, fastq2,
                     raise downsamplingError("Error running following command ", command)
         return(downpath1, downpath2)
     else:
-        logger.debug('Skipping downsampling as max coverage is < %s', maxcoverage)
+        logger.info('Skipping downsampling as max coverage is < %s', maxcoverage)
         return(fastq1, fastq2)
 
 
@@ -430,7 +441,8 @@ def make_riboseed_cmd(sra, readsf, readsr, cores, subassembler, threads,
                   "--threads {threads} -v 1 --serialize -o {output} " +
                   "--subassembler {subassembler} --stages score " +
                   "--memory {memory}").format(**locals())
-    logger.debug('Running riboSeed: %s', cmd)
+    logger.info('Running riboSeed')
+    logger.debug(cmd)
     return(cmd)
 
 
@@ -461,7 +473,7 @@ def process_strain(rawreadsf, rawreadsr, read_length, this_output, args, logger,
                 logger.debug("Using genome length: %s", approx_length)
     else:
         approx_length = args.approx_length
-    logger.debug('Quality trimming reads')
+    logger.info('Quality trimming reads')
     #  this shouldn't happen, but might
     if "TRIMMED" not in parse_status_file(status_file):
         update_status_file(status_file,
@@ -519,7 +531,7 @@ def process_strain(rawreadsf, rawreadsr, read_length, this_output, args, logger,
             raise riboSeedError("Error running the following command: %s" %
                                 riboseed_cmd)
     else:
-        logger.debug("Skipping riboSeed")
+        logger.info("Skipping riboSeed")
 
 
     if not os.path.exists(ribo_contigs):
@@ -554,7 +566,7 @@ def extract_16s_from_assembly_list(all_assemblies, args, logger):
         sra = assembly.split(os.path.sep)[1]
         barr_out = os.path.join(os.path.join(args.output_dir, sra, "barrnap"))
         barrnap = "barrnap {assembly} > {barr_out}".format(**locals())
-        logger.debug('Identifying 16S sequences with barnap: %s', barrnap)
+        logger.info('Identifying 16S sequences with barnap: %s', barrnap)
         try:
             subprocess.run(barrnap,
                            shell=sys.platform != "win32",
@@ -671,11 +683,11 @@ def decide_skip_or_download_genomes(args, logger):
     # created is easier than checking if it exists/is intact twice
     os.makedirs(args.genomes_dir, exist_ok=True)
     if len(glob.glob(os.path.join(args.genomes_dir, "*.fna"))) == 0:
-        logger.debug('Downloading genomes')
+        logger.info('Downloading genomes')
         return(our_get_n_genomes(args, logger))
     if len(glob.glob(os.path.join(args.genomes_dir, "*.fna.gz"))) != 0:
-        logger.debug('Warning: genome downloading may have been interupted; ' +
-                     'downloading fresh')
+        logger.warning('Genome downloading may have been interupted; ' +
+                       'downloading fresh')
         shutil.rmtree(args.genomes_dir)
         os.makedirs(args.genomes_dir)
         return(our_get_n_genomes(args, logger))
@@ -693,11 +705,11 @@ def main():
         os.remove(os.path.join(args.output_dir, "SUMMARY"))
 
     logger = setup_logging(args)
-    logger.debug("Processing %s", args.organism_name)
+    logger.info("Processing %s", args.organism_name)
     logger.info("Usage:\n{0}\n".format(" ".join([x for x in sys.argv])))
-    # logger.debug("All settings used:")
-    # for k,v in sorted(vars(args).items()):
-    #     logger.debug("{0}: {1}".format(k,v))
+    logger.debug("All settings used:")
+    for k,v in sorted(vars(args).items()):
+        logger.debug("{0}: {1}".format(k,v))
     check_programs(logger)
 
     fetch_sraFind_data(args.sra_path)
@@ -718,7 +730,7 @@ def main():
     sra_num = len(filtered_sras)
     if filtered_sras == []:
         if args.example_reads is None:
-            logger.error('No SRAs found on NCBI by sraFind')
+            logger.critical('No SRAs found on NCBI by sraFind')
             write_pass_fail(
                 args, status="FAIL",
                 stage="global",
@@ -740,7 +752,7 @@ def main():
         sys.exit(1)
 
     if not os.path.exists(os.path.join(args.genomes_dir, ".references_passed_checks")):
-        logger.debug("checking reference genomes for rDNA counts")
+        logger.info("checking reference genomes for rDNA counts")
         for potential_reference in glob.glob(os.path.join(args.genomes_dir, "*.fna")):
             rDNAs = check_rDNA_copy_number(ref=potential_reference,
                                            output=args.genomes_dir,
@@ -754,7 +766,7 @@ def main():
     else:
         logger.debug("Already checked reference genomes")
     if len(glob.glob(os.path.join(args.genomes_dir, "*.fna"))) == 0:
-        logger.error("No usable reference genome found!")
+        logger.critical("No usable reference genome found!")
         write_pass_fail(args, status="FAIL",
                         stage="global",
                         note="filtering_references: no references had more than 1 rDNA")
@@ -795,11 +807,10 @@ def main():
             this_results = os.path.join(this_output, "results")
             os.makedirs(this_output, exist_ok=True)
             status_file = os.path.join(this_output, "status")
-            logger.debug("Organism: %s", args.organism_name)
+            logger.info("Organism: %s", args.organism_name)
             # check status file for SRA COMPLETE
 
             if "SRA DOWNLOAD COMPLETE" not in parse_status_file(status_file):
-                logger.debug('Downloading SRA: %s', accession)
                 # a fresh start
                 # shutil.rmtree(this_data)
 
@@ -900,7 +911,7 @@ def main():
                      "seed", "final_long_reads", "riboSeedContigs.fasta"))
     n_extracted_seqs, extract16soutput  =  extract_16s_from_assembly_list(
         all_assemblies, args, logger)
-    logger.debug("Wrote out  %i  sequences", n_extracted_seqs)
+    logger.info("Wrote out  %i  sequences", n_extracted_seqs)
     if n_extracted_seqs == 0:
         write_pass_fail(args, status="FAIL",
                         stage="global",
