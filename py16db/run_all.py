@@ -755,12 +755,17 @@ def check_fastq_dir(this_data, logger):
     else:
         download_error_message = "No forward/single read files detected"
 
-    if len(set(rawf)) == 1:
+    if len(set(rawr)) == 1:
         rawreadsr = rawr[0]
     elif len(set(rawr)) > 1:
         download_error_message = "multiple reverse reads files detected"
     else:
         rawreadsr= None
+    # catch only .fastq and _2.fastq weird combo
+    if rawreadsf is not None:
+         if not rawreadsf.endswith("_1.fastq") and rawreadsr is not None:
+             download_error_message = "cannot process a single library " + \
+                 "file and a reverse file"
     return (rawreadsf, rawreadsr, download_error_message)
 
 
