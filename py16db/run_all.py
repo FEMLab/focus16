@@ -870,8 +870,14 @@ def main():
             os.makedirs(this_output, exist_ok=True)
             status_file = os.path.join(this_output, "status")
             logger.info("Organism: %s", args.organism_name)
-            # check status file for SRA COMPLETE, or empty dir
+            # check status file for SRA COMPLETE, or empty dir, missing dir,
+            # and other anomolies. Such things probably only occur
+            # during testing, but we still want to catch them
             # this can catch issue arrising from an aborted run
+            if not os.path.exists(this_data):
+                # this never happens unless a run is aborted;
+                # regardless, we want to make sure we attempt to re-download
+                update_status_file(status_file, to_remove=["SRA DOWNLOAD COMPLETE"])
             if os.path.exists(this_data):
                 if len(os.listdir(this_data)) == 0:
                     logger.info("Data directory present but empty; attempting download")
