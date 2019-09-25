@@ -870,16 +870,20 @@ def main():
             os.makedirs(this_output, exist_ok=True)
             status_file = os.path.join(this_output, "status")
             logger.info("Organism: %s", args.organism_name)
-            # check status file for SRA COMPLETE
-
-            if "SRA DOWNLOAD COMPLETE" not in parse_status_file(status_file):
+            # check status file for SRA COMPLETE, or empty dir
+            # this can catch issue arrising from an aborted run
+            if (
+                    "SRA DOWNLOAD COMPLETE" not in parse_status_file(status_file) or
+                    len(os.listdir(this_data)) == 0
+            ):
                 # a fresh start
                 if os.path.exists(this_data):
                     shutil.rmtree(this_data)
                 try:
                     download_SRA(cores=args.cores, SRA=accession,
                                  destination=this_data, logger=logger)
-                    update_status_file(status_file, message="SRA DOWNLOAD COMPLETE")
+                    if len(os.listdir(this_data)) != 0:
+                        update_status_file(status_file, message="SRA DOWNLOAD COMPLETE")
                 except fasterqdumpError:
                     message =  'Error downloading %s'  % accession
                     write_pass_fail(args, status="FAIL", stage=accession, note=message)
