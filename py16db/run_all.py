@@ -872,10 +872,11 @@ def main():
             logger.info("Organism: %s", args.organism_name)
             # check status file for SRA COMPLETE, or empty dir
             # this can catch issue arrising from an aborted run
-            if (
-                    "SRA DOWNLOAD COMPLETE" not in parse_status_file(status_file) or
-                    len(os.listdir(this_data)) == 0
-            ):
+            if os.path.exists(this_data):
+                if len(os.listdir(this_data)) == 0:
+                    logger.info("Data directory present but empty; attempting download")
+                    update_status_file(status_file, to_remove=["SRA DOWNLOAD COMPLETE"])
+            if "SRA DOWNLOAD COMPLETE" not in parse_status_file(status_file):
                 # a fresh start
                 if os.path.exists(this_data):
                     shutil.rmtree(this_data)
