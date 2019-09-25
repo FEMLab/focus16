@@ -32,6 +32,7 @@ def shannon_calc(values):
 
     return(entropy)
 
+
 def read_in_msa(path):
     """
     count occurances of each nucleotide in a sequence
@@ -51,9 +52,6 @@ def read_in_msa(path):
                     break
             leaddash.append(this_lead_dash)
             seqs.append(str(rec.seq).lower())
-
-    #print(Counter(leaddash))
-
     return seqs
 
 
@@ -64,7 +62,3 @@ def main():
         values_string = "".join([x[i] for x in seqs])
         entropy = shannon_calc(values_string)
         sys.stdout.write("{i}\t{entropy}\n".format(**locals()))
-
-
-if __name__ == '__main__':
-    main()

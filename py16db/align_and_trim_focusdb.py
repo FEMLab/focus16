@@ -55,7 +55,6 @@ def run_TrimAl(msa):
     return(msa)
 
 
-
 def main():
     args = get_args()
     if shutil.which("trimal") is None:

@@ -25,29 +25,11 @@ class coverageTests(unittest.TestCase):
         if os.path.exists(self.test_dir):
             shutil.rmtree(self.test_dir)
 
-        # for readfile in [self.readsgzipd1, self.readsgzipd2]:
-        #     gunzip = "gunzip {readfile}".format(**locals())
-        #     if os.path.exists(readfile):
-        #         subprocess.run(gunzip,
-        #                        shell=sys.platform !="win32",
-        #                        stdout=subprocess.PIPE,
-        #                        stderr=subprocess.PIPE,
-        #                        check=True)
-
 
     def tearDown(self):
         "tear down test fixtures"
         if os.path.exists(self.test_dir):
             shutil.rmtree(self.test_dir)
-
-        # for readfile in [self.readsgunzipd1, self.readsgunzipd2]:
-        #     if os.path.exists(readfile):
-        #         gzip = "gzip {readfile}".format(**locals())
-        #         subprocess.run(gzip,
-        #                        shell=sys.platform !="win32",
-        #                        stdout=subprocess.PIPE,
-        #                        stderr=subprocess.PIPE,
-        #                        check=True)
 
 
     @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",

@@ -6,17 +6,17 @@ import os
 import subprocess
 import random
 import shutil
-import re
 import gzip
 import logging
 import glob
 
-from plentyofbugs import get_n_genomes as gng
-from py16db.run_sickle import run_sickle
+from pathlib import Path
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 
-#from Bio.Seq import Seq
+from plentyofbugs import get_n_genomes as gng
+from py16db.run_sickle import run_sickle
+
 from . import __version__
 
 
@@ -33,8 +33,6 @@ class fasterqdumpError(Exception):
 
 
 class riboSeedError(Exception):
-    """ for issues with running riboSeed
-    """
     pass
 
 
@@ -64,7 +62,6 @@ def setup_logging(args):  # pragma: nocover
         str("%(asctime)s \u001b[3%(levelname)s\033[1;0m  %(message)s"),
         "%H:%M:%S")
     console_err.setFormatter(console_err_format)
-
     logging.addLevelName(logging.DEBUG,    "4m --")
     logging.addLevelName(logging.INFO,     "2m ==")
     logging.addLevelName(logging.WARNING,  "3m !!")
@@ -187,7 +184,6 @@ def check_programs(logger):
             sys.exit(1)
 
 
-
 def parse_status_file(path):
     # because downloading and assembling can fail for many reasons,
     # we write out status to a file.  this allows for easier restarting of
@@ -227,7 +223,6 @@ def filter_SRA(sraFind, organism_name, strains, get_all, thisseed, logger):
             if split_line[11].startswith(organism_name):
                 if split_line[8].startswith("ILLUMINA"):
                     results.append(split_line[17])
-    #  arbitrary seed number
     random.seed(thisseed)
     random.shuffle(results)
 
@@ -285,7 +280,6 @@ def pob(genomes_dir, readsf, output_dir, logger):
     Uses plentyofbugs, a package that useqs mash to
     find the best reference genome for draft genome
     """
-
     pobcmd = str("plentyofbugs -g {genomes_dir} -f {readsf} -o {output_dir} " +
                  "--downsampling_ammount 1000000").format(**locals())
     logger.info('Finding best reference genome: %s', pobcmd)
@@ -342,12 +336,6 @@ def check_rDNA_copy_number(ref, output, logger):
             if line[8].startswith("Name=16S"):
                 rrn_num += 1
     return rrn_num
-    # if rrn_num > 1:
-    #     logger.debug('%s rrn operons detected in reference genome', rrn_num)
-    # else:
-    #     logger.critical('SRA does not have multiple rrn operons')
-    #     sys.exit(1)
-    # return(rrn_num)
 
 
 def get_and_check_ave_read_len_from_fastq(fastq1, minlen, maxlen, logger=None):
@@ -359,7 +347,6 @@ def get_and_check_ave_read_len_from_fastq(fastq1, minlen, maxlen, logger=None):
         open_fun = gzip.open
     else:
         open_fun = open
-
     with open_fun(fastq1, "rt") as file_handle:
         data = SeqIO.parse(file_handle, "fastq")
         logger.debug("Obtaining average read length from first 30 reads")
@@ -389,7 +376,7 @@ def get_coverage(read_length, approx_length, fastq1, fastq2, logger):
         open_fun = gzip.open
     else:
         open_fun = open
-    logger.info("Counting reads")
+    logger.debug("Counting reads")
 
     with open_fun(fastq1, "rt") as data:
         for count, line in enumerate(data):
@@ -399,7 +386,7 @@ def get_coverage(read_length, approx_length, fastq1, fastq2, logger):
         read_length = read_length * 2
 
     coverage = float((count * read_length) / (approx_length * 4))
-    logger.info('Read coverage is : %s', coverage)
+    logger.info('Read coverage: %sx', round(coverage, 1))
     return(coverage)
 
 
@@ -461,11 +448,9 @@ def make_riboseed_cmd(sra, readsf, readsr, cores, subassembler, threads,
 
     if readsr is None:
         cmd = str("ribo run -r {sra} -S1 {readsf} --cores {cores} " +
-                  "--threads {threads} -v 1 --serialize -o {output} " +
-                  "--subassembler {subassembler} --stages score " +
+                  "--threads {threads} -v 1 -o {output} {serialize}" +
+                  "--subassembler {subassembler} --just_seed " +
                   "--memory {memory}").format(**locals())
-    logger.info('Running riboSeed')
-    logger.debug(cmd)
     return(cmd)
 
 
@@ -496,9 +481,8 @@ def process_strain(rawreadsf, rawreadsr, read_length, this_output, args, logger,
                 logger.debug("Using genome length: %s", approx_length)
     else:
         approx_length = args.approx_length
-    logger.info('Quality trimming reads')
-    #  this shouldn't happen, but might
     if "TRIMMED" not in parse_status_file(status_file):
+        logger.info('Quality trimming reads')
         update_status_file(status_file,
                            to_remove=["DOWNSAMPLED", "RIBOSEED COMPLETE"])
         if os.path.exists(sickle_out):
@@ -546,6 +530,7 @@ def process_strain(rawreadsf, rawreadsr, read_length, this_output, args, logger,
         if os.path.exists(ribo_dir):
             shutil.rmtree(ribo_dir)
         try:
+            logger.debug(roboseed_cmd)
             subprocess.run(riboseed_cmd,
                            shell=sys.platform != "win32",
                            stdout=subprocess.PIPE,
@@ -580,56 +565,53 @@ def fetch_sraFind_data(dest_path):
             check=True)
 
 
-def extract_16s_from_assembly_list(all_assemblies, args, logger):
-    extract16soutput = os.path.join(
-        args.output_dir,
-        "{}_ribo16s.fasta".format(args.organism_name.replace(" ", "_")))
-    if os.path.exists(extract16soutput):
-        os.remove(extract16soutput)
+def run_barrnap(assembly,  results, logger):
+    barrnap = "barrnap {assembly} > {results}".format(**locals())
+    logger.debug('Identifying 16S sequences with barnap: %s', barrnap)
+    try:
+        subprocess.run(barrnap,
+                       shell=sys.platform != "win32",
+                       stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE,
+                       check=True)
+    except:
+        raise extracting16sError(
+            "Error running the following command %s" % barrnap)
+
+
+def extract_16s_from_assembly(assembly, gff, sra, output, args, logger):
     results16s = {}  # [sra_#, chromosome, start, end, reverse complimented]
     nseqs = 0
-    for assembly in all_assemblies:
-        sra = assembly.split(os.path.sep)[1]
-        barr_out = os.path.join(os.path.join(args.output_dir, sra, "barrnap"))
-        barrnap = "barrnap {assembly} > {barr_out}".format(**locals())
-        logger.info('Identifying 16S sequences with barnap: %s', barrnap)
-        try:
-            subprocess.run(barrnap,
-                           shell=sys.platform != "win32",
-                           stdout=subprocess.PIPE,
-                           stderr=subprocess.PIPE,
-                           check=True)
-        except:
-            raise extracting16sError("Error running the following command %s" % barrnap)
-        with open(barr_out, "r") as rrn, open(extract16soutput, "a") as outf:
-            rrn_num = 0
-            for rawline in rrn:
-                line = rawline.strip().split('\t')
-                # need this: catches index errors
-                if line[0].startswith("##"):
-                    pass
-                elif line[8].startswith("Name=16S"):
-                    rrn_num = rrn_num + 1
-                    if line[6] == "-":
-                        suffix = 'chromosome-RC@'
-                    else:
-                        suffix = ''
-                    chrom = line[0]
-                    ori = line[6]
-                    start = int(line[3])
-                    end = int(line[4])
-                    thisid = "{}_{}".format(sra, rrn_num)
-                    results16s[thisid] = [chrom, start, end, line[6]]
-                    with open(assembly, "r")  as asmb:
-                        for rec in SeqIO.parse(asmb, "fasta"):
-                            if rec.id  == chrom:
-                                seq = rec.seq[start + 1: end + 1]
-                                if  ori == "-":
-                                    seq = seq.reverse_complement()
-                                thisdesc = "{chrom}:{start}:{end}({ori})".format(**locals())
-                                SeqIO.write(SeqRecord(seq, id=thisid, description=thisdesc), outf,  "fasta")
-                                nseqs = nseqs  +  1
-    return(nseqs, extract16soutput)
+    with open(gff, "r") as rrn, open(output, "a") as outf:
+        rrn_num = 0
+        for rawline in rrn:
+            line = rawline.strip().split('\t')
+            # need this: catches index errors
+            if line[0].startswith("##"):
+                pass
+            elif line[8].startswith("Name=16S"):
+                rrn_num = rrn_num + 1
+                if line[6] == "-":
+                    suffix = 'chromosome-RC@'
+                else:
+                    suffix = ''
+                chrom = line[0]
+                ori = line[6]
+                start = int(line[3])
+                end = int(line[4])
+                thisid = "{}_{}".format(sra, rrn_num)
+                results16s[thisid] = [chrom, start, end, line[6]]
+                with open(assembly, "r")  as asmb:
+                    for rec in SeqIO.parse(asmb, "fasta"):
+                        if rec.id == chrom:
+                            seq = rec.seq[start + 1: end + 1]
+                            if ori == "-":
+                                seq = seq.reverse_complement()
+                            thisdesc = "{chrom}:{start}:{end}({ori})".format(**locals())
+                            SeqIO.write(SeqRecord(seq, id=thisid, description=thisdesc), outf,  "fasta")
+                            nseqs = nseqs + 1
+
+    return nseqs
 
 
 def write_pass_fail(args, stage, status, note):
@@ -845,9 +827,10 @@ def main():
         write_pass_fail(args, status="FAIL",
                         stage="global",
                         note="No references had more than 1 rDNA")
-
+    # data_dirs = []
     if args.example_reads is not None:
         this_output = os.path.join(args.output_dir, "example", "")
+        # data_dirs.append(this_output)
         status_file = os.path.join(this_output, "example", "")
         if os.path.exists(this_output):
             logger.warning("using existing output directory")
@@ -969,12 +952,30 @@ def main():
     all_assemblies  =  glob.glob(
         os.path.join(args.output_dir, "*", "results", "riboSeed",
                      "seed", "final_long_reads", "riboSeedContigs.fasta"))
-    n_extracted_seqs, extract16soutput  =  extract_16s_from_assembly_list(
-        all_assemblies, args, logger)
-    logger.info("Wrote out  %i  sequences", n_extracted_seqs)
+    ###########################################################################
+    extract16soutput = os.path.join(
+        args.output_dir,
+        "{}_ribo16s.fasta".format(args.organism_name.replace(" ", "_")))
+    if os.path.exists(extract16soutput):
+        os.remove(extract16soutput)
+
+    n_extracted_seqs = 0
+    for assembly in all_assemblies:
+        sra = str(Path(assembly).parents[4].name)
+        barr_gff = os.path.join(args.output_dir, sra, "barrnap.gff")
+        try:
+            run_barrnap(assembly,  barr_gff, logger)
+            this_extracted_seqs = extract_16s_from_assembly(
+                assembly, barr_gff, sra, extract16soutput, args, logger)
+            n_extracted_seqs  = n_extracted_seqs + this_extracted_seqs
+        except extracting16sError as e:
+            write_pass_fail(args, status="FAIL", stage=sra,
+                note="Error running barrnap")
+
+    ###########################################################################
+    logger.info("Wrote out %i sequences", n_extracted_seqs)
     if n_extracted_seqs == 0:
-        write_pass_fail(args, status="FAIL",
-                        stage="global",
+        write_pass_fail(args, status="FAIL", stage="global",
                         note="No 16s sequences detected in re-assemblies")
         logger.warning("No 16s sequences recovered. exiting")
         sys.exit()
