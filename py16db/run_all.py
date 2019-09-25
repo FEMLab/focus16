@@ -726,7 +726,7 @@ def check_fastq_dir(this_data):
     # and if so, adjust expeactations
     fastqs = glob.glob(os.path.join(this_data, "", "*.fastq"))
     if len(fastqs) == 0:
-        return(None, None, "No fastq files downloaded"
+        return(None, None, "No fastq files downloaded")
     rawf, rawr = [], []
     rawreadsf, rawreadsr = None, None
     download_error_message = ""
