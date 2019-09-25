@@ -543,9 +543,10 @@ def process_strain(rawreadsf, rawreadsr, read_length, this_output, args, logger,
                                 riboseed_cmd)
     else:
         logger.info("Skipping riboSeed")
-
-
-    if not os.path.exists(ribo_contigs):
+    # check for the files to see if riboSeed completed
+    if os.path.exists(ribo_contigs):
+        update_status_file(status_file, message="RIBOSEED COMPLETE")
+    else:
         raise riboSeedUnsuccessfulError(
             "riboSeed completed but was not successful; for details, see log file at %s" %
             os.path.join(this_output, "riboSeed", "run_riboSeed.log"))
