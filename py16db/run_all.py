@@ -725,7 +725,10 @@ def check_fastq_dir(this_data):
     # it wont have a _1 prefix, so we check if that exists
     # and if so, adjust expeactations
     fastqs = glob.glob(os.path.join(this_data, "", "*.fastq"))
+    if len(fastqs) == 0:
+        return(None, None, "No fastq files downloaded"
     rawf, rawr = [], []
+    rawreadsf, rawreadsr = None, None
     download_error_message = ""
     for fastq in fastqs:
         if fastq.endswith("_1.fastq"):
