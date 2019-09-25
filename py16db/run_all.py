@@ -28,6 +28,10 @@ class downsamplingError(Exception):
     pass
 
 
+class fasterqdumpError(Exception):
+    pass
+
+
 class riboSeedError(Exception):
     """ for issues with running riboSeed
     """
@@ -258,7 +262,11 @@ def download_SRA(cores, SRA, destination, logger):
     """Download SRAs, downsample forward reads to 1000000"""
     suboutput_dir_raw = os.path.join(destination, "")
     os.makedirs(suboutput_dir_raw)
-    cmd = str("fasterq-dump {SRA} --threads {cores} -O " +
+    # defaults to 6 threads or whatever is convenient; we suspect I/O limits
+    # using more in most cases, so we don't give the user the option
+    # to increase this
+    # https://github.com/ncbi/sra-tools/wiki/HowTo:-fasterq-dump
+    cmd = str("fasterq-dump {SRA} -O " +
               "{suboutput_dir_raw} --split-files").format(**locals())
     logger.info("Downloading %s", SRA)
     logger.debug(cmd)
@@ -269,7 +277,7 @@ def download_SRA(cores, SRA, destination, logger):
                        stderr=subprocess.PIPE,
                        check=True)
     except subprocess.CalledProcessError:
-        logger.critical("Error with fasterq-dump")
+        logger.critical("Error running fasterq-dump")
 
 
 def pob(genomes_dir, readsf, output_dir, logger):
@@ -712,6 +720,39 @@ def decide_skip_or_download_genomes(args, logger):
     return 0
 
 
+def check_fastq_dir(this_data):
+    # Double check the download worked.  If its a single lib,
+    # it wont have a _1 prefix, so we check if that exists
+    # and if so, adjust expeactations
+    fastqs = glob.glob(os.path.join(this_data, "", "*.fastq"))
+    rawf, rawr = [], []
+    download_error_message = ""
+    for fastq in fastqs:
+        if fastq.endswith("_1.fastq"):
+                rawf.append(fastq)
+        elif fastq.endswith("_2.fastq"):
+                rawr.append(fastq)
+        elif fastq.endswith(".fastq") and not fastq.endswith("_3.fastq"):
+            # This is how we treat single libraries
+            rawf.append(fastq)
+        else:
+            download_error_message = "Unexpected item in the bagging area"
+    if len(set(rawf)) == 1:
+        rawreadsf = rawf[0]
+    elif len(set(rawf)) > 1:
+        download_error_message = "multiple forward reads files detected"
+    else:
+        download_error_message = "No forward/single read files detected"
+
+    if len(set(rawf)) == 1:
+        rawreadsr = rawr[0]
+    elif len(set(rawr)) > 1:
+        download_error_message = "multiple reverse reads files detected"
+    else:
+        rawreadsr= None
+    return (rawreadsf, rawreadsr, download_error_message)
+
+
 def main():
     args = get_args()
 
@@ -830,44 +871,28 @@ def main():
 
             if "SRA DOWNLOAD COMPLETE" not in parse_status_file(status_file):
                 # a fresh start
-                # shutil.rmtree(this_data)
-
-                # ######   Delete this after rerunning on cluster; this helps rescue runs but should
-                # # not be used in production
-                # if os.path.exists(this_data):
-                #     logger.info("SRA directory for %s exists, checking for files")
-                #     candidates =  glob.glob(os.path.join(this_data, accession + "*fastq"))
-                #     if any([os.path.getsize(x) == 0 for x in candidates]):
-                #         logger.info("Empty files found; redownloading")
-                #         shutil.rmtree(this_data)
-                #         DOWNLOAD_SRA = True
-                #     else:
-                #         DOWNLOAD_SRA = False
-                # else:
-                #     DOWNLOAD_SRA = False
-                # if DOWNLOAD_SRA:
-                    #####################################################33333
-                download_SRA(cores=args.cores, SRA=accession,
-                             destination=this_data, logger=logger)
-                update_status_file(status_file, message="SRA DOWNLOAD COMPLETE")
-            else:
-                logger.debug("Skipping SRA download: %s", accession)
-
-            rawreadsf = os.path.join(this_data, accession + "_1.fastq")
-            rawreadsr = os.path.join(this_data, accession + "_2.fastq")
-            if not os.path.exists(rawreadsr):
-                rawreadsr = None
-            # Double check the download worked.  If its a single lib,
-            # it wont have a _1 prefix, so we check if that exists
-            # and if so, adjust expeactations
-            if not os.path.exists(rawreadsf):
-                # check if its a single library situation
-                rawreadsf = os.path.join(this_data, accession + ".fastq")
-                if not os.path.exists(rawreadsf):
-                    message =  'Error downloading  %s'  % accession
+                if os.path.exists(this_data):
+                    shutil.rmtree(this_data)
+                try:
+                    download_SRA(cores=args.cores, SRA=accession,
+                                 destination=this_data, logger=logger)
+                    update_status_file(status_file, message="SRA DOWNLOAD COMPLETE")
+                except fasterqdumpError:
+                    message =  'Error downloading %s'  % accession
                     write_pass_fail(args, status="FAIL", stage=accession, note=message)
                     logger.error(message)
                     continue
+            else:
+                logger.debug("Skipping SRA download: %s", accession)
+            rawreadsf, rawreadsr, download_error_message =  check_fastq_dir(this_data)
+            if download_error_message is not  "":
+                write_pass_fail(args, status="FAIL", stage=accession, note=download_error_message)
+                logger.error(
+                    "Error either downloading or parsing the file " +
+                    "name for this accession.")
+                logger.error(this_data)
+                logger.error(download_error_message)
+                continue
             read_len_status, read_length = get_and_check_ave_read_len_from_fastq(
                 minlen=65,
                 maxlen=301,
@@ -887,7 +912,7 @@ def main():
             except subprocess.CalledProcessError:
                 write_pass_fail(args, status="FAIL",
                                 stage=accession,
-                                note="unknown failure")
+                                note="Unknown failure")
                 logger.error('Unknown subprocess error')
                 continue
             except bestreferenceError as e:
@@ -918,7 +943,7 @@ def main():
             except extracting16sError as e:
                 write_pass_fail(args, status="FAIL",
                                 stage=accession,
-                                note="unknown error extracting 16s sequences")
+                                note="Unknown error extracting 16s sequences")
                 logger.error(e)
                 continue
 
