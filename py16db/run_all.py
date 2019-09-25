@@ -720,24 +720,32 @@ def decide_skip_or_download_genomes(args, logger):
     return 0
 
 
-def check_fastq_dir(this_data):
+def check_fastq_dir(this_data, logger):
     # Double check the download worked.  If its a single lib,
     # it wont have a _1 prefix, so we check if that exists
     # and if so, adjust expeactations
     fastqs = glob.glob(os.path.join(this_data, "", "*.fastq"))
+    logger.debug("fastqs detected: %s", " ".join(fastqs))
     if len(fastqs) == 0:
         return(None, None, "No fastq files downloaded")
-    rawf, rawr = [], []
+    rawf, rawr, raws = [], [], []
     rawreadsf, rawreadsr = None, None
     download_error_message = ""
     for fastq in fastqs:
         if fastq.endswith("_1.fastq"):
-                rawf.append(fastq)
+            # not appending, cause we want to bump out any single libs t
+            # that may have been read in first
+            if len(rawf) != 0:
+                logger.warning("ignoring extra library %s", " ".join(rawf))
+            rawf = [fastq]
         elif fastq.endswith("_2.fastq"):
-                rawr.append(fastq)
+            rawr.append(fastq)
         elif fastq.endswith(".fastq") and not fastq.endswith("_3.fastq"):
-            # This is how we treat single libraries
-            rawf.append(fastq)
+            if len(rawf) == 0:
+                # This is how we treat single libraries
+                rawf.append(fastq)
+            else:
+                logger.warning("ignoring extra library %s", fastq)
         else:
             download_error_message = "Unexpected item in the bagging area"
     if len(set(rawf)) == 1:
@@ -887,7 +895,8 @@ def main():
                     continue
             else:
                 logger.debug("Skipping SRA download: %s", accession)
-            rawreadsf, rawreadsr, download_error_message =  check_fastq_dir(this_data)
+            rawreadsf, rawreadsr, download_error_message =  check_fastq_dir(
+                this_data, logger)
             if download_error_message is not  "":
                 write_pass_fail(args, status="FAIL", stage=accession, note=download_error_message)
                 logger.error(
