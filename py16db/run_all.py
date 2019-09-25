@@ -538,7 +538,8 @@ def process_strain(rawreadsf, rawreadsr, read_length, this_output, args, logger,
                            check=True)
 
             update_status_file(status_file, message="RIBOSEED COMPLETE")
-        except:
+        except exception as e:
+            logger.error(e)
             raise riboSeedError("Error running the following command: %s" %
                                 riboseed_cmd)
     else:
