@@ -530,7 +530,7 @@ def process_strain(rawreadsf, rawreadsr, read_length, this_output, args, logger,
         if os.path.exists(ribo_dir):
             shutil.rmtree(ribo_dir)
         try:
-            logger.debug(roboseed_cmd)
+            logger.debug(riboseed_cmd)
             subprocess.run(riboseed_cmd,
                            shell=sys.platform != "win32",
                            stdout=subprocess.PIPE,
@@ -538,7 +538,7 @@ def process_strain(rawreadsf, rawreadsr, read_length, this_output, args, logger,
                            check=True)
 
             update_status_file(status_file, message="RIBOSEED COMPLETE")
-        except exception as e:
+        except Exception as e:
             logger.error(e)
             raise riboSeedError("Error running the following command: %s" %
                                 riboseed_cmd)
@@ -962,6 +962,7 @@ def main():
                                 note="Unknown error extracting 16s sequences")
                 logger.error(e)
                 continue
+            write_pass_fail(args, status="PASS", stage=accession, note="")
 
     # alignoutput = os.path.join(args.output_dir, "allsequences",  "")
     # pathtotree = os.path.join(alignoutput, "MSA.fasta.tree")
