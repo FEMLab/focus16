@@ -730,7 +730,10 @@ def check_fastq_dir(this_data, logger):
             else:
                 logger.warning("ignoring extra library %s", fastq)
         else:
+            logger.error("Can only process paired or reads")
+            logger.error(fastqs)
             download_error_message = "Unexpected item in the bagging area"
+            download_error_message = "Unable to process library type"
     if len(set(rawf)) == 1:
         rawreadsf = rawf[0]
     elif len(set(rawf)) > 1:
