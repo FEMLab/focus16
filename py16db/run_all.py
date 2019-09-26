@@ -902,7 +902,8 @@ def main():
             rawreadsf, rawreadsr, download_error_message =  check_fastq_dir(
                 this_data, logger)
             if download_error_message is not  "":
-                write_pass_fail(args, status="FAIL", stage=accession, note=download_error_message)
+                write_pass_fail(args, status="FAIL", stage=accession,
+                                note=download_error_message)
                 logger.error(
                     "Error either downloading or parsing the file " +
                     "name for this accession.")
@@ -964,8 +965,6 @@ def main():
                 continue
             write_pass_fail(args, status="PASS", stage=accession, note="")
 
-    # alignoutput = os.path.join(args.output_dir, "allsequences",  "")
-    # pathtotree = os.path.join(alignoutput, "MSA.fasta.tree")
     all_assemblies  =  glob.glob(
         os.path.join(args.output_dir, "*", "results", "riboSeed",
                      "seed", "final_long_reads", "riboSeedContigs.fasta"))

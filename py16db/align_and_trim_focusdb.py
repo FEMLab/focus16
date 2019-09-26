@@ -20,9 +20,65 @@ def get_args():
         "combine-focusdb-and-silva, generate an alignment with " +
         "mafft and trim to median sequence.  Requires mafft and TrimAl" )
     # REQUIRED
-    parser.add_argument("-i", "--input", help="multifasta input file", required=True)
-    parser.add_argument("-o", "--out_prefix", help="prefix for msa and trimmed msa", required=True)
+    parser.add_argument(
+        "-i", "--input",
+        help="Multifasta input file", required=True)
+    parser.add_argument(
+        "-o", "--out_prefix",
+        help="Prefix for msa and trimmed msa", required=True)
+    parser.add_argument(
+        "--addcoli", action="store_true",
+        help="Add cannonical MG1655 E coli sequence")
     return(parser.parse_args())
+
+
+def add_cannonical(msa, tmp):
+    coli_header = str(">NC_000913.3:4166659-4168200 Escherichia coli " +
+                      "str. K-12 substr. MG1655, complete genome")
+    coli_sequence = \
+"""
+AAATTGAAGAGTTTGATCATGGCTCAGATTGAACGCTGGCGGCAGGCCTAACACATGCAAGTCGAACGGT
+AACAGGAAGAAGCTTGCTTCTTTGCTGACGAGTGGCGGACGGGTGAGTAATGTCTGGGAAACTGCCTGAT
+GGAGGGGGATAACTACTGGAAACGGTAGCTAATACCGCATAACGTCGCAAGACCAAAGAGGGGGACCTTC
+GGGCCTCTTGCCATCGGATGTGCCCAGATGGGATTAGCTAGTAGGTGGGGTAACGGCTCACCTAGGCGAC
+GATCCCTAGCTGGTCTGAGAGGATGACCAGCCACACTGGAACTGAGACACGGTCCAGACTCCTACGGGAG
+GCAGCAGTGGGGAATATTGCACAATGGGCGCAAGCCTGATGCAGCCATGCCGCGTGTATGAAGAAGGCCT
+TCGGGTTGTAAAGTACTTTCAGCGGGGAGGAAGGGAGTAAAGTTAATACCTTTGCTCATTGACGTTACCC
+GCAGAAGAAGCACCGGCTAACTCCGTGCCAGCAGCCGCGGTAATACGGAGGGTGCAAGCGTTAATCGGAA
+TTACTGGGCGTAAAGCGCACGCAGGCGGTTTGTTAAGTCAGATGTGAAATCCCCGGGCTCAACCTGGGAA
+CTGCATCTGATACTGGCAAGCTTGAGTCTCGTAGAGGGGGGTAGAATTCCAGGTGTAGCGGTGAAATGCG
+TAGAGATCTGGAGGAATACCGGTGGCGAAGGCGGCCCCCTGGACGAAGACTGACGCTCAGGTGCGAAAGC
+GTGGGGAGCAAACAGGATTAGATACCCTGGTAGTCCACGCCGTAAACGATGTCGACTTGGAGGTTGTGCC
+CTTGAGGCGTGGCTTCCGGAGCTAACGCGTTAAGTCGACCGCCTGGGGAGTACGGCCGCAAGGTTAAAAC
+TCAAATGAATTGACGGGGGCCCGCACAAGCGGTGGAGCATGTGGTTTAATTCGATGCAACGCGAAGAACC
+TTACCTGGTCTTGACATCCACGGAAGTTTTCAGAGATGAGAATGTGCCTTCGGGAACCGTGAGACAGGTG
+CTGCATGGCTGTCGTCAGCTCGTGTTGTGAAATGTTGGGTTAAGTCCCGCAACGAGCGCAACCCTTATCC
+TTTGTTGCCAGCGGTCCGGCCGGGAACTCAAAGGAGACTGCCAGTGATAAACTGGAGGAAGGTGGGGATG
+ACGTCAAGTCATCATGGCCCTTACGACCAGGGCTACACACGTGCTACAATGGCGCATACAAAGAGAAGCG
+ACCTCGCGAGAGCAAGCGGACCTCATAAAGTGCGTCGTAGTCCGGATTGGAGTCTGCAACTCGACTCCAT
+GAAGTCGGAATCGCTAGTAATCGTGGATCAGAATGCCACGGTGAATACGTTCCCGGGCCTTGTACACACC
+GCCCGTCACACCATGGGAGTGGGTTGCAAAAGAAGTAGGTAGCTTAACCTTCGGGAGGGCGCTTACCACT
+TTGTGATTCATGACTGGGGTGAAGTCGTAACAAGGTAACCGTAGGGGAACCTGCGGTTGGATCACCTCCT
+TA
+"""
+    # table from  https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4802574/
+    regions = {
+        "V1": [8,    96],
+        "V2": [97,   306],
+        "V3": [307,  487],
+        "V4": [488,  746],
+        "V5": [747,  885],
+        "V6": [886,  1029],
+        "V7": [1030, 1180],
+        "V8": [1181, 1372],
+        "V9": [1373, 1468],
+        "VT": [8,    1468]
+    }
+    with open(msa, "r") as inf, open(tmp,"w") as  outf:
+        outf.write("%s\n%s\n" % (coli_header, coli_sequence.replace('\n', '').strip()))
+        for line in inf:
+            outf.write(line)
+    return tmp
 
 
 def mafft(args, multifasta):
@@ -44,7 +100,10 @@ def run_TrimAl(msa):
     ''' performs default mafft alignment
     '''
     outmsa = msa + ".trimmed"
-    cmd = "trimal -in {msa} -out {outmsa} -gappyout".format(**locals())
+    outhtml = msa + ".trimmed.html"
+    cmd = str("trimal -in {msa} -htmlout {outhtml} -out {outmsa} " +
+              # "-gappyout" +
+              "-strictplus -keepheader").format(**locals())
     print(cmd)
     subprocess.run(cmd,
                    shell=sys.platform !="win32",
@@ -52,7 +111,7 @@ def run_TrimAl(msa):
                    stderr=subprocess.PIPE,
                    check=True)
     print("Trimming complete")
-    return(msa)
+    return(outmsa)
 
 
 def main():
@@ -62,8 +121,16 @@ def main():
               "installed from https://github.com/scapella/trimal/releases" +
               " . Exiting...")
         sys.exit(1)
-
-    msa = mafft(args=args, multifasta = args.input)
+    if args.out_prefix.endswith(os.path.sep):
+        print("Output prefix should not end with path separator")
+        sys.exit(1)
+    if args.addcoli:
+        multifasta = add_cannonical(
+            msa=args.input,
+            tmp=args.out_prefix  + "with_coli")
+    else:
+        multifasta = args.input
+    msa = mafft(args=args, multifasta = multifasta)
     run_TrimAl(msa)
 
 
