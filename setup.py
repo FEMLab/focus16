@@ -14,11 +14,11 @@ else:
     raise RuntimeError("Unable to find version string in %s." % (VERSIONFILE,))
 
 
-setup(name='16db',
+setup(name='focusDB',
       description='Draft genome reassembly using riboSeed, for the construction ' +
       'of high resolution 16S databases',
       version=verstr,
-      url='http://github.com/BenNolann/16db',
+      url='https://github.com/FEMLab/focusdb_manuscript',
       author='Ben Nolan,Nick Waters',
       author_email='N.BEN1@nuigalway.ie, nickp60@gmail.com',
       license='MIT',
@@ -54,7 +54,7 @@ setup(name='16db',
       # },
       entry_points={
           'console_scripts': [
-              '16db = py16db.run_all:main',
+              'focusDB = py16db.run_all:main',
               'combine-focusdb-and-silva = py16db.combine_focusdb_and_silva:main',
               'calculate-shannon-entropy = py16db.calculate_shannon_entropy:main',
               'align-and-trim-focusdb = py16db.align_and_trim_focusdb:main'

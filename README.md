@@ -1,21 +1,21 @@
-# 16db
+# focusDB
 ## High resolution 16S database construction from correctly assembled rDNA operons
 
 ## Description
-16db is a package built for the construction of species-specific, high-resolution 16S rDNA databases.
+focusDB is a package built for the construction of species-specific, high-resolution 16S rDNA databases.
 It does so with through the use of riboSeed, a pipeline for the use of ribosomal flanking regions to improve bacterial genome assembly.
-riboSeed allows the correct assembly of multiple rDNA operons within a single genome. 16db uses various tools around and including
+riboSeed allows the correct assembly of multiple rDNA operons within a single genome. focusDB uses various tools around and including
 riboSeed to take an input of arguments listed below and produces a file containing all 16S sequences from draft full genomes available for that species.
 
 
 ## Installation
-###### Installing 16db
+###### Installing focusDB
 TODO: get pip install worrking
 ```
-pip install 16db
+pip install focusDB
 ```
 
-###### Packages required for 16db:
+###### Packages required for focusDB:
 ```
 conda install python=3.5 seqtk sickle-trim sra-tools riboseed mash skesa barrnap parallel-fastq-dump iqtree
 ```
@@ -26,7 +26,7 @@ Optionally, to use the trimming alignment feature, TrimAl must be installed from
 ###### Example
 ```
 # reassemble SRAs and extract potentially novel 16S sequnces
-16db --output_dir ./focusdb_ecoli/ -g ./escherichia_genomes/ --n_SRAs 5 --n_references 30 --memory 8 --cores 4 --organism_name "Escherichia coli"
+focusDB --output_dir ./focusdb_ecoli/ -g ./escherichia_genomes/ --n_SRAs 5 --n_references 30 --memory 8 --cores 4 --organism_name "Escherichia coli"
 ## Optional downstream analyses
 # build E. coli specific DB from E colis in Silva and our new seqeunces
 combine-focusdb-and-silva  -d ~/Downloads/SILVA_132_SSUParc_tax_silva.fasta  -o ecolidb.fasta  -n "Escherichia coli" -S ./focusdb_ecoli/ribo16s.fasta
@@ -38,7 +38,7 @@ calculate-shannon-entropy calculate-shannon-entropy.py -i aligned_ecolidb.mafft.
 
 
 
-##### `16db`
+##### `focusDB`
 This will go through the process of getting the list of assemblies that are associated with SRAs, downloading up to 5 SRAs,  finding the closes referece for each of the 5 SRAs, assembling, and extracting the 16S sequences.
 
 
@@ -53,13 +53,13 @@ This will go through the process of getting the list of assemblies that are asso
 ###### Optional Arguments:
 ```
 [--sra_list]: Uses a user-given list of SRA accessions instead of obtaining SRA accessions from the pipeline.
-[--version]: Returns 16db version number.
+[--version]: Returns focusDB version number.
 [--approx_length]: Uses a user-given genome length as opposed to using reference genome length.
 [--sraFind_path]: Path to pre-downloaded sraFind-All-biosample-with-SRA-hits.txt file.
 [--prokaryotes]: Path to pre-downloaded prokaryotes.txt file.
 [--get_all]: If one SRA has two accessions, downloads both.
-[--cores]: The number of cores the user would like to use for 16db. Specifically, riboSeed and plentyofbugs can be optimized for thread usage.
-[--memory]: As with [--cores], RAM can be optimized for 16db.
+[--cores]: The number of cores the user would like to use for focusDB. Specifically, riboSeed and plentyofbugs can be optimized for thread usage.
+[--memory]: As with [--cores], RAM can be optimized for focusDB.
 [--maxcov]: The maximum read coverage for SRA assembly. Downsamples to this coverage if the coverage exceeds it.
 [--example_reads]: Input of user-given reads.
 [--subassembler]: Choice of mash or skesa for subassembly in riboSeed.
@@ -67,7 +67,7 @@ This will go through the process of getting the list of assemblies that are asso
 
 ### Included Utilities:
 #### `combine-focusdb-and-silva`
-Use this script to combine silva  and 16db seqeunces for a given organism name.
+Use this script to combine silva  and focusDB seqeunces for a given organism name.
 #### `align-and-trim-focusdb`
 ```
 usage: align-and-trim-focusdb [-h] -i INPUT -o OUT_PREFIX
@@ -100,12 +100,12 @@ optional arguments:
 ### Unit tests
 Testing is done with the `nose` package. Generate the test data with
 ```
-nosetests  py16db/generator.py
+nosetests  pyfocusDB/generator.py
 ```
 and run the unit tests with
 
 ```
-nosetests py16db/ -v
+nosetests pyfocusDB/ -v
 ```
 
 Note  that `generator.py` requires ART to generate synthetic.
@@ -126,4 +126,4 @@ conda install openblas=0.2.19
 
 
 ### Fuzzy matching organisms for `plentyofbugs`
-The default behavior for identifying organisms of interest from NCBI's `prokaryotes.txt` is to find lines starting with `--organism_name`.  This is intentional, as the names are poorly defined in the file, and  this allows us to capture a whole genus if desired.  We have never come across a case where this happens, but this could have the consequence of including undesired organisms, if they start with the same characters. For instance, an `--organism_name` of `dog` would also match `dogfish`.  If you notice undesired organisms included in the log file in our output directory,  you will have to manually select the lines of interest from `prokaryotes.txt`, save that as an alterative file, and use the `--prokaryotes` argument to provide this edited version to 16db.
+The default behavior for identifying organisms of interest from NCBI's `prokaryotes.txt` is to find lines starting with `--organism_name`.  This is intentional, as the names are poorly defined in the file, and  this allows us to capture a whole genus if desired.  We have never come across a case where this happens, but this could have the consequence of including undesired organisms, if they start with the same characters. For instance, an `--organism_name` of `dog` would also match `dogfish`.  If you notice undesired organisms included in the log file in our output directory,  you will have to manually select the lines of interest from `prokaryotes.txt`, save that as an alterative file, and use the `--prokaryotes` argument to provide this edited version to focusDB.
