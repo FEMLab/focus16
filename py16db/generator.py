@@ -1,4 +1,3 @@
-from . import run_all as ra
 import glob
 import os
 import sys
@@ -130,7 +129,7 @@ class test_generate_reads(unittest.TestCase):
         reads = self.artreads
         genome = self.genome = os.path.join(os.path.dirname(__file__), "test_data", "ecoli", "NC_011750.1.fna")
 
-        cmd = "{artdir} -ss HS25 -i {genome} -p -l 150 -f 10 -rs 12345  -m 400 -qs 10 -s 10 -o {reads}".format(**locals())
+        cmd = "{artdir} -ss HS25 -i {genome} -p -l 150 -f 1 -rs 12345  -m 400 -qs 10 -s 10 -o {reads}".format(**locals())
 
         subprocess.run(
             cmd,
