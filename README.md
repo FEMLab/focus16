@@ -1,3 +1,4 @@
+[![Build Status](https://travis-ci.com/FEMLab/focusdb.svg?branch=master)](https://travis-ci.com/FEMLab/focusdb)
 # focusDB
 ## High resolution 16S database construction from correctly assembled rDNA operons
 
