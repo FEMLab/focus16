@@ -1,4 +1,4 @@
-from .run_all import alignment
+from .align_and_trim_focusdb import mafft as alignment
 from nose.tools.nontrivial import with_setup
 import os
 import shutil
@@ -13,28 +13,14 @@ class alignmentTest(unittest.TestCase):
                                    "alignment_test")
       self.fasta = os.path.join(os.path.dirname(__file__),
                                 "test_data", "test_16s_multilineSHORT.fasta")
-      if os.path.exists(self.test_dir):
-         shutil.rmtree(self.test_dir)
 
-   def tearDown(self):
-      """ tear down test fixtures
-      """
-      shutil.rmtree(self.test_dir)
-
-   @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
-                    "skipping this test on travis.CI")
    def test_alignment(self):
       test_output = (self.test_dir)
-      os.makedirs(test_output)
       test_fasta = (self.fasta)
-      test_result = alignment(fasta=test_fasta, output=test_output, logger=logger)
-      print(test_result)
-      mafftoutput = os.path.join(self.test_dir, "alignment", "MSA.fasta")
-      with open(mafftoutput, "r") as infile:
-         firstline = infile.readline().strip()
-         print(firstline)
-      # TODO determinine why this chromosome is not in generator.py data builder
-      # assert firstline == ">chromosome-RC@CU928164.2 :480955:482492"
+      outpath, test_result = alignment(multifasta=test_fasta, pre=test_output)
+      assert test_result.startswith("mafft --retree 2 --reorder"), "malformatted mafft cmd"
+      assert outpath == self.test_dir + ".mafft"
+
 
 class alignmentLongTest(unittest.TestCase):
    """ test for the alignment step, using 5 whole genome sequences from E. coli
@@ -43,18 +29,10 @@ class alignmentLongTest(unittest.TestCase):
       self.test2_dir = os.path.join(os.path.dirname(__file__),
                                     "alignment_test_long")
       self.inputfasta = os.path.join(os.path.dirname(__file__), "test_data", "ribo16")
-      if os.path.exists(self.test2_dir):
-         shutil.rmtree(self.test2_dir)
 
-
-   def tearDown(self):
-      shutil.rmtree(self.test2_dir)
-
-
-   @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
-                       "skipping this test on travis.CI")
    def test_alignmentlong(self):
       test_output = (self.test2_dir)
       inputfasta = (self.inputfasta)
-      test_result = alignment(fasta=inputfasta, output=test_output, logger=logger)
-      assert os.path.exists(test_result)
+      out_path, test_result = alignment(multifasta=inputfasta, pre=test_output)
+      assert test_result.startswith("mafft --retree 2 --reorder"), "malformatted mafft cmd"
+      assert out_path == self.test2_dir + ".mafft"

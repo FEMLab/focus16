@@ -18,7 +18,7 @@ setup(name='focusDB',
       description='Draft genome reassembly using riboSeed, for the construction ' +
       'of high resolution 16S databases',
       version=verstr,
-      url='https://github.com/FEMLab/focusdb_manuscript',
+      url='https://github.com/FEMLab/focusdb',
       author='Ben Nolan,Nick Waters',
       author_email='N.BEN1@nuigalway.ie, nickp60@gmail.com',
       license='MIT',

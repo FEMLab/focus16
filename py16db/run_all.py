@@ -71,7 +71,7 @@ def setup_logging(args):  # pragma: nocover
     return logger
 
 
-def get_args():
+def get_args():  # pragma: nocover
     parser = argparse.ArgumentParser()
     parser.add_argument("-o", "--output_dir",
                         help="path to output", required=True)
@@ -513,7 +513,6 @@ def process_strain(rawreadsf, rawreadsr, read_length, this_output, args, logger,
     update_status_file(status_file, message="DOWNSAMPLED")
     logger.debug('Downsampled f reads: %s', downsampledf)
     logger.debug('Downsampled r reads: %s', downsampledr)
-
     riboseed_cmd = make_riboseed_cmd(sra=best_ref_fasta, readsf=downsampledf,
                                      readsr=downsampledr, cores=args.cores,
                                      memory=args.memory,
@@ -530,6 +529,7 @@ def process_strain(rawreadsf, rawreadsr, read_length, this_output, args, logger,
         if os.path.exists(ribo_dir):
             shutil.rmtree(ribo_dir)
         try:
+            logger.info("Running riboSeed")
             logger.debug(riboseed_cmd)
             subprocess.run(riboseed_cmd,
                            shell=sys.platform != "win32",

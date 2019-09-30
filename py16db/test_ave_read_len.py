@@ -13,29 +13,26 @@ class avereadlenTest(unittest.TestCase):
         self.readsgunzipd = os.path.join(os.path.dirname(__file__), "test_data", "test_reads1.fq")
         self.readsgzipd = os.path.join(os.path.dirname(__file__), "test_data", "test_reads1.fq.gz")
 
-        # gunzip = "gunzip {self.readsgzipd}".format(**locals())
-
-        # if os.path.exists(self.readsgzipd):
-        #     subprocess.run(gunzip,
-        #                    shell=sys.platform !="win32",
-        #                    stdout=subprocess.PIPE,
-        #                    stderr=subprocess.PIPE,
-        #                    check=True)
-
     def tearDown(self):
         pass
-        # if os.path.exists(self.readsgunzipd):
-        #     gzip = "gzip {self.readsgunzipd}".format(**locals())
-
-        #     subprocess.run(gzip,
-        #                    shell=sys.platform !="win32",
-        #                    stdout=subprocess.PIPE,
-        #                    stderr=subprocess.PIPE,
-        #                    check=True)
 
     def test_get_ave(self):
         reads = self.readsgunzipd
-        test_result = get_and_check_ave_read_len_from_fastq(fastq1=reads, logger=logger)
+        code, test_result = get_and_check_ave_read_len_from_fastq(fastq1=reads, logger=logger, minlen=50, maxlen=300)
         print(test_result)
         assert 150.0 == test_result
-        return()
+        assert code == 0
+
+    def test_get_ave_too_long(self):
+        reads = self.readsgunzipd
+        code, test_result = get_and_check_ave_read_len_from_fastq(fastq1=reads, logger=logger, minlen=50, maxlen=100)
+        print(test_result)
+        assert 150.0 == test_result
+        assert code == 2
+
+    def test_get_ave_too_short(self):
+        reads = self.readsgunzipd
+        code, test_result = get_and_check_ave_read_len_from_fastq(fastq1=reads, logger=logger, minlen=200, maxlen=1000)
+        print(test_result)
+        assert 150.0 == test_result
+        assert code == 1

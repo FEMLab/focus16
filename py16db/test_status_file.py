@@ -14,8 +14,7 @@ def test_parse_status_file():
 def test_update_status_file():
     update_status_file(fpath, message="DONE")
     statuses = parse_status_file(fpath)
-    print(statuses)
     update_status_file(fpath, to_remove = ["DONE"], message="THIRD THING")
     statuses = parse_status_file(fpath)
     print(statuses)
-    assert statuses == ["FIRST THING", "THIRD THING"]
+    assert statuses.sort() == ["FIRST THING", "THIRD THING"].sort()

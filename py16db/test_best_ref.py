@@ -24,27 +24,10 @@ class bestrefTest(unittest.TestCase):
         if os.path.exists(os.path.join(self.plasmids_dir, "reference.msh")):
             os.remove(os.path.join(self.plasmids_dir, "reference.msh"))
 
-        # gunzip = "gunzip {self.readsgzipd}".format(**locals())
-
-        # if os.path.exists(self.readsgzipd):
-        #     subprocess.run(gunzip,
-        #                    shell=sys.platform !="win32",
-        #                    stdout=subprocess.PIPE,
-        #                    stderr=subprocess.PIPE,
-        #                    check=True)
 
     def tearDown(self):
         "tear down test fixtures"
         shutil.rmtree(self.test_dir)
-
-        # if os.path.exists(self.readsgunzipd):
-        #     gzip = "gzip {self.readsgunzipd}".format(**locals())
-
-        #     subprocess.run(gzip,
-        #                    shell=sys.platform !="win32",
-        #                    stdout=subprocess.PIPE,
-        #                    stderr=subprocess.PIPE,
-        #                    check=True)
 
 
     @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",

@@ -22,32 +22,13 @@ class coverageTests(unittest.TestCase):
         self.readsgunzipd2 = os.path.join(self.data_dir, "test_reads1.fq")
         self.readsgzipd2 = os.path.join(self.data_dir, "test_reads1.fq.gz")
         self.downsample_dir = os.path.join(self.test_dir, "downsampled")
-        if os.path.exists(self.test_dir):
-            shutil.rmtree(self.test_dir)
 
-        # for readfile in [self.readsgzipd1, self.readsgzipd2]:
-        #     gunzip = "gunzip {readfile}".format(**locals())
-        #     if os.path.exists(readfile):
-        #         subprocess.run(gunzip,
-        #                        shell=sys.platform !="win32",
-        #                        stdout=subprocess.PIPE,
-        #                        stderr=subprocess.PIPE,
-        #                        check=True)
 
     def tearDown(self):
         "tear down test fixtures"
         for dir in [self.test_dir, self.downsample_dir]:
             if os.path.exists(dir):
                 shutil.rmtree(dir)
-
-        # for readfile in [self.readsgunzipd1, self.readsgunzipd2]:
-        #     if os.path.exists(readfile):
-        #         gzip = "gzip {readfile}".format(**locals())
-        #         subprocess.run(gzip,
-        #                        shell=sys.platform !="win32",
-        #                        stdout=subprocess.PIPE,
-        #                        stderr=subprocess.PIPE,
-        #                        check=True)
 
 
     @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
@@ -75,6 +56,7 @@ class coverageTests(unittest.TestCase):
             fastq2=self.readsgunzipd2,
             destination=self.downsample_dir,
             maxcoverage=2,
+            run=True,
             logger=logger)
         down_cov1 = get_coverage(read_length=150, approx_length=5132068, fastq1=reads1, fastq2=reads2, logger=logger)
         # down_cov2 = get_coverage(read_length=150, approx_length=5132068, fastq1=reads2, fastq2=reads2, logger=logger)
@@ -91,6 +73,7 @@ class coverageTests(unittest.TestCase):
             fastq2=self.readsgunzipd2,
             destination=self.downsample_dir,
             maxcoverage=2,
+            run=True,
             logger=logger)
         down_cov = get_coverage(read_length=150, approx_length=5132068, fastq1=reads1, fastq2=reads2, logger=logger)
         assert 2.0110460344640795 == down_cov

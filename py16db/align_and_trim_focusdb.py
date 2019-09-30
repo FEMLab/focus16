@@ -81,19 +81,12 @@ TA
     return tmp
 
 
-def mafft(args, multifasta):
+def mafft(pre, multifasta):
     ''' performs default mafft alignment
     '''
-    msa = args.out_prefix + ".mafft"
+    msa = pre + ".mafft"
     cmd = "mafft --retree 2 --reorder {multifasta} > {msa}".format(**locals())
-    print(cmd)
-    subprocess.run(cmd,
-                   shell=sys.platform !="win32",
-                   stdout=subprocess.PIPE,
-                   stderr=subprocess.PIPE,
-                   check=True)
-    print("MSA complete")
-    return(msa)
+    return(msa, cmd)
 
 
 def run_TrimAl(msa):
@@ -130,7 +123,16 @@ def main():
             tmp=args.out_prefix  + "with_coli")
     else:
         multifasta = args.input
-    msa = mafft(args=args, multifasta = multifasta)
+
+    msa, msa_cmd = mafft(pre=args.output_pre, multifasta = multifasta)
+    print(msa_cmd)
+    subprocess.run(msa_cmd,
+                   shell=sys.platform !="win32",
+                   stdout=subprocess.PIPE,
+                   stderr=subprocess.PIPE,
+                   check=True)
+    print("MSA complete")
+
     run_TrimAl(msa)
 
 
