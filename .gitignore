@@ -12,3 +12,9 @@ py16db/sralist.py
 16db.egg-info/
 prokaryotes.txt
 py16db/sample_status_file
+*.egg-info/
+escherichi*/
+dist/
+*sraFind-All-biosample-with-SRA-hits.txt
+.coverage
+cover/

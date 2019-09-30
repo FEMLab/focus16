@@ -1,12 +1,18 @@
 language: python
-
 os:
- - linux
-# - macos
-
+- linux
 python:
- - 3.5
-
+- 3.5
 script:
 - python setup.py install
 - nosetests py16db/test_*.py
+- focusDB -h
+
+deploy:
+  provider: pypi
+  user: NickWaters
+  password:
+    secure: PjBLmz5muHQEi6ILcbPkftA6qd6AGI9JscA53dqNpbmytvcXuz4MXElrzfqBylfbsxGbbkiwBo1iVy1eF5N4JZiP7PwxlUUPRcE+VzEsBCPaEXp7SSXOViHCWyPpTusXMdE1TW2UZ9207nUKL4bWIleTZJ9OULwdNh1iXYx+7AilzmSx8su2Feck3OMoCRQgiEEiK/AsEq71+Q48pFfqbMMFvKZlUeRH2fpV6Rt1bdV7NLQPGitAXfoD/UrASmALWMLi1h/E3i5E4d9+B1YCFhLL0xWEQovWQpaNilNe2bWTIGAeVO58A9NP7sSOapSA21n+5PAUZquSPTzuTnEMDkSB15st/kwaMxKsQOj6kAaWI8OhiHHcV7QBpOsnuUAlDLHwjOlKj6zhlFcPiNnDu2/fci7d3w0mXiXY+FrNWuiWTdgbzj/4YaUeUj57GY0gr4usfTjLqW11cA5vgwIxMzyFHn5Dmz+6SNbv2wCNA0gIwM6pgMP/mWhHNifjhqmDuJqbi6SigGbLh1V4nvrlTEJx4RthcrYGLB3R9eFzko2tfAggpxNoMgM4EpQVy88RgsWGtFaeJrquyIS90KlPl1bf/zryAf6bYDz5qzJ8zTAjsxQQJvbQJ+XzRkSreEoC/0Bz4GOawq0PuOdvLgbH0DKSpskfMSfUS4aX7LXml/Y=
+  skip_existing: true
+  on:
+    tags: true
