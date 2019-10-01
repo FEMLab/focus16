@@ -20,7 +20,8 @@ def test_start_SRAs():
 
 def test_add_SRAs():
     fDB = FocusDBData(dbdir = thisdbdir)
-    fDB.update_manifest(newacc="SRRtest123", newstatus="mostly_ok", logger=logger)
+    fDB.update_manifest(newacc="SRRtest123", newstatus="mostly_ok",
+                        organism = "test", logger=logger)
     print(fDB.SRAs)
     assert fDB.SRAs['SRRtest123']['status'] == "mostly_ok", \
         "error adding SRA to list"

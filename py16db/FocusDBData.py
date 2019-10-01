@@ -29,28 +29,31 @@ class FocusDBData(object):
             os.makedirs(self.dbdir)
         if not os.path.exists(self.SRAs_manifest):
             with open(self.SRAs_manifest, "w") as outf:
-                outf.write("SRA_accession\tStatus\n")
+                outf.write("SRA_accession\tStatus\tOrganism\n")
 
     def read_manifest(self):
         with open(self.SRAs_manifest, "r") as inf:
             for i, line in enumerate(inf):
-                acc, status = line.strip().split("\t")
+                acc, status, org = line.strip().split("\t")
                 if i != 0:
-                    self.SRAs[acc] = {"status": status}
+                    self.SRAs[acc] = {
+                        "status": status,
+                        "organism": org,
+                    }
 
-    def update_manifest(self, newacc, newstatus, logger):
+    def update_manifest(self, newacc, newstatus, organism, logger):
         tmp = self.SRAs_manifest + ".bak"
         shutil.move(self.SRAs_manifest, tmp)
         with open(tmp, "r") as inf, open(self.SRAs_manifest, "w") as outf:
             for i, line in enumerate(inf):
-                acc, status = line.strip().split("\t")
+                acc, status, organism = line.strip().split("\t")
                 if acc == newacc:
                     pass
                 else:
-                    outf.write("{}\t{}\n".format(acc, status))
+                    outf.write("{}\t{}\t{}\n".format(acc, status, organism))
             # if we still haven;t written out our new SRA (ie, if we are adding
             # a new one, not updating)
-            outf.write("{}\t{}\n".format(newacc, newstatus))
+            outf.write("{}\t{}\t{}\n".format(newacc, newstatus, organism))
         os.remove(tmp)
         self.read_manifest()
 
@@ -75,7 +78,7 @@ class FocusDBData(object):
                 check=True)
         self.sraFind_data = dest_path
 
-    def get_SRA_data(self, cores, SRA, logger):
+    def get_SRA_data(self, cores, SRA, org, logger):
         """download_SRA_if_needed
         This doesnt check the manifest right off the bad to make it easier for
         users to move data into the .focusdb dir manually
@@ -93,6 +96,7 @@ class FocusDBData(object):
             self.update_manifest(
                 newacc=SRA,
                 newstatus="PASS",
+                organism=org,
                 logger=logger)
             return (rawreadsf, rawreadsr, download_error_message)
         elif SRA in self.SRAs.keys():
@@ -127,6 +131,7 @@ class FocusDBData(object):
             self.update_manifest(
                 newacc=SRA,
                 newstatus="DOWNLOAD ERROR",
+                organism=org,
                 logger=logger)
             logger.critical("Error running fasterq-dump")
             raise fasterqdumpError
@@ -136,6 +141,7 @@ class FocusDBData(object):
             self.update_manifest(
                 newacc=SRA,
                 newstatus="PASS",
+                organism=org,
                 logger=logger)
             return (rawreadsf, rawreadsr, download_error_message)
         else:

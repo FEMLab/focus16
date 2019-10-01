@@ -671,7 +671,7 @@ def get_focusDB_dir(args):
     if args.focusDB_data is None:
         return os.path.join(os.path.expanduser("~"), ".focusDB", "")
     else:
-        return args.args.focusDB_data
+        return args.focusDB_data
 
 
 def main():
@@ -785,7 +785,6 @@ def main():
     else:
         for i, accession in enumerate(filtered_sras):
             this_output = os.path.join(args.output_dir, accession)
-            this_data = os.path.join(get_focusDB_dir(), "data")
             this_results = os.path.join(this_output, "results")
             os.makedirs(this_output, exist_ok=True)
             status_file = os.path.join(this_output, "status")
@@ -794,6 +793,7 @@ def main():
                 rawreadsf, rawreadsr, download_error_message = \
                     fDB.get_SRA_data(
                         cores=args.cores,
+                        org=args.organism_name,
                         SRA=accession,
                         logger=logger)
             except fasterqdumpError:
@@ -807,7 +807,6 @@ def main():
                 logger.error(
                     "Error either downloading or parsing the file " +
                     "name for this accession.")
-                logger.error(this_data)
                 logger.error(download_error_message)
                 continue
             read_len_status, read_length = get_and_check_ave_read_len_from_fastq(
