@@ -1,8 +1,9 @@
 import os
 from pathlib import Path
 import logging as logger
-from .run_all import check_fastq_dir
+
 here = os.path.dirname(__file__)
+from py16db.FocusDBData import FocusDBData, fasterqdumpError
 
 thesedirs = {
     # dir,      REads,                  should have F,   R, S,  message
@@ -28,14 +29,16 @@ for k, v in thesedirs.items():
         Path(os.path.join(base, "test" + d)).touch()
 
 
-def test_parse_status_file():
+def test_fastq_files():
+    fDB = FocusDBData(dbdir = testdir)
+
     for k, v in thesedirs.items():
         base = os.path.join(testdir,  k)
         if k.startswith("bad"):
-            fwd, rev, mgs = check_fastq_dir(base, logger)
+            fwd, rev, mgs = fDB.check_fastq_dir(base, logger)
             assert mgs != "", "no error thrown"
         else:
-            fwd, rev, mgs = check_fastq_dir(base, logger)
+            fwd, rev, mgs = fDB.check_fastq_dir(base, logger)
             if v[1]:
                 assert fwd == os.path.join(base, "test_1.fastq"), "missing forward library"
             if v[2]:

@@ -1,4 +1,5 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 import argparse
 import sys
@@ -14,21 +15,16 @@ from pathlib import Path
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 
-from plentyofbugs import get_n_genomes as gng
 from py16db.run_sickle import run_sickle
 
 from . import __version__
-
+from py16db.FocusDBData import FocusDBData,fasterqdumpError
 
 class bestreferenceError(Exception):
     pass
 
 
 class downsamplingError(Exception):
-    pass
-
-
-class fasterqdumpError(Exception):
     pass
 
 
@@ -54,7 +50,7 @@ def setup_logging(args):  # pragma: nocover
         level=logging.DEBUG,
         filename=os.path.join(args.output_dir, "focusDB.log"),
         format="%(asctime)s - %(levelname)s - %(message)s",
-        )
+    )
     logger = logging.getLogger(__name__)
     console_err = logging.StreamHandler(sys.stderr)
     console_err.setLevel(level=(args.verbosity * 10))
@@ -88,9 +84,9 @@ def get_args():  # pragma: nocover
     parser.add_argument("-l", "--approx_length",
                         help="Integer for approximate genome length",
                         required=False, type=int)
-    parser.add_argument("-s", "--sraFind_path", dest="sra_path",
-                        help="path to sraFind file",
-                        default="sraFind-All-biosample-with-SRA-hits.txt",
+    parser.add_argument("--sraFind_path", dest="sra_path",
+                        help="path to sraFind file; default is in .focusDB/",
+                        default=None,
                         required=False)
     parser.add_argument("--SRAs", default=None, nargs="+",
                         help="run pipeline on this (these) SRA(s) only",
@@ -251,28 +247,6 @@ def sralist(list):
         for sra in infile:
             sras.append(sra.strip())
     return sras
-
-
-def download_SRA(cores, SRA, destination, logger):
-    """Download SRAs, downsample forward reads to 1000000"""
-    suboutput_dir_raw = os.path.join(destination, "")
-    os.makedirs(suboutput_dir_raw)
-    # defaults to 6 threads or whatever is convenient; we suspect I/O limits
-    # using more in most cases, so we don't give the user the option
-    # to increase this
-    # https://github.com/ncbi/sra-tools/wiki/HowTo:-fasterq-dump
-    cmd = str("fasterq-dump {SRA} -O " +
-              "{suboutput_dir_raw} --split-files").format(**locals())
-    logger.info("Downloading %s", SRA)
-    logger.debug(cmd)
-    try:
-        subprocess.run(cmd,
-                       shell=sys.platform != "win32",
-                       stdout=subprocess.PIPE,
-                       stderr=subprocess.PIPE,
-                       check=True)
-    except subprocess.CalledProcessError:
-        logger.critical("Error running fasterq-dump")
 
 
 def pob(genomes_dir, readsf, output_dir, logger):
@@ -553,20 +527,6 @@ def process_strain(rawreadsf, rawreadsr, read_length, this_output, args, logger,
             os.path.join(this_output, "riboSeed", "run_riboSeed.log"))
 
 
-def fetch_sraFind_data(dest_path):
-    sraFind_results = "https://raw.githubusercontent.com/nickp60/sraFind/master/results/sraFind-All-biosample-with-SRA-hits.txt"
-    # gets just the file name
-    if not os.path.exists(dest_path):
-        print("Downloading sraFind Dump")
-        download_sraFind_cmd = str("wget " + sraFind_results + " -O " + dest_path)
-        subprocess.run(
-            download_sraFind_cmd,
-            shell=sys.platform != "win32",
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=True)
-
-
 def run_barrnap(assembly,  results, logger):
     barrnap = "barrnap {assembly} > {results}".format(**locals())
     logger.debug('Identifying 16S sequences with barnap: %s', barrnap)
@@ -704,56 +664,10 @@ def decide_skip_or_download_genomes(args, logger):
     return 0
 
 
-def check_fastq_dir(this_data, logger):
-    # Double check the download worked.  If its a single lib,
-    # it wont have a _1 prefix, so we check if that exists
-    # and if so, adjust expeactations
-    fastqs = glob.glob(os.path.join(this_data, "", "*.fastq"))
-    logger.debug("fastqs detected: %s", " ".join(fastqs))
-    if len(fastqs) == 0:
-        return(None, None, "No fastq files downloaded")
-    rawf, rawr, raws = [], [], []
-    rawreadsf, rawreadsr = None, None
-    download_error_message = ""
-    for fastq in fastqs:
-        if fastq.endswith("_1.fastq"):
-            # not appending, cause we want to bump out any single libs t
-            # that may have been read in first
-            if len(rawf) != 0:
-                logger.warning("ignoring extra library %s", " ".join(rawf))
-            rawf = [fastq]
-        elif fastq.endswith("_2.fastq"):
-            rawr.append(fastq)
-        elif fastq.endswith(".fastq") and not fastq.endswith("_3.fastq"):
-            if len(rawf) == 0:
-                # This is how we treat single libraries
-                rawf.append(fastq)
-            else:
-                logger.warning("ignoring extra library %s", fastq)
-        else:
-            logger.error("Can only process paired or reads")
-            logger.error(fastqs)
-            download_error_message = "Unexpected item in the bagging area"
-            download_error_message = "Unable to process library type"
-    if len(set(rawf)) == 1:
-        rawreadsf = rawf[0]
-    elif len(set(rawf)) > 1:
-        download_error_message = "multiple forward reads files detected"
-    else:
-        download_error_message = "No forward/single read files detected"
 
-    if len(set(rawr)) == 1:
-        rawreadsr = rawr[0]
-    elif len(set(rawr)) > 1:
-        download_error_message = "multiple reverse reads files detected"
-    else:
-        rawreadsr= None
-    # catch only .fastq and _2.fastq weird combo
-    if rawreadsf is not None:
-         if not rawreadsf.endswith("_1.fastq") and rawreadsr is not None:
-             download_error_message = "cannot process a single library " + \
-                 "file and a reverse file"
-    return (rawreadsf, rawreadsr, download_error_message)
+def get_focusDB_dir():
+    return os.path.join(os.path.expanduser("~"), ".focusDB", "")
+
 
 
 def main():
@@ -773,8 +687,9 @@ def main():
     for k,v in sorted(vars(args).items()):
         logger.debug("{0}: {1}".format(k,v))
     check_programs(logger)
-
-    fetch_sraFind_data(args.sra_path)
+    # set up the data object
+    fDB = FocusDBData(dbdir = get_focusDB_dir())
+    fDB.fetch_sraFind_data(dest_path=args.sra_path, logger=logger)
 
     if args.SRAs is not None:
         filtered_sras = args.SRAs
@@ -782,7 +697,7 @@ def main():
         filtered_sras = sralist(list=args.SRA_list)
     else:
         filtered_sras = filter_SRA(
-            sraFind=args.sra_path,
+            sraFind=fDB.sraFind_data,
             organism_name=args.organism_name,
             strains=args.n_SRAs,
             thisseed=args.seed,
@@ -866,41 +781,22 @@ def main():
     else:
         for i, accession in enumerate(filtered_sras):
             this_output = os.path.join(args.output_dir, accession)
-            this_data = os.path.join(this_output, "data")
+            this_data = os.path.join(get_focusDB_dir(), "data")
             this_results = os.path.join(this_output, "results")
             os.makedirs(this_output, exist_ok=True)
             status_file = os.path.join(this_output, "status")
             logger.info("Organism: %s", args.organism_name)
-            # check status file for SRA COMPLETE, or empty dir, missing dir,
-            # and other anomolies. Such things probably only occur
-            # during testing, but we still want to catch them
-            # this can catch issue arrising from an aborted run
-            if not os.path.exists(this_data):
-                # this never happens unless a run is aborted;
-                # regardless, we want to make sure we attempt to re-download
-                update_status_file(status_file, to_remove=["SRA DOWNLOAD COMPLETE"])
-            if os.path.exists(this_data):
-                if len(os.listdir(this_data)) == 0:
-                    logger.info("Data directory present but empty; attempting download")
-                    update_status_file(status_file, to_remove=["SRA DOWNLOAD COMPLETE"])
-            if "SRA DOWNLOAD COMPLETE" not in parse_status_file(status_file):
-                # a fresh start
-                if os.path.exists(this_data):
-                    shutil.rmtree(this_data)
-                try:
-                    download_SRA(cores=args.cores, SRA=accession,
-                                 destination=this_data, logger=logger)
-                    if len(os.listdir(this_data)) != 0:
-                        update_status_file(status_file, message="SRA DOWNLOAD COMPLETE")
-                except fasterqdumpError:
-                    message =  'Error downloading %s'  % accession
-                    write_pass_fail(args, status="FAIL", stage=accession, note=message)
-                    logger.error(message)
-                    continue
-            else:
-                logger.debug("Skipping SRA download: %s", accession)
-            rawreadsf, rawreadsr, download_error_message =  check_fastq_dir(
-                this_data, logger)
+            try:
+                rawreadsf, rawreadsr, download_error_message = \
+                    fDB.get_SRA_data(
+                        cores=args.cores,
+                        SRA=accession,
+                        logger=logger)
+            except fasterqdumpError:
+                message =  'Error downloading %s'  % accession
+                write_pass_fail(args, status="FAIL", stage=accession, note=message)
+                logger.error(message)
+                continue
             if download_error_message is not  "":
                 write_pass_fail(args, status="FAIL", stage=accession,
                                 note=download_error_message)

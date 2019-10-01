@@ -1,4 +1,4 @@
-from .run_all import download_SRA, filter_SRA
+from .run_all import filter_SRA
 import os
 import shutil
 import unittest
@@ -34,11 +34,11 @@ class download_SRATest(unittest.TestCase):
         "tear down test fixtures"
         shutil.rmtree(self.test_dir)
 
-    @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
-                     "skipping this test on travis.CI")
-    def test_download_SRA(self):
+    # @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
+    #                  "skipping this test on travis.CI")
+    # def test_download_SRA(self):
 
-        download_SRA(cores=4, destination=self.test_dir,
-                     SRA="SRR8443698", logger=logger)
+    #     download_SRA(cores=4, destination=self.test_dir,
+    #                  SRA="SRR8443698", logger=logger)
 
-        assert os.path.exists(os.path.join(self.test_dir, "SRR8443698_1.fastq"))
+    #     assert os.path.exists(os.path.join(self.test_dir, "SRR8443698_1.fastq"))

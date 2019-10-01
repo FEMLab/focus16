@@ -1,25 +1,36 @@
-[![Build Status](https://travis-ci.com/FEMLab/focusdb.svg?branch=master)](https://travis-ci.com/FEMLab/focusdb)
+[![Build Status](https://travis-ci.com/FEMLab/focusdb.svg?branch=master)](https://travis-ci.com/FEMLab/focusdb)[![PyPI version](https://badge.fury.io/py/focusDB.svg)](https://badge.fury.io/py/focusDB)
 # focusDB
 ## High resolution 16S database construction from correctly assembled rDNA operons
 
 ## Description
 focusDB is a package built for the construction of species-specific, high-resolution 16S rDNA databases.
 It does so with through the use of riboSeed, a pipeline for the use of ribosomal flanking regions to improve bacterial genome assembly.
-riboSeed allows the correct assembly of multiple rDNA operons within a single genome. focusDB uses various tools around and including
-riboSeed to take an input of arguments listed below and produces a file containing all 16S sequences from draft full genomes available for that species.
+
+## What it does:
+focusDB sets up a directory in your home folder to store  downloaded SRAs. This makes rerunning easier, as all the raw data is centralized for reuse. This keeps the data transfer load to a minimum.  A manifest file keeps track of the runs already downloaded.
+
+Given an organism, focusDB does the following:
+	- Identify all the whole-genome seqeuncing SRAs available for that species
+	- Download all potential complete reference genomes.
+	For each SRA:
+		- use `plentyofbugs` to identify which reference genome would be the closest
+		- run QC on reads, downsampling if neccessary
+		- run riboSeed assembly
+	Extract all the 16S seqeunces from reassembly
 
 
 ## Installation
-###### Installing focusDB
-TODO: get pip install worrking
+#### Installing focusDB
+focusDB available via pypi. We recommend installing within a python environment.
+
 ```
+conda create --name focusDBenv python=3.5 seqtk sickle-trim sra-tools riboseed mash skesa barrnap parallel-fastq-dump iqtree mafft
+conda activate focusDBenv
 pip install focusDB
+
 ```
 
-###### Packages required for focusDB:
-```
-conda install python=3.5 seqtk sickle-trim sra-tools riboseed mash skesa barrnap parallel-fastq-dump iqtree
-```
+#### Packages needed for additional features:
 Optionally, to use the trimming alignment feature, TrimAl must be installed from github https://github.com/scapella/trimal.  For re-generating test data, ART read simulator must also be installed.
 
 
@@ -33,7 +44,7 @@ focusDB --output_dir ./focusdb_ecoli/ -g ./escherichia_genomes/ --n_SRAs 5 --n_r
 combine-focusdb-and-silva  -d ~/Downloads/SILVA_132_SSUParc_tax_silva.fasta  -o ecolidb.fasta  -n "Escherichia coli" -S ./focusdb_ecoli/ribo16s.fasta
 # Align sequences and trim  the alignment
 align-and-trim-focusdb -i ecolidb.fasta --out_prefix aligned_ecolidb
-# Calculate the per-column shannon entropy of the trimmed allignment.
+# Calculate the per-column shannon entropy of the trimmed alignment.
 calculate-shannon-entropy calculate-shannon-entropy.py -i aligned_ecolidb.mafft.trimmed > ecoli_entropy
 ```
 
@@ -113,7 +124,6 @@ Note  that `generator.py` requires ART to generate synthetic.
 {https://www.niehs.nih.gov/research/resources/software/biostatistics/art/index.cfm}
 
 ### Running on test datasets
-
 
 
 
