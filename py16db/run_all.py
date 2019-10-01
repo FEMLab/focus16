@@ -88,6 +88,9 @@ def get_args():  # pragma: nocover
                         help="path to sraFind file; default is in .focusDB/",
                         default=None,
                         required=False)
+    parser.add_argument("--focusDB_data", dest="focusDB_data",
+                        help="path to data storage area; default .focusDB/",
+                        default=None)
     parser.add_argument("--SRAs", default=None, nargs="+",
                         help="run pipeline on this (these) SRA(s) only",
                         required=False)
@@ -664,10 +667,11 @@ def decide_skip_or_download_genomes(args, logger):
     return 0
 
 
-
-def get_focusDB_dir():
-    return os.path.join(os.path.expanduser("~"), ".focusDB", "")
-
+def get_focusDB_dir(args):
+    if args.focusDB_data is None:
+        return os.path.join(os.path.expanduser("~"), ".focusDB", "")
+    else:
+        return args.args.focusDB_data
 
 
 def main():
@@ -688,7 +692,7 @@ def main():
         logger.debug("{0}: {1}".format(k,v))
     check_programs(logger)
     # set up the data object
-    fDB = FocusDBData(dbdir = get_focusDB_dir())
+    fDB = FocusDBData(dbdir = get_focusDB_dir(args))
     fDB.fetch_sraFind_data(dest_path=args.sra_path, logger=logger)
 
     if args.SRAs is not None:
