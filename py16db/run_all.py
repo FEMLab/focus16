@@ -10,6 +10,7 @@ import shutil
 import gzip
 import logging
 import glob
+import multiprocessing
 
 from pathlib import Path
 from Bio import SeqIO
@@ -39,6 +40,10 @@ class riboSeedUnsuccessfulError(Exception):
 
 
 class extracting16sError(Exception):
+    pass
+
+
+class barrnapError(Exception):
     pass
 
 
@@ -114,9 +119,20 @@ def get_args():  # pragma: nocover
                         "download the first only.  Use --get_all to " +
                         "analyse each library",
                         action="store_true", required=False)
+    parser.add_argument("--njobs",
+                        help="integer for how many jobs to run concurrently " +
+                        "via multiprocessing. --cores and --memory is per job",
+                        default=1, type=int)
     parser.add_argument("--cores",
-                        help="integer for how many cores you wish to use",
+                        help="PER JOB: integer for how many cores you wish to use",
                         default=1,
+                        required=False, type=int)
+    parser.add_argument("--memory",
+                        help="PER JOB: amount of RAM to be used. riboSeed " +
+                        "needs 10GB ram to run optimally; less, riboSeed " +
+                        "runs in --serialize mode to prevent memory errors" +
+                        "during subassemblies",
+                        default=4,
                         required=False, type=int)
     parser.add_argument("--threads",
                         action="store",
@@ -131,8 +147,11 @@ def get_args():  # pragma: nocover
                         help="integer for maximum coverage of reads",
                         default=50,
                         required=False, type=int)
-    parser.add_argument("--example_reads",
-                        help="input of example reads", nargs='+',
+    parser.add_argument("--custom_reads",
+                        help="input of custom reads", nargs='+',
+                        required=False, type=str)
+    parser.add_argument("--custom_name",
+                        help="if using --custom_reads, store as this name",
                         required=False, type=str)
     parser.add_argument("--redo_assembly", action="store_true",
                         help="redo the assembly step, ignoring status file")
@@ -144,10 +163,6 @@ def get_args():  # pragma: nocover
     # this is needed for plentyofbugs, should not be user set
     parser.add_argument("--nstrains", help=argparse.SUPPRESS,
                         type=int, required=False)
-    parser.add_argument("--memory",
-                        help="amount of RAM to be used",
-                        default=4,
-                        required=False, type=int)
     parser.add_argument("--seed",
                         help="random seed for subsampling referencese",
                         type=int, default=12345)
@@ -160,13 +175,22 @@ def get_args():  # pragma: nocover
                         "4 = error() and 5 = critical(); " +
                         "default: %(default)s")
     args = parser.parse_args()
-    # plentyofbugs uses args.nstrains, but wecall it args.n_references for clarity
+    # plentyofbugs uses args.nstrains, but we call it args.n_references for clarity
+    if args.custom_reads is not None:
+        if args.custom_name is None:
+            print("--custom_name is required using custom reads")
+            print("this name is used to store the reads in the focusDB data ")
+            sys.exit(1)
+        else:
+            args.custom_name = args.custom_name.replace(" ", "_")
+
     args.nstrains = args.n_references
     if args.SRAs is None:
-        if args.n_SRAs is None:
-            print("if not running with --SRAs, " +
-                  "then --n_SRAs must be provided!")
-            sys.exit(1)
+        if args.custom_reads is  None:
+            if args.n_SRAs is None:
+                print("if not running with --SRAs, " +
+                      "then --n_SRAs must be provided!")
+                sys.exit(1)
     return(args)
 
 
@@ -270,8 +294,8 @@ def pob(genomes_dir, readsf, output_dir, logger):
                            check=True)
             best_ref = os.path.join(output_dir, "best_reference")
         except:
-            raise bestreferenceError("Error running the following command: %s" %
-                                     command)
+            raise bestreferenceError(
+                "Error running the following command: %s" % command)
 
     with open(best_ref, "r") as infile:
         for line in infile:
@@ -431,6 +455,8 @@ def make_riboseed_cmd(sra, readsf, readsr, cores, subassembler, threads,
 
 
 def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir, this_output, args, logger, status_file):
+    """return a tuple of the riboSeed cmd and the path to contigs
+    """
     pob_dir = os.path.join(this_output, "plentyofbugs")
     ribo_dir = os.path.join(this_output, "riboSeed")
     sickle_out = os.path.join(this_output, "sickle")
@@ -439,9 +465,11 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir, this_output, 
     # Note thhat the status file is checked before each step.
     # If a failure occured, all future steps are rerrun
     # for instance, if trimming has been done, but downsample hasn't,
-    # downsampling and assembly will be run. This is to protectt against
+    # downsampling and assembly will be run. This is to protect against
     # files sticking around when they shouldn't
     if not os.path.exists(best_reference):
+        if os.path.exists(pob_dir):
+            shutil.rmtree(pob_dir)
         pob(genomes_dir=genomes_dir, readsf=rawreadsf,
             output_dir=pob_dir, logger=logger)
 
@@ -451,10 +479,15 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir, this_output, 
 
     if args.approx_length is None:
         genome_length=os.path.join(pob_dir, "genome_length")
+        approx_length = None
         with open(genome_length, "r") as infile:
             for line in infile:
                 approx_length = float(line.split()[0])
                 logger.debug("Using genome length: %s", approx_length)
+        if approx_length is None:
+            raise ValueError("Error running plentyofbugs; " +
+                             "database possibly outdated")
+
     else:
         approx_length = args.approx_length
     if "TRIMMED" not in parse_status_file(status_file):
@@ -504,29 +537,21 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir, this_output, 
     if "RIBOSEED COMPLETE" not in parse_status_file(status_file):
         if os.path.exists(ribo_dir):
             shutil.rmtree(ribo_dir)
-        try:
-            logger.info("Running riboSeed")
-            logger.debug(riboseed_cmd)
-            subprocess.run(riboseed_cmd,
-                           shell=sys.platform != "win32",
-                           stdout=subprocess.PIPE,
-                           stderr=subprocess.PIPE,
-                           check=True)
-
-            update_status_file(status_file, message="RIBOSEED COMPLETE")
-        except Exception as e:
-            logger.error(e)
-            raise riboSeedError("Error running the following command: %s" %
-                                riboseed_cmd)
+        return(riboseed_cmd, ribo_contigs)
     else:
         logger.info("Skipping riboSeed")
+        return (None, ribo_contigs)
+
+
+def check_riboSeed_outcome(status_file, contigs):
     # check for the files to see if riboSeed completed
-    if os.path.exists(ribo_contigs):
+    if os.path.exists(contigs):
         update_status_file(status_file, message="RIBOSEED COMPLETE")
     else:
+        this_output = os.path.basename(contigs)
         raise riboSeedUnsuccessfulError(
             "riboSeed completed but was not successful; for details, see log file at %s" %
-            os.path.join(this_output, "riboSeed", "run_riboSeed.log"))
+            os.path.join(this_output, "run_riboSeed.log"))
 
 
 def run_barrnap(assembly,  results, logger):
@@ -539,7 +564,7 @@ def run_barrnap(assembly,  results, logger):
                        stderr=subprocess.PIPE,
                        check=True)
     except:
-        raise extracting16sError(
+        raise barrnapError(
             "Error running the following command %s" % barrnap)
 
 
@@ -606,6 +631,21 @@ def get_genomes_dir(args):
         return os.path.join(args.genomes_dir, "")
 
 
+def run_riboSeed_catch_errors( cmd, acc=None, args=None,status_file=None):
+    if cmd is None:
+        return 0
+    try:
+        subprocess.run(cmd,
+                       shell=sys.platform != "win32",
+                       stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE,
+                       check=True)
+    except subprocess.CalledProcessError:
+        write_pass_fail(args, status="FAIL",
+                        stage=acc,
+                        note="Unknown failure running riboSeed")
+    return 0
+
 def main():
     args = get_args()
 
@@ -629,10 +669,23 @@ def main():
                       prokaryotes=args.prokaryotes)
     fDB.fetch_sraFind_data(logger=logger)
 
+    # process data 1 of 4 ways: specific SRA(s), a file of SRA(s),
+    #  specific read file (stored as a faux SRA), or the default
+    #  to get a list of SRAs from sraFind for a given organism name
     if args.SRAs is not None:
         filtered_sras = args.SRAs
     elif args.SRA_list is not None:
         filtered_sras = sralist(list=args.SRA_list)
+    elif args.custom_reads is not None:
+        this_data_dir = os.path.join(fDB.dbdir, args.custom_name)
+        if not os.path.exists(this_data_dir):
+            os.makedirs(this_data_dir)
+            for read in args.custom_reads:
+                dest = os.path.join(this_data_dir, os.path.basename(read))
+                shutil.copy(read, dest)
+        else:
+            pass
+        filtered_sras = [args.custom_name]
     else:
         filtered_sras = filter_SRA(
             sraFind=fDB.sraFind_data,
@@ -644,7 +697,7 @@ def main():
 
     sra_num = len(filtered_sras)
     if filtered_sras == []:
-        if args.example_reads is None:
+        if args.custom_reads is None:
             logger.critical('No SRAs found on NCBI by sraFind')
             write_pass_fail(
                 args, status="FAIL",
@@ -679,55 +732,57 @@ def main():
         with open(os.path.join(fDB.refdir, ".references_passed_checks"), "w") as statusfile:
             statusfile.write("References have been checked\n")
     else:
-        logger.debug("Already checked reference genomes")
+        logger.debug("Already checked reference genomes in %s", fDB.refdir)
     if len(glob.glob(os.path.join(fDB.refdir, "*.fna"))) == 0:
         logger.critical("No usable reference genome found!")
         write_pass_fail(args, status="FAIL",
                         stage="global",
                         note="No references had more than 1 rDNA")
-    # data_dirs = []
-    if args.example_reads is not None:
-        this_output = os.path.join(args.output_dir, "example", "")
-        # data_dirs.append(this_output)
-        status_file = os.path.join(this_output, "example", "")
-        if os.path.exists(this_output):
-            logger.warning("using existing output directory")
-        os.makedirs(this_output)
-        rawreadsf = args.example_reads[0]
-        try:
-            rawreadsr = args.example_reads[1]
-        except IndexError:
-            rawreadsr = None
-        read_len_status, read_length = get_and_check_ave_read_len_from_fastq(
-            minlen=65,
-            maxlen=301,
-            fastq1=rawreadsf,
-            logger=logger)
-        if read_len_status != 0:
-            if read_len_status == 1:
-                message = "Reads were shorter than 65bp threshold"
-            else:
-                message = "Reads were longer than 300bp threshold"
-            write_pass_fail(args, status="FAIL",
-                            stage="examplereads",
-                            note=message)
-            logger.error(message)
-            sys.exit(1)
+    # riboSeed_jobs = {}  # accession: [cmd, contigs, status_file]
+    riboSeed_jobs = []  # [accession, cmd, contigs, status_file]
+    # if args.custom_reads is not None:
+    #     this_output = os.path.join(args.output_dir, "custom", "")
+    #     # data_dirs.append(this_output)
+    #     status_file = os.path.join(this_output, "custom", "")
+    #     if os.path.exists(this_output):
+    #         logger.warning("using existing output directory")
+    #     os.makedirs(this_output)
+    #     rawreadsf = args.custom_reads[0]
+    #     try:
+    #         rawreadsr = args.custom_reads[1]
+    #     except IndexError:
+    #         rawreadsr = None
+    #     read_len_status, read_length = get_and_check_ave_read_len_from_fastq(
+    #         minlen=65,
+    #         maxlen=301,
+    #         fastq1=rawreadsf,
+    #         logger=logger)
+    #     if read_len_status != 0:
+    #         if read_len_status == 1:
+    #             message = "Reads were shorter than 65bp threshold"
+    #         else:
+    #             message = "Reads were longer than 300bp threshold"
+    #         write_pass_fail(args, status="FAIL",
+    #                         stage="customreads",
+    #                         note=message)
+    #         logger.error(message)
+    #         sys.exit(1)
+    #     riboSeed_cmd, contigs_path  = process_strain(
+    #         rawreadsf, rawreadsr, read_length,
+    #         fDB.refdir, this_results, args, logger, status_file)
+    #     riboSeed_jobs[accession] = [riboSeed_cmd, contigs_path,  status_file]
 
-        process_strain(rawreadsf, rawreadsr, read_length,
-                       fDB.refdir, this_results, args, logger, status_file)
-
-    else:
+    # else:
+    if True:
         for i, accession in enumerate(filtered_sras):
             this_output = os.path.join(args.output_dir, accession)
             this_results = os.path.join(this_output, "results")
             os.makedirs(this_output, exist_ok=True)
             status_file = os.path.join(this_output, "status")
-            logger.info("Organism: %s", args.organism_name)
+            logger.info("Organism: %s; Accession: %s", args.organism_name, accession)
             try:
                 rawreadsf, rawreadsr, download_error_message = \
                     fDB.get_SRA_data(
-                        cores=args.cores,
                         org=args.organism_name,
                         SRA=accession,
                         logger=logger)
@@ -756,17 +811,12 @@ def main():
                 write_pass_fail(args, status="FAIL", stage=accession, note=message)
                 logger.error(message)
                 continue
-
+            #  hears the meat of the main, catching errors for anything but the riboSeed step
             try:
-                process_strain(rawreadsf, rawreadsr, read_length,
-                               fDB.refdir, this_results, args, logger, status_file)
-
-            except subprocess.CalledProcessError:
-                write_pass_fail(args, status="FAIL",
-                                stage=accession,
-                                note="Unknown failure")
-                logger.error('Unknown subprocess error')
-                continue
+                riboSeed_cmd, contigs_path  = process_strain(
+                    rawreadsf, rawreadsr, read_length,
+                    fDB.refdir, this_results, args, logger, status_file)
+                riboSeed_jobs.append([accession, riboSeed_cmd, contigs_path,  status_file])
             except bestreferenceError as e:
                 write_pass_fail(args, status="FAIL",
                                 stage=accession,
@@ -779,30 +829,47 @@ def main():
                                 note="Unknown error downsampling")
                 logger.error(e)
                 continue
-            except riboSeedError as e:
-                write_pass_fail(args, status="FAIL",
-                                stage=accession,
-                                note="Unknown failure running riboSeed")
-                logger.error(e)
-                continue
+        #######################################################################
+        logger.info("Processing %i riboSeed runs", len(riboSeed_jobs))
+        all_assemblies = []
+        ribo_cmds = [x[1] for x in riboSeed_jobs if x[1] is not None]
+        # split_cores = int(args.cores / (len(ribo_cmds) / 2))
+        # if split_cores < 1:
+        #     split_cores = 1
+
+        pool = multiprocessing.Pool(processes=args.njobs)
+        logger.debug("running the following commands:")
+        logger.debug("\n".join(ribo_cmds))
+        riboSeed_pool_results = [
+            pool.apply_async(run_riboSeed_catch_errors,
+                             (cmd,),
+                              {"args": args,
+                              "acc": acc,
+                              "status_file": sfile})
+            for acc, cmd, contigs, sfile in riboSeed_jobs]
+        pool.close()
+        pool.join()
+        ribo_results_sum = sum([r.get() for r in riboSeed_pool_results])
+        logger.debug("Sum of return codes (should be 0): %i",ribo_results_sum )
+
+        for v in riboSeed_jobs:
+            try:
+                check_riboSeed_outcome(status_file, v[2])
+                update_status_file(v[3], message="RIBOSEED COMPLETE")
+                write_pass_fail(args, status="PASS", stage=v[0], note="")
+                all_assemblies.append(v[2])
             except riboSeedUnsuccessfulError as e:
                 write_pass_fail(args, status="FAIL",
                                 stage=accession,
                                 note="riboSeed unsuccessful")
                 logger.error(e)
-                continue
 
-            except extracting16sError as e:
-                write_pass_fail(args, status="FAIL",
-                                stage=accession,
-                                note="Unknown error extracting 16s sequences")
-                logger.error(e)
-                continue
-            write_pass_fail(args, status="PASS", stage=accession, note="")
 
-    all_assemblies  =  glob.glob(
-        os.path.join(args.output_dir, "*", "results", "riboSeed",
-                     "seed", "final_long_reads", "riboSeedContigs.fasta"))
+        #######################################################################
+
+    # all_assemblies  =  glob.glob(
+    #     os.path.join(args.output_dir, "*", "results", "riboSeed",
+    #                  "seed", "final_long_reads", "riboSeedContigs.fasta"))
     ###########################################################################
     extract16soutput = os.path.join(
         args.output_dir,

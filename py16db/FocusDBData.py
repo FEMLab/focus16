@@ -88,7 +88,7 @@ class FocusDBData(object):
                 stderr=subprocess.PIPE,
                 check=True)
 
-    def get_SRA_data(self, cores, SRA, org, logger):
+    def get_SRA_data(self, SRA, org, logger):
         """download_SRA_if_needed
         This doesnt check the manifest right off the bad to make it easier for
         users to move data into the .focusdb dir manually
