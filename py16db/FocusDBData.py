@@ -7,19 +7,23 @@ import subprocess
 import logging
 import glob
 
+from plentyofbugs import get_n_genomes as gng
 
 class fasterqdumpError(Exception):
     pass
 
 
 class FocusDBData(object):
-    def __init__(self, dbdir=None, sraFind_data=None):
+    def __init__(self, dbdir=None, refdir=None, sraFind_data=None, prokaryotes=None):
         self.dbdir = dbdir
+        self.refdir = refdir
         self.SRAs_manifest = os.path.join(self.dbdir, "SRAs_manifest.tab")
-        self.sraFind_data = None
+        self.refs_manifest = os.path.join(self.dbdir, "reference_genomes.tab")
+        self.prokaryotes = prokaryotes
+        self.sraFind_data = sraFind_data
         self.SRAs = {}
         self.setup_if_needed()
-        self.read_manifest()
+        self.read_SRA_manifest()
 
     def setup_if_needed(self):
         """ if needed, create directory and write header for status file
@@ -27,14 +31,21 @@ class FocusDBData(object):
         """
         if not os.path.exists(self.dbdir):
             os.makedirs(self.dbdir)
+        if not os.path.exists(self.refdir):
+            os.makedirs(self.refdir)
         if not os.path.exists(self.SRAs_manifest):
             with open(self.SRAs_manifest, "w") as outf:
                 outf.write("SRA_accession\tStatus\tOrganism\n")
 
-    def read_manifest(self):
+    def read_SRA_manifest(self):
         with open(self.SRAs_manifest, "r") as inf:
             for i, line in enumerate(inf):
-                acc, status, org = line.strip().split("\t")
+                try:
+                    acc, status, org = line.strip().split("\t")
+                except ValueError as e:
+                    print(self.SRAs_manifest)
+                    print(line)
+                    raise e
                 if i != 0:
                     self.SRAs[acc] = {
                         "status": status,
@@ -51,22 +62,22 @@ class FocusDBData(object):
                     pass
                 else:
                     outf.write("{}\t{}\t{}\n".format(acc, status, lineorg))
-            # if we still haven;t written out our new SRA (ie, if we are adding
+            # if we still haven't written out our new SRA (ie, if we are adding
             # a new one, not updating)
             outf.write("{}\t{}\t{}\n".format(newacc, newstatus, organism))
         os.remove(tmp)
-        self.read_manifest()
+        self.read_SRA_manifest()
 
-    def fetch_sraFind_data(self, dest_path, logger):
-        if dest_path is None:
-            dest_path = os.path.join(
+    def fetch_sraFind_data(self, logger):
+        if self.sraFind_data is None:
+            self.sraFind_data = os.path.join(
                 self.dbdir, "sraFind-All-biosample-with-SRA-hits.txt")
         sraFind_results = str(
             "https://raw.githubusercontent.com/nickp60/sraFind/master/"+
             "results/sraFind-All-biosample-with-SRA-hits.txt"
         )
         # gets just the file name
-        if not os.path.exists(dest_path):
+        if not os.path.exists(self.sraFind_data):
             logger.info("Downloading sraFind Dump")
             download_sraFind_cmd = str("wget " + sraFind_results + " -O " + dest_path)
             logger.debug(download_sraFind_cmd)
@@ -76,7 +87,6 @@ class FocusDBData(object):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 check=True)
-        self.sraFind_data = dest_path
 
     def get_SRA_data(self, cores, SRA, org, logger):
         """download_SRA_if_needed
@@ -201,3 +211,87 @@ class FocusDBData(object):
                  download_error_message = "cannot process a single library " + \
                      "file and a reverse file"
         return (rawreadsf, rawreadsr, download_error_message)
+
+    #####################   Methods for dealing with reference genomes ########
+    def decide_skip_or_download_genomes(self, args, logger):
+        """ checks the genomes dir
+        returns
+        - 0 if all is well
+        - 1 if no matching genomes in prokaryotes.txt
+        - 2 if error downloading
+        - 3 if error unzipping
+        """
+        # check basic integrity of genomes dir
+        # it might exist, but making it here simplifies the control flow later
+        # it seems counter intuitive, but checking if the dir we might have just
+        # created is easier than checking if it exists/is intact twice
+        os.makedirs(self.refdir, exist_ok=True)
+        if len(glob.glob(os.path.join(self.refdir, "*.fna"))) == 0:
+            logger.info('Downloading genomes')
+            return(self.our_get_n_genomes(
+                org=args.organism_name,
+                nstrains=args.nstrains,
+                thisseed=args.seed,
+                logger=logger)
+            )
+        if len(glob.glob(os.path.join(self.refdir, "*.fna.gz"))) != 0:
+            logger.warning('Genome downloading may have been interupted; ' +
+                           'downloading fresh')
+            shutil.rmtree(self.refdir)
+            os.makedirs(self.refdir)
+            return(self.our_get_n_genomes(
+                org=args.organism_name,
+                nstrains=args.nstrains,
+                thisseed=args.seed,
+                logger=logger)
+            )
+        return 0
+
+    def our_get_n_genomes(self, org, nstrains,  thisseed, logger):
+        # taken from the main function of get_n_genomes
+        if not os.path.exists(self.prokaryotes):
+            gng.fetch_prokaryotes(dest=self.prokaryotes)
+        org_lines = gng.get_lines_of_interest_from_proks(path=self.prokaryotes,
+                                                         org=org)
+        if len(org_lines) == 0:
+            return 1
+        if nstrains == 0:
+            nstrains = len(org_lines)
+        print(nstrains)
+        cmds = gng.make_fetch_cmds(
+            org_lines,
+            nstrains=nstrains,
+            thisseed=thisseed,
+            genomes_dir=self.refdir,
+            SHUFFLE=True)
+        print(cmds)
+        # this can happen if tabs end up in metadata (see
+        # AP019724.1 B. unifomis, and others
+        # I updated plentyofbugs to try to catch it, but still might happen
+        if len(cmds) == 0:
+            return 1
+        try:
+            for i, cmd in enumerate(cmds):
+                sys.stderr.write("Downloading genome %i of %i\n%s\n" %(i + 1, len(cmds), cmd))
+                logger.debug(cmd)
+                subprocess.run(
+                    cmd,
+                    shell=sys.platform != "win32",
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=True)
+        except Exception as e:
+            logger.error(e)
+            return 2
+
+        unzip_cmd = "gunzip " + os.path.join(self.refdir, "*.gz")
+        sys.stderr.write(unzip_cmd + "\n")
+        try:
+            subprocess.run(
+                unzip_cmd,
+                shell=sys.platform != "win32",
+                check=True)
+        except Exception as e:
+            logger.error(e)
+            return 3
+        return 0

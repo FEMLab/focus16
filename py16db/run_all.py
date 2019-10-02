@@ -14,7 +14,6 @@ import glob
 from pathlib import Path
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
-from plentyofbugs import get_n_genomes as gng
 from py16db.run_sickle import run_sickle
 
 from . import __version__
@@ -85,21 +84,21 @@ def get_args():  # pragma: nocover
                         help="Integer for approximate genome length",
                         required=False, type=int)
     parser.add_argument("--sraFind_path", dest="sra_path",
-                        help="path to sraFind file; default is in .focusDB/",
+                        help="path to sraFind file; default is in ~/.focusDB/",
                         default=None,
                         required=False)
     parser.add_argument("--focusDB_data", dest="focusDB_data",
-                        help="path to data storage area; default .focusDB/",
+                        help="path to data storage area; default ~/.focusDB/",
                         default=None)
     parser.add_argument("--SRAs", default=None, nargs="+",
                         help="run pipeline on this (these) SRA(s) only",
                         required=False)
-    parser.add_argument("-g", "--genomes_dir",
-                        help="path to directory containing, or empty, " +
-                        "candidate genomes for reference",
-                        required=True)
+    parser.add_argument("--genomes_dir",
+                        help="path to where reference genomes are/will be " +
+                        "stored . Default location " +
+                        "is ~/.focusDB/references/genus_species/" )
     #  Note that this agument doesn't get called, but is inheirited by get_n_genomes
-    parser.add_argument("-p", "--prokaryotes", action="store",
+    parser.add_argument("--prokaryotes", action="store",
                         help="path_to_prokaryotes.txt",
                         default="./prokaryotes.txt",
                         required=False)
@@ -431,7 +430,7 @@ def make_riboseed_cmd(sra, readsf, readsr, cores, subassembler, threads,
     return(cmd)
 
 
-def process_strain(rawreadsf, rawreadsr, read_length, this_output, args, logger, status_file):
+def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir, this_output, args, logger, status_file):
     pob_dir = os.path.join(this_output, "plentyofbugs")
     ribo_dir = os.path.join(this_output, "riboSeed")
     sickle_out = os.path.join(this_output, "sickle")
@@ -443,7 +442,7 @@ def process_strain(rawreadsf, rawreadsr, read_length, this_output, args, logger,
     # downsampling and assembly will be run. This is to protectt against
     # files sticking around when they shouldn't
     if not os.path.exists(best_reference):
-        pob(genomes_dir=args.genomes_dir, readsf=rawreadsf,
+        pob(genomes_dir=genomes_dir, readsf=rawreadsf,
             output_dir=pob_dir, logger=logger)
 
     with open(best_reference, "r") as infile:
@@ -590,81 +589,6 @@ def write_pass_fail(args, stage, status, note):
         failfile.write("{}\t{}\t{}\t{}\n".format(org, status, stage, note))
 
 
-def our_get_n_genomes(args, logger):
-    # taken from the main function of get_n_genomes
-    if not os.path.exists(args.prokaryotes):
-        gng.fetch_prokaryotes(dest=args.prokaryotes)
-    org_lines = gng.get_lines_of_interest_from_proks(path=args.prokaryotes,
-                                                     org=args.organism_name)
-    if len(org_lines) == 0:
-        return 1
-    if args.nstrains == 0:
-        nstrains = len(org_lines)
-    else:
-        nstrains = args.nstrains
-    print(nstrains)
-    cmds = gng.make_fetch_cmds(
-        org_lines,
-        nstrains=nstrains,
-        thisseed=args.seed,
-        genomes_dir=args.genomes_dir,
-        SHUFFLE=True)
-    print(cmds)
-    # this can happen if tabs end up in metadata (see
-    # AP019724.1 B. unifomis, and others
-    # I updated plentyofbugs to try to catch it, but still might happen
-    if len(cmds) == 0:
-        return 1
-    try:
-        for i, cmd in enumerate(cmds):
-            sys.stderr.write("Downloading genome %i of %i\n%s\n" %(i + 1, len(cmds), cmd))
-            logger.debug(cmd)
-            subprocess.run(
-                cmd,
-                shell=sys.platform != "win32",
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=True)
-    except Exception as e:
-        logger.error(e)
-        return 2
-
-    unzip_cmd = "gunzip " + os.path.join(args.genomes_dir, "*.gz")
-    sys.stderr.write(unzip_cmd + "\n")
-    try:
-        subprocess.run(
-            unzip_cmd,
-            shell=sys.platform != "win32",
-            check=True)
-    except Exception as e:
-        logger.error(e)
-        return 3
-    return 0
-
-
-def decide_skip_or_download_genomes(args, logger):
-    """ checks the genomes dir
-    returns
-    - 0 if all is well
-    - 1 if no matching genomes in prokaryotes.txt
-    - 2 if error downloading
-    - 3 if error unzipping
-    """
-    # check basic integrity of genomes dir
-    # it might exist, but making it here simplifies the control flow later
-    # it seems counter intuitive, but checking if the dir we might have just
-    # created is easier than checking if it exists/is intact twice
-    os.makedirs(args.genomes_dir, exist_ok=True)
-    if len(glob.glob(os.path.join(args.genomes_dir, "*.fna"))) == 0:
-        logger.info('Downloading genomes')
-        return(our_get_n_genomes(args, logger))
-    if len(glob.glob(os.path.join(args.genomes_dir, "*.fna.gz"))) != 0:
-        logger.warning('Genome downloading may have been interupted; ' +
-                       'downloading fresh')
-        shutil.rmtree(args.genomes_dir)
-        os.makedirs(args.genomes_dir)
-        return(our_get_n_genomes(args, logger))
-    return 0
 
 
 def get_focusDB_dir(args):
@@ -673,11 +597,17 @@ def get_focusDB_dir(args):
     else:
         return args.focusDB_data
 
+def get_genomes_dir(args):
+    if args.genomes_dir is None:
+        dirname = args.organism_name.replace(" ", "_")
+        return os.path.join(get_focusDB_dir(args), "references", dirname, "")
+    else:
+        # make sure we have a trailing pathsep for globs down the line
+        return os.path.join(args.genomes_dir, "")
+
 
 def main():
     args = get_args()
-
-    genomesdir = os.path.join(args.genomes_dir, "")
 
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
@@ -692,8 +622,12 @@ def main():
         logger.debug("{0}: {1}".format(k,v))
     check_programs(logger)
     # set up the data object
-    fDB = FocusDBData(dbdir = get_focusDB_dir(args))
-    fDB.fetch_sraFind_data(dest_path=args.sra_path, logger=logger)
+    # grooms path names or uses default location if unset
+    fDB = FocusDBData(dbdir = get_focusDB_dir(args),
+                      refdir = get_genomes_dir(args),
+                      sraFind_data = args.sra_path,
+                      prokaryotes=args.prokaryotes)
+    fDB.fetch_sraFind_data(logger=logger)
 
     if args.SRAs is not None:
         filtered_sras = args.SRAs
@@ -718,7 +652,7 @@ def main():
                 note="No SRAs available")
             sys.exit(1)
 
-    pob_result = decide_skip_or_download_genomes(args, logger)
+    pob_result = fDB.decide_skip_or_download_genomes(args, logger)
     if pob_result != 0:
         if pob_result == 1:
             message = "No available references"
@@ -732,21 +666,21 @@ def main():
         write_pass_fail(args, status="FAIL", stage="global", note=message)
         sys.exit(1)
 
-    if not os.path.exists(os.path.join(args.genomes_dir, ".references_passed_checks")):
+    if not os.path.exists(os.path.join(fDB.refdir, ".references_passed_checks")):
         logger.info("checking reference genomes for rDNA counts")
-        for potential_reference in glob.glob(os.path.join(args.genomes_dir, "*.fna")):
+        for potential_reference in glob.glob(os.path.join(fDB.refdir, "*.fna")):
             rDNAs = check_rDNA_copy_number(ref=potential_reference,
-                                           output=args.genomes_dir,
+                                           output=fDB.refdir,
                                            logger=logger)
             if rDNAs < 2:
                 logger.warning(
                     "reference %s does not have multiple rDNAs; excluding", potential_reference)
                 os.remove(potential_reference)
-        with open(os.path.join(args.genomes_dir, ".references_passed_checks"), "w") as statusfile:
+        with open(os.path.join(fDB.refdir, ".references_passed_checks"), "w") as statusfile:
             statusfile.write("References have been checked\n")
     else:
         logger.debug("Already checked reference genomes")
-    if len(glob.glob(os.path.join(args.genomes_dir, "*.fna"))) == 0:
+    if len(glob.glob(os.path.join(fDB.refdir, "*.fna"))) == 0:
         logger.critical("No usable reference genome found!")
         write_pass_fail(args, status="FAIL",
                         stage="global",
@@ -780,7 +714,8 @@ def main():
             logger.error(message)
             sys.exit(1)
 
-        process_strain(rawreadsf, rawreadsr, read_length,this_results, args, logger, status_file)
+        process_strain(rawreadsf, rawreadsr, read_length,
+                       fDB.refdir, this_results, args, logger, status_file)
 
     else:
         for i, accession in enumerate(filtered_sras):
@@ -823,7 +758,8 @@ def main():
                 continue
 
             try:
-                process_strain(rawreadsf, rawreadsr, read_length,this_results, args,  logger, status_file)
+                process_strain(rawreadsf, rawreadsr, read_length,
+                               fDB.refdir, this_results, args, logger, status_file)
 
             except subprocess.CalledProcessError:
                 write_pass_fail(args, status="FAIL",
@@ -873,7 +809,7 @@ def main():
         "{}_ribo16s.fasta".format(args.organism_name.replace(" ", "_")))
     if os.path.exists(extract16soutput):
         os.remove(extract16soutput)
-
+    logger.info("attempting to extract 16S sequences for re-assemblies")
     n_extracted_seqs = 0
     for assembly in all_assemblies:
         sra = str(Path(assembly).parents[4].name)

@@ -1,4 +1,5 @@
 import os
+import shutil
 from pathlib import Path
 import logging as logger
 
@@ -22,6 +23,8 @@ thesedirs = {
 
 
 testdir = os.path.join(here, "tmp_fastqs")
+if os.path.exists(testdir):
+    shutil.rmtree(testdir)
 for k, v in thesedirs.items():
     base = os.path.join(testdir, k)
     os.makedirs(base, exist_ok=True)
@@ -30,7 +33,10 @@ for k, v in thesedirs.items():
 
 
 def test_fastq_files():
-    fDB = FocusDBData(dbdir = testdir)
+    fDB = FocusDBData(dbdir = testdir,
+                      refdir = testdir + "res",
+                      prokaryotes="proks",
+                      sraFind_data="sraFind.txt")
 
     for k, v in thesedirs.items():
         base = os.path.join(testdir,  k)
