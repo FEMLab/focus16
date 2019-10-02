@@ -14,7 +14,7 @@ import glob
 from pathlib import Path
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
-
+from plentyofbugs import get_n_genomes as gng
 from py16db.run_sickle import run_sickle
 
 from . import __version__
