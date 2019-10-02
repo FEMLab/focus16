@@ -46,11 +46,11 @@ class FocusDBData(object):
         shutil.move(self.SRAs_manifest, tmp)
         with open(tmp, "r") as inf, open(self.SRAs_manifest, "w") as outf:
             for i, line in enumerate(inf):
-                acc, status, organism = line.strip().split("\t")
+                acc, status, lineorg = line.strip().split("\t")
                 if acc == newacc:
                     pass
                 else:
-                    outf.write("{}\t{}\t{}\n".format(acc, status, organism))
+                    outf.write("{}\t{}\t{}\n".format(acc, status, lineorg))
             # if we still haven;t written out our new SRA (ie, if we are adding
             # a new one, not updating)
             outf.write("{}\t{}\t{}\n".format(newacc, newstatus, organism))
