@@ -4,17 +4,18 @@ import os
 import sys
 import shutil
 import subprocess
-import logging
 import glob
 
 from plentyofbugs import get_n_genomes as gng
+
 
 class fasterqdumpError(Exception):
     pass
 
 
 class FocusDBData(object):
-    def __init__(self, dbdir=None, refdir=None, sraFind_data=None, prokaryotes=None):
+    def __init__(self, dbdir=None, refdir=None,
+                 sraFind_data=None, prokaryotes=None):
         self.dbdir = dbdir
         self.refdir = refdir
         self.SRAs_manifest = os.path.join(self.dbdir, "SRAs_manifest.tab")
@@ -73,13 +74,14 @@ class FocusDBData(object):
             self.sraFind_data = os.path.join(
                 self.dbdir, "sraFind-All-biosample-with-SRA-hits.txt")
         sraFind_results = str(
-            "https://raw.githubusercontent.com/nickp60/sraFind/master/"+
+            "https://raw.githubusercontent.com/nickp60/sraFind/master/" +
             "results/sraFind-All-biosample-with-SRA-hits.txt"
         )
         # gets just the file name
         if not os.path.exists(self.sraFind_data):
             logger.info("Downloading sraFind Dump")
-            download_sraFind_cmd = str("wget " + sraFind_results + " -O " + dest_path)
+            download_sraFind_cmd = str(
+                "wget " + sraFind_results + " -O " + self.sraFind_data)
             logger.debug(download_sraFind_cmd)
             subprocess.run(
                 download_sraFind_cmd,
@@ -95,7 +97,8 @@ class FocusDBData(object):
         1) check if dir and files exists.  If so, recheck and return files path
         if all is well;
         2) check manifest; there will be an status message if we removed the
-        data intentionally.  raises an error if it looks like files have gone missing
+        data intentionally.
+        raises an error if it looks like files have gone missing
         3) rerun if needed, and return the results
         """
         suboutput_dir_raw = os.path.join(self.dbdir, SRA, "")
@@ -111,7 +114,8 @@ class FocusDBData(object):
             return (rawreadsf, rawreadsr, download_error_message)
         elif SRA in self.SRAs.keys():
             if self.SRAs[SRA]['status'] == "-":
-                raise ValueError("Corrupted manifest; unable to find previously processed files")
+                raise ValueError("Corrupted manifest; unable to find " +
+                                 "previously processed files")
             elif self.SRAs[SRA]['status'] == "DOWNLOAD ERROR":
                 if os.path.exists(suboutput_dir_raw):
                     shutil.rmtree(suboutput_dir_raw)
@@ -119,13 +123,13 @@ class FocusDBData(object):
                 # dont try to reprocess
                 return (None, None, "Library type Error")
         elif os.path.exists(suboutput_dir_raw):
-                shutil.rmtree(suboutput_dir_raw)
+            shutil.rmtree(suboutput_dir_raw)
         else:
             pass
         os.makedirs(suboutput_dir_raw)
-        # defaults to 6 threads or whatever is convenient; we suspect I/O limits
-        # using more in most cases, so we don't give the user the option
-        # to increase this
+        # defaults to 6 threads or whatever is convenient;
+        # we suspect I/O limits using more in most cases,
+        # so we don't give the user the option to increase this
         # https://github.com/ncbi/sra-tools/wiki/HowTo:-fasterq-dump
         cmd = str("fasterq-dump {SRA} -O " +
                   "{suboutput_dir_raw} --split-files").format(**locals())
@@ -164,12 +168,12 @@ class FocusDBData(object):
         if not os.path.exists(this_data):
             # this never happens unless a run is aborted;
             # regardless, we want to make sure we attempt to re-download
-            return(None, None, "No directory created for SRA data during download")
+            return(None, None, "No directory created for SRA during download")
         fastqs = glob.glob(os.path.join(this_data, "", "*.fastq"))
         logger.debug("fastqs detected: %s", " ".join(fastqs))
         if len(fastqs) == 0:
             return(None, None, "No fastq files downloaded")
-        rawf, rawr, raws = [], [], []
+        rawf, rawr = [], []
         rawreadsf, rawreadsr = None, None
         download_error_message = ""
         for fastq in fastqs:
@@ -204,12 +208,12 @@ class FocusDBData(object):
         elif len(set(rawr)) > 1:
             download_error_message = "multiple reverse reads files detected"
         else:
-            rawreadsr= None
+            rawreadsr = None
         # catch only .fastq and _2.fastq weird combo
         if rawreadsf is not None:
-             if not rawreadsf.endswith("_1.fastq") and rawreadsr is not None:
-                 download_error_message = "cannot process a single library " + \
-                     "file and a reverse file"
+            if not rawreadsf.endswith("_1.fastq") and rawreadsr is not None:
+                download_error_message = "cannot process a single library " + \
+                    "file and a reverse file"
         return (rawreadsf, rawreadsr, download_error_message)
 
     #####################   Methods for dealing with reference genomes ########
@@ -223,7 +227,7 @@ class FocusDBData(object):
         """
         # check basic integrity of genomes dir
         # it might exist, but making it here simplifies the control flow later
-        # it seems counter intuitive, but checking if the dir we might have just
+        # it seems counter intuitive, but checking the dir we might have just
         # created is easier than checking if it exists/is intact twice
         os.makedirs(self.refdir, exist_ok=True)
         if len(glob.glob(os.path.join(self.refdir, "*.fna"))) == 0:
@@ -249,6 +253,8 @@ class FocusDBData(object):
 
     def our_get_n_genomes(self, org, nstrains,  thisseed, logger):
         # taken from the main function of get_n_genomes
+        if self.prokaryotes is None:
+            self.prokaryotes = os.path.join(self.dbdir, "prokaryotes.txt")
         if not os.path.exists(self.prokaryotes):
             gng.fetch_prokaryotes(dest=self.prokaryotes)
         org_lines = gng.get_lines_of_interest_from_proks(path=self.prokaryotes,
@@ -272,7 +278,8 @@ class FocusDBData(object):
             return 1
         try:
             for i, cmd in enumerate(cmds):
-                sys.stderr.write("Downloading genome %i of %i\n%s\n" %(i + 1, len(cmds), cmd))
+                sys.stderr.write("Downloading genome %i of %i\n%s\n" %
+                                 (i + 1, len(cmds), cmd))
                 logger.debug(cmd)
                 subprocess.run(
                     cmd,
