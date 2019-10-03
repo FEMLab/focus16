@@ -640,7 +640,7 @@ def main():
         refdir=args.genomes_dir,
         sraFind_data=args.sra_path,
         prokaryotes=args.prokaryotes)
-    fDB.check_genomes_dir(args.genomes_dir)
+    fDB.check_genomes_dir(org=args.organism_name)
     fDB.fetch_sraFind_data(logger=logger)
 
     # process data 1 of 4 ways: specific SRA(s), a file of SRA(s),
