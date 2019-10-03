@@ -108,6 +108,15 @@ optional arguments:
                         trimmed MSA
 ```
 
+
+## Beast Mode
+Reassembling hundreds or thousands of genomes can eat into a ton of resources, so we try to make this a feasible. For optimal running
+1) install Aspera connect.  NCBI uses this to transfer data faster than the default connections with http or ftp.
+2) set up your cache somewhere with lots of space and fast I/O.  run `vdb-config -i`, following the instructions here: https://github.com/ncbi/sra-tools/wiki/03.-Quick-Toolkit-Configuration
+3) Use the focusDB-prefetch command to get your data.  This will download the data as `.sra`, and add them to your cache.  This can be configured to run the requests in batches.
+4) Run focusDB: the calls to `fasterq-dump` will now go to the local copy of the `.sra` in the cache area.
+
+
 ## Test Data
 ### Unit tests
 Testing is done with the `nose` package. Generate the test data with
