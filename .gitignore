@@ -18,3 +18,4 @@ dist/
 *sraFind-All-biosample-with-SRA-hits.txt
 .coverage
 cover/
+py16db/.test_db_dir/

@@ -18,11 +18,14 @@ class FocusDBData(object):
                  sraFind_data=None, prokaryotes=None):
         self.dbdir = dbdir
         self.refdir = refdir
-        self.SRAs_manifest = os.path.join(self.dbdir, "SRAs_manifest.tab")
-        self.refs_manifest = os.path.join(self.dbdir, "reference_genomes.tab")
         self.prokaryotes = prokaryotes
         self.sraFind_data = sraFind_data
         self.SRAs = {}
+        # get/set location of data
+        self.get_focusDB_dir()
+        # make dirs/files as needed
+        self.refs_manifest = os.path.join(self.dbdir, "reference_genomes.tab")
+        self.SRAs_manifest = os.path.join(self.dbdir, "SRAs_manifest.tab")
         self.setup_if_needed()
         self.read_SRA_manifest()
 
@@ -32,11 +35,26 @@ class FocusDBData(object):
         """
         if not os.path.exists(self.dbdir):
             os.makedirs(self.dbdir)
-        if not os.path.exists(self.refdir):
-            os.makedirs(self.refdir)
         if not os.path.exists(self.SRAs_manifest):
             with open(self.SRAs_manifest, "w") as outf:
                 outf.write("SRA_accession\tStatus\tOrganism\n")
+
+    def get_focusDB_dir(self):
+        if self.dbdir is None:
+            self.dbdir = os.path.join(os.path.expanduser("~"), ".focusDB", "")
+
+    def check_genomes_dir(self, org):
+        if org is None:
+            raise ValueError("organism is required")
+        if self.refdir is None:
+            dirname = org.replace(" ", "_")
+            self.refdir = os.path.join(
+                self.dbdir, "references", dirname, "")
+        else:
+            # make sure we have a trailing pathsep for globs down the line
+            self.refdir = os.path.join(self.refdir, "")
+        if not os.path.exists(self.refdir):
+            os.makedirs(self.refdir)
 
     def read_SRA_manifest(self):
         with open(self.SRAs_manifest, "r") as inf:
@@ -89,6 +107,10 @@ class FocusDBData(object):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 check=True)
+
+    def run_prefetch_data(self, SRA_list, org, logger):
+
+        pass
 
     def get_SRA_data(self, SRA, org, logger):
         """download_SRA_if_needed

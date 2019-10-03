@@ -55,9 +55,10 @@ setup(name='focusDB',
       entry_points={
           'console_scripts': [
               'focusDB = py16db.run_all:main',
-              'combine-focusdb-and-silva = py16db.combine_focusdb_and_silva:main',
-              'calculate-shannon-entropy = py16db.calculate_shannon_entropy:main',
-              'align-and-trim-focusdb = py16db.align_and_trim_focusdb:main'
+              'focusDB-combine-with-silva = py16db.combine_focusdb_and_silva:main',
+              'focusDB-shannon-entropy = py16db.calculate_shannon_entropy:main',
+              'focusDB-align-and-trim = py16db.align_and_trim_focusdb:main',
+              'focusDB-prefetch = py16db.prefetch:main'
           ],
       }
 )

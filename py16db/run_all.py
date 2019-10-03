@@ -5,7 +5,6 @@ import argparse
 import sys
 import os
 import subprocess
-import random
 import shutil
 import gzip
 import logging
@@ -19,6 +18,7 @@ from py16db.run_sickle import run_sickle
 
 from . import __version__
 from py16db.FocusDBData import FocusDBData, fasterqdumpError
+from py16db.shared_methods import filter_SRA
 
 
 class bestreferenceError(Exception):
@@ -235,35 +235,6 @@ def update_status_file(path, to_remove=[], message=None):
         for status in set(statuses):
             if status not in to_remove:
                 statusfile.write(status + "\n")
-
-
-def filter_SRA(sraFind, organism_name, strains, get_all, thisseed, logger):
-    """sraFind [github.com/nickp60/srafind], contains"""
-    results = []
-    with open(sraFind, "r") as infile:
-        for line in infile:
-            split_line = [x.replace('"', '').replace("'", "") for x
-                          in line.strip().split("\t")]
-            if split_line[11].startswith(organism_name):
-                if split_line[8].startswith("ILLUMINA"):
-                    results.append(split_line[17])
-    random.seed(thisseed)
-    random.shuffle(results)
-
-    if strains != 0:
-        results = results[0:strains]
-        logger.debug('Found SRAs: %s', results)
-
-    sras = []
-    for result in results:
-        these_sras = result.split(",")
-        if get_all:
-            for sra in these_sras:
-                sras.append(sra)
-        else:
-            sras.append(these_sras[0])
-
-    return(sras)
 
 
 def sralist(list):
@@ -631,22 +602,6 @@ def write_pass_fail(args, stage, status, note):
         failfile.write("{}\t{}\t{}\t{}\n".format(org, status, stage, note))
 
 
-def get_focusDB_dir(args):
-    if args.focusDB_data is None:
-        return os.path.join(os.path.expanduser("~"), ".focusDB", "")
-    else:
-        return args.focusDB_data
-
-
-def get_genomes_dir(args):
-    if args.genomes_dir is None:
-        dirname = args.organism_name.replace(" ", "_")
-        return os.path.join(get_focusDB_dir(args), "references", dirname, "")
-    else:
-        # make sure we have a trailing pathsep for globs down the line
-        return os.path.join(args.genomes_dir, "")
-
-
 def run_riboSeed_catch_errors(cmd, acc=None, args=None, status_file=None):
     if cmd is None:
         return 0
@@ -681,10 +636,11 @@ def main():
     # set up the data object
     # grooms path names or uses default location if unset
     fDB = FocusDBData(
-        dbdir=get_focusDB_dir(args),
-        refdir=get_genomes_dir(args),
+        dbdir=args.focusDB_data,
+        refdir=args.genomes_dir,
         sraFind_data=args.sra_path,
         prokaryotes=args.prokaryotes)
+    fDB.check_genomes_dir(args.genomes_dir)
     fDB.fetch_sraFind_data(logger=logger)
 
     # process data 1 of 4 ways: specific SRA(s), a file of SRA(s),
