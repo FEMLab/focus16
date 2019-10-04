@@ -53,6 +53,7 @@ def setup_logging(args):  # pragma: nocover
         raise ValueError('Invalid log level: %s' % args.verbosity)
     logging.basicConfig(
         level=logging.DEBUG,
+        filemode='w',
         filename=os.path.join(args.output_dir, "focusDB.log"),
         format="%(asctime)s - %(levelname)s - %(message)s",
     )

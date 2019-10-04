@@ -90,17 +90,28 @@ def main():
     fDB.fetch_sraFind_data(logger=logger)
     cmds = []
     for i in range(math.ceil(len(filtered_sras)/args.batch_size)):
-        lowlim = i * args.batch_size
-        uplim = min((i * args.batch_size) + args.batch_size, len(filtered_sras))
-        print(lowlim, uplim)
-        these_sras = filtered_sras[lowlim: uplim]
+        lowlm = i * args.batch_size
+        uplm = min((i * args.batch_size) + args.batch_size, len(filtered_sras))
+        these_sras = filtered_sras[lowlm: uplm]
         cmds.append(make_prefetch_cmd(args, these_sras))
     if args.output_cmds:
         with open(args.output_cmds, "w") as outf:
-            for cmd in cmds:
-                outf.write(cmd)
+            for i, cmd in enumerate(cmds):
+                if i % 2 == 0:
+                    outf.write(cmd.replace("prefetch", "prefetch -t https") + "\n")
+                else:
+                    outf.write(cmd + "\n")
+    else:
+        ncmds = len(cmds)
+        for i, cmd in enumerate(cmds):
+            if i % 5 == 0:
+                print("fetching %i of %i" % (i,  ncmds))
+            subprocess.run(cmd,
+                           shell=sys.platform != "win32",
+                           stdout=subprocess.PIPE,
+                           stderr=subprocess.PIPE,
+                           check=True)
 
-    print(cmds)
 
 
 if __name__ == '__main__':
