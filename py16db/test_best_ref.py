@@ -1,4 +1,4 @@
-from .run_all import pob
+from .run_all import pob, referenceNotGoodEnoughError
 import os
 import shutil
 import unittest
@@ -37,8 +37,8 @@ class bestrefTest(unittest.TestCase):
         reads = (self.readsgunzipd)
         os.makedirs(self.test_dir)
         output_dir= (self.out_dir)
-        test_result = pob(genomes_dir=plasmids, readsf=reads, output_dir=output_dir, logger=logger)
+        with self.assertRaises(referenceNotGoodEnoughError):
+            bad_test_result = pob(genomes_dir=plasmids, readsf=reads, output_dir=output_dir, maxdist=.05, logger=logger)
+        test_result = pob(genomes_dir=plasmids, readsf=reads, output_dir=output_dir + "2", maxdist=.3, logger=logger)
         print(test_result)
         assert round(0.295981, 2) == round(test_result[1], 2)
-        # assert os.path.basename(os.path.join(self.plasmids_dir, "NC_011750.1.fna")) == \
-        #     os.path.basename(test_result[0])

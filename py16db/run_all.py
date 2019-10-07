@@ -25,6 +25,10 @@ class bestreferenceError(Exception):
     pass
 
 
+class referenceNotGoodEnoughError(Exception):
+    pass
+
+
 class downsamplingError(Exception):
     pass
 
@@ -122,6 +126,12 @@ def get_args():  # pragma: nocover
                         "download the first only.  Use --get_all to " +
                         "analyse each library",
                         action="store_true", required=False)
+    parser.add_argument("--maxdist",
+                        help="maximum mash distance allowed for reference " +
+                        "genome; defaults to .05 (see Mash paper), which " +
+                        "roughly corresponds to species level similarity. " +
+                        "If desired, this can be relaxed",
+                        default=.05)
     parser.add_argument("--njobs",
                         help="how many jobs to run concurrently " +
                         "via multiprocessing. --cores and --memory is per job",
@@ -249,7 +259,7 @@ def sralist(list):
     return sras
 
 
-def pob(genomes_dir, readsf, output_dir, logger):
+def pob(genomes_dir, readsf, output_dir, maxdist, logger):
     """use plentyofbugs to identify best reference
     Uses plentyofbugs, a package that useqs mash to
     find the best reference genome for draft genome
@@ -278,7 +288,9 @@ def pob(genomes_dir, readsf, output_dir, logger):
             sim = float(sraacc[1])
             ref = sraacc[0]
             logger.debug("Reference genome mash distance: %s", sim)
-
+            if sim > maxdist:
+                raise referenceNotGoodEnoughError(
+                    "Reference similarity %s does not meet .05 threshold" % sim)
             length_path = os.path.join(output_dir, "genome_length")
             cmd = "wc -c {ref} > {length_path}".format(**locals())
             subprocess.run(cmd,
@@ -466,7 +478,8 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
         if os.path.exists(pob_dir):
             shutil.rmtree(pob_dir)
         pob(genomes_dir=genomes_dir, readsf=rawreadsf,
-            output_dir=pob_dir, logger=logger)
+            output_dir=pob_dir, maxdist=args.maxdist, logger=logger)
+
 
     with open(best_reference, "r") as infile:
         for line in infile:
@@ -482,7 +495,6 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
         if approx_length is None:
             raise ValueError("Error running plentyofbugs; " +
                              "database possibly outdated")
-
     else:
         approx_length = args.approx_length
     if "TRIMMED" not in parse_status_file(status_file):
@@ -795,6 +807,13 @@ def main():
             write_pass_fail(args, status="FAIL",
                             stage=accession,
                             note="Unknown error selecting reference")
+            logger.error(e)
+            continue
+        except referenceNotGoodEnoughError as e:
+            write_pass_fail(
+                args, status="FAIL",
+                stage=accession,
+                note="No reference meets threshold for re-assembly")
             logger.error(e)
             continue
         except downsamplingError as e:
