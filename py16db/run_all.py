@@ -553,10 +553,13 @@ def run_barrnap(assembly,  results, logger):
             "Error running the following command %s" % barrnap)
 
 
-def extract_16s_from_assembly(assembly, gff, sra, output, args, logger):
+def extract_16s_from_assembly(assembly, gff, sra, output, output_summary,
+                              args, singleline,logger):
+
     results16s = {}  # [sra_#, chromosome, start, end, reverse complimented]
     nseqs = 0
-    with open(gff, "r") as rrn, open(output, "a") as outf:
+    with open(gff, "r") as rrn, open(output, "a") as outf, \
+         open(output_summary, "a") as outsum:
         rrn_num = 0
         for rawline in rrn:
             line = rawline.strip().split('\t')
@@ -577,17 +580,31 @@ def extract_16s_from_assembly(assembly, gff, sra, output, args, logger):
                 results16s[thisid] = [chrom, start, end, line[6]]
                 with open(assembly, "r") as asmb:
                     for rec in SeqIO.parse(asmb, "fasta"):
-                        if rec.id == chrom:
-                            seq = rec.seq[start + 1: end + 1]
-                            if ori == "-":
-                                seq = seq.reverse_complement()
-                            thisdesc = "{chrom}:{start}:{end}({ori})".format(
-                                **locals())
+                        if rec.id != chrom:
+                            continue
+                        seq = rec.seq[start + 1: end + 1]
+                        if ori == "-":
+                            seq = seq.reverse_complement()
+                        thisidcoords = "{thisid}.{start}.{end}".format(
+                            **locals())
+                        thisdesc = args.organism_name
+                        # Need to diable linewrapping for use with SILVA, etc
+                        if singleline:
+                            seqstr = str(seq)
+                            outf.write(
+                                ">{thisidcoords} {thisdesc}\n{seqstr}\n".format(
+                                    **locals()))
+                        else:
                             SeqIO.write(
                                 SeqRecord(
-                                    seq, id=thisid, description=thisdesc
+                                    seq, id=thisidcoords, description=thisdesc
                                 ), outf,  "fasta")
-                            nseqs = nseqs + 1
+                        outsum.write(
+                            str(
+                                "{thisid}\t{assembly}\t" +
+                                "{chrom}\t{start}\t{end}\n"
+                            ).format(**locals()))
+                        nseqs = nseqs + 1
 
     return nseqs
 
@@ -818,17 +835,21 @@ def main():
     extract16soutput = os.path.join(
         args.output_dir,
         "{}_ribo16s.fasta".format(args.organism_name.replace(" ", "_")))
-    if os.path.exists(extract16soutput):
-        os.remove(extract16soutput)
+    out_summary = os.path.join(args.output_dir, "sequence_summary.tab")
+    for outf in [extract16soutput, out_summary]:
+        if os.path.exists(outf):
+            os.remove(outf)
     logger.info("attempting to extract 16S sequences for re-assemblies")
     n_extracted_seqs = 0
+    singleline = True
     for assembly in all_assemblies:
         sra = str(Path(assembly).parents[4].name)
         barr_gff = os.path.join(args.output_dir, sra, "barrnap.gff")
         try:
             run_barrnap(assembly, barr_gff, logger)
             this_extracted_seqs = extract_16s_from_assembly(
-                assembly, barr_gff, sra, extract16soutput, args, logger)
+                assembly, barr_gff, sra, extract16soutput, out_summary,args,
+                singleline, logger)
             n_extracted_seqs = n_extracted_seqs + this_extracted_seqs
         except extracting16sError as e:
             logger.error(e)

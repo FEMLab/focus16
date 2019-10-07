@@ -1,4 +1,6 @@
-[![Build Status](https://travis-ci.com/FEMLab/focusdb.svg?branch=master)](https://travis-ci.com/FEMLab/focusdb)[![PyPI version](https://badge.fury.io/py/focusDB.svg)](https://badge.fury.io/py/focusDB)
+[![Build Status](https://travis-ci.com/FEMLab/focusdb.svg?branch=master)](https://travis-ci.com/FEMLab/focusdb)[![PyPI version](https://badge.fury.io/py/focusDB.svg)](https://badge.fury.io/py/focusDB)[![DOI](https://zenodo.org/badge/191556439.svg)](https://zenodo.org/badge/latestdoi/191556439)
+
+
 # focusDB
 ## High resolution 16S database construction from correctly assembled rDNA operons
 
@@ -35,11 +37,13 @@ Optionally, to use the trimming alignment feature, TrimAl must be installed from
 
 
 ## Usage
-###### Example
+####  reassemble SRAs and extract potentially novel 16S sequences
+This will go through the process of setting up the `.focusDB` dir (defaults to your home directory), downloading up to 30 reference complete genomes, downloading up to 5 WGS SRAs, finding the closes referece for each of the 5 SRAs, assembling, and extracting the 16S sequences.  Say we have a 4 core computer with 16 gb ram, we spilt it so the assemblies each use half the resources.
 ```
-# reassemble SRAs and extract potentially novel 16S sequnces
-focusDB --output_dir ./focusdb_ecoli/ -g ./escherichia_genomes/ --n_SRAs 5 --n_references 30 --memory 8 --cores 4 --organism_name "Escherichia coli"
-## Optional downstream analyses
+focusDB --output_dir ./focusdb_ecoli/ --n_SRAs 5 --n_references 30 --memory 8 --cores 2 --njobs 2 --organism_name "Escherichia coli"
+```
+#### Optional downstream analyses
+```
 # build E. coli specific DB from E colis in Silva and our new seqeunces
 combine-focusdb-and-silva  -d ~/Downloads/SILVA_132_SSUParc_tax_silva.fasta  -o ecolidb.fasta  -n "Escherichia coli" -S ./focusdb_ecoli/ribo16s.fasta
 # Align sequences and trim  the alignment
@@ -51,16 +55,11 @@ calculate-shannon-entropy calculate-shannon-entropy.py -i aligned_ecolidb.mafft.
 
 
 ##### `focusDB`
-This will go through the process of getting the list of assemblies that are associated with SRAs, downloading up to 5 SRAs,  finding the closes referece for each of the 5 SRAs, assembling, and extracting the 16S sequences.
-
-
-
 ###### Required Arguments
 ```
 [--organism_name]: The species of interest, input within quotes.
-[--nstrains]: The number of reference genomes and the number of SRAs the user wishes to download.
-[--output_dir]: The output directory.
-[--genomes_dir]: The output directory for which to store reference genomes, or a preexisting directory containing genomes the user wishes to use as reference genomes.
+[--n_references]: Maximum number of reference genomes the user wishes to download.
+[--n_SRAs]: Maximum number of SRAs the user wishes to download.
 ```
 ###### Optional Arguments:
 ```
@@ -69,7 +68,7 @@ This will go through the process of getting the list of assemblies that are asso
 [--approx_length]: Uses a user-given genome length as opposed to using reference genome length.
 [--sraFind_path]: Path to pre-downloaded sraFind-All-biosample-with-SRA-hits.txt file.
 [--prokaryotes]: Path to pre-downloaded prokaryotes.txt file.
-[--get_all]: If one SRA has two accessions, downloads both.
+[--get_all]: If one SRA has two runs, downloads both.
 [--cores]: The number of cores the user would like to use for focusDB. Specifically, riboSeed and plentyofbugs can be optimized for thread usage.
 [--memory]: As with [--cores], RAM can be optimized for focusDB.
 [--maxcov]: The maximum read coverage for SRA assembly. Downsamples to this coverage if the coverage exceeds it.
@@ -113,7 +112,7 @@ optional arguments:
 Reassembling hundreds or thousands of genomes can eat into a ton of resources, so we try to make this a feasible. For optimal running
 1) install Aspera connect.  NCBI uses this to transfer data faster than the default connections with http or ftp.
 2) set up your cache somewhere with lots of space and fast I/O.  run `vdb-config -i`, following the instructions here: https://github.com/ncbi/sra-tools/wiki/03.-Quick-Toolkit-Configuration
-3) Use the focusDB-prefetch command to get your data.  This will download the data as `.sra`, and add them to your cache.  This can be configured to run the requests in batches.
+3) Use the focusDB-prefetch command to get your data. This will download the data as `.sra`, and add them to your cache.  This can be configured to run the requests in batches.
 4) Run focusDB: the calls to `fasterq-dump` will now go to the local copy of the `.sra` in the cache area.
 
 
@@ -138,8 +137,11 @@ Note  that `generator.py` requires ART to generate synthetic.
 
 ## Bugs
 
+### Numpy
+If you get a failure running riboSeed about `dependencies not installed:["numpy"]`, try running `python -c "import numpy as np"`. If you get an error about multiple versions being installed, repeat `pip uninstall numpy` repeatedly until no more versions remain in your environment.  Then, reinstall numpy and try again.
+
 ### OpenBlas on MacOS
-If you get a failure running riboSeed about `dependencies not installed:["numpy"]`, try running `python -c "import numpy as np"`. If you get an error about openblas, try upgrading the one chosen by conda with:
+If you get an error about openblas, try upgrading the one chosen by conda with:
 ```
 conda install openblas=0.2.19
 ```
