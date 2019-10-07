@@ -181,6 +181,11 @@ class FocusDBData(object):
                 logger=logger)
             return (rawreadsf, rawreadsr, download_error_message)
         else:
+            self.update_manifest(
+                newacc=SRA,
+                newstatus="LIBRARY TYPE ERROR",
+                organism=org,
+                logger=logger)
             return (None, None, download_error_message)
 
     def check_fastq_dir(self, this_data, logger):
@@ -214,7 +219,7 @@ class FocusDBData(object):
                 else:
                     logger.warning("ignoring extra library %s", fastq)
             else:
-                logger.error("Can only process paired or reads")
+                logger.error("Can only process paired or single-end reads")
                 logger.error(fastqs)
                 download_error_message = "Unexpected item in the bagging area"
                 download_error_message = "Unable to process library type"
