@@ -371,7 +371,6 @@ def downsample(read_length, approx_length, fastq1, fastq2,
     Given the coverage from coverage(), downsamples the reads if over
     the max coverage set by args.maxcov. Default 50.
     """
-
     suboutput_dir_downsampled = destination
     downpath1 = os.path.join(suboutput_dir_downsampled,
                              "downsampledreadsf.fastq")
@@ -379,6 +378,19 @@ def downsample(read_length, approx_length, fastq1, fastq2,
     if fastq2 is not None:
         downpath2 = os.path.join(suboutput_dir_downsampled,
                                  "downsampledreadsr.fastq")
+    return_originals = True
+    if not run:
+        # if any downsmapled reads are here, return those;
+        # othewise, we assume they did not need to be downsmapled
+        for f in [downpath1, downpath2]:
+            if f is not None:
+                if os.path.exists(f):
+                    return_originals = False
+        if return_originals:
+            return(fastq1, fastq2)
+        else:
+            return(downpath1, downpath2)
+
     coverage = get_coverage(read_length, approx_length,
                             fastq1, fastq2, logger=logger)
     # seqtk either works with a number of reads, or a fractional value
