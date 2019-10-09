@@ -160,6 +160,11 @@ def get_args():  # pragma: nocover
                         help="integer for maximum coverage of reads",
                         default=50,
                         required=False, type=int)
+    parser.add_argument("--fastqtool",
+                        help="either fastq-dump or fasterq-dump",
+                        default="fasterq-dump",
+                        choices=["fastq-dump", "fasterq-dump"],
+                        required=False)
     parser.add_argument("--custom_reads",
                         help="input of custom reads", nargs='+',
                         required=False, type=str)
@@ -555,7 +560,7 @@ def check_riboSeed_outcome(status_file, contigs):
     if os.path.exists(contigs):
         update_status_file(status_file, message="RIBOSEED COMPLETE")
     else:
-        this_output = os.path.basename(contigs)
+        this_output = os.path.dirname(contigs)
         raise riboSeedUnsuccessfulError(str(
             "riboSeed completed but was not successful; " +
             "for details, see log file at %s") %
@@ -770,7 +775,8 @@ def main():
                 fDB.get_SRA_data(
                     org=args.organism_name,
                     SRA=accession,
-                    logger=logger)
+                    logger=logger,
+                    tool=args.fastqtool)
         except fasterqdumpError:
             message = 'Error downloading %s' % accession
             write_pass_fail(args, status="FAIL", stage=accession, note=message)

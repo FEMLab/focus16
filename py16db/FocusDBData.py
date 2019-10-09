@@ -112,7 +112,7 @@ class FocusDBData(object):
 
         pass
 
-    def get_SRA_data(self, SRA, org, logger):
+    def get_SRA_data(self, SRA, org, logger, tool="fasterq-dump"):
         """download_SRA_if_needed
         This doesnt check the manifest right off the bad to make it easier for
         users to move data into the .focusdb dir manually
@@ -123,6 +123,8 @@ class FocusDBData(object):
         raises an error if it looks like files have gone missing
         3) rerun if needed, and return the results
         """
+        assert tool in ["fastq-dump", "fasterq-dump"], \
+            "unrecognized download tool"
         suboutput_dir_raw = os.path.join(self.dbdir, SRA, "")
         logfile = os.path.join(suboutput_dir_raw, "download.log")
         rawreadsf, rawreadsr, download_error_message = \
@@ -153,9 +155,10 @@ class FocusDBData(object):
         # we suspect I/O limits using more in most cases,
         # so we don't give the user the option to increase this
         # https://github.com/ncbi/sra-tools/wiki/HowTo:-fasterq-dump
+        verb = "" if tool == "fastq-dump" else "-vvv "
         cmd = str(
-            "fasterq-dump {SRA} -O " +
-            "{suboutput_dir_raw} --split-files -vvv > {logfile}"
+            "{tool} -O " +
+            "{suboutput_dir_raw} --split-files {verb}{SRA} > {logfile}"
         ).format(**locals())
         logger.info("Downloading %s", SRA)
         logger.debug(cmd)
