@@ -764,6 +764,7 @@ def main():
         status_file = os.path.join(this_output, "status")
         logger.info("Organism: %s; Accession: %s",
                     args.organism_name, accession)
+        message = ""
         try:
             rawreadsf, rawreadsr, download_error_message = \
                 fDB.get_SRA_data(
