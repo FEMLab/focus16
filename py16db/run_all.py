@@ -853,6 +853,7 @@ def main():
             write_pass_fail(args, status="PASS", stage=v[0], note="")
             all_assemblies.append(v[2])
         except riboSeedUnsuccessfulError as e:
+            update_status_file(v[3], message="RIBOSEED COMPLETE")
             write_pass_fail(args, status="FAIL",
                             stage=accession,
                             note="riboSeed unsuccessful")

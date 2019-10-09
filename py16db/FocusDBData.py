@@ -124,7 +124,7 @@ class FocusDBData(object):
         3) rerun if needed, and return the results
         """
         suboutput_dir_raw = os.path.join(self.dbdir, SRA, "")
-
+        logfile = os.path.join(suboutput_dir_raw, "download.log")
         rawreadsf, rawreadsr, download_error_message = \
             self.check_fastq_dir(this_data=suboutput_dir_raw, logger=logger)
         if download_error_message == "":
@@ -153,8 +153,10 @@ class FocusDBData(object):
         # we suspect I/O limits using more in most cases,
         # so we don't give the user the option to increase this
         # https://github.com/ncbi/sra-tools/wiki/HowTo:-fasterq-dump
-        cmd = str("fasterq-dump {SRA} -O " +
-                  "{suboutput_dir_raw} --split-files").format(**locals())
+        cmd = str(
+            "fasterq-dump {SRA} -O " +
+            "{suboutput_dir_raw} --split-files -vvv > {logfile}"
+        ).format(**locals())
         logger.info("Downloading %s", SRA)
         logger.debug(cmd)
         try:
@@ -169,7 +171,8 @@ class FocusDBData(object):
                 newstatus="DOWNLOAD ERROR",
                 organism=org,
                 logger=logger)
-            logger.critical("Error running fasterq-dump")
+            logger.critical("Error running fasterq-dump; see log file at %s",
+                            logfile)
             raise fasterqdumpError
         rawreadsf, rawreadsr, download_error_message = \
             self.check_fastq_dir(this_data=suboutput_dir_raw, logger=logger)
