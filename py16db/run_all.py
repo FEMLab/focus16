@@ -131,7 +131,8 @@ def get_args():  # pragma: nocover
                         "genome; defaults to .05 (see Mash paper), which " +
                         "roughly corresponds to species level similarity. " +
                         "If desired, this can be relaxed",
-                        default=.05)
+                        default=.05,
+                        type=float)
     parser.add_argument("--njobs",
                         help="how many jobs to run concurrently " +
                         "via multiprocessing. --cores and --memory is per job",
