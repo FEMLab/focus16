@@ -296,7 +296,7 @@ def pob(genomes_dir, readsf, output_dir, maxdist, logger):
             logger.debug("Reference genome mash distance: %s", sim)
             if sim > maxdist:
                 raise referenceNotGoodEnoughError(
-                    "Reference similarity %s does not meet .05 threshold" % sim)
+                    "Reference similarity %s does not meet %s threshold" % (sim, maxdist))
             length_path = os.path.join(output_dir, "genome_length")
             cmd = "wc -c {ref} > {length_path}".format(**locals())
             subprocess.run(cmd,
