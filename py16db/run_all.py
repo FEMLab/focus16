@@ -771,6 +771,14 @@ def main():
         logger.info("Organism: %s; Accession: %s",
                     args.organism_name, accession)
         message = ""
+        if "RIBOSEED COMPLETE" in parse_status_file(status_file) and not args.redo_assembly:
+            logger.info("using existing results")
+            ribo_contigs = os.path.join(this_results, "riboSeed", "seed",
+                                        "final_long_reads", "riboSeedContigs.fasta")
+            riboSeed_jobs.append([accession, None,
+                                  ribo_contigs,  status_file])
+            continue
+
         try:
             rawreadsf, rawreadsr, download_error_message = \
                 fDB.get_SRA_data(
