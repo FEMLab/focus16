@@ -336,14 +336,15 @@ class FocusDBData(object):
             return 2
         if fetched == 0:
             return 0
-        unzip_cmd = "gunzip " + os.path.join(self.refdir, "*.gz")
-        sys.stderr.write(unzip_cmd + "\n")
-        try:
-            subprocess.run(
-                unzip_cmd,
-                shell=sys.platform != "win32",
-                check=True)
-        except Exception as e:
-            logger.error(e)
-            return 3
+        for gz in glob.glob(os.path.join(self.refdir, "*.gz")):
+            unzip_cmd = "gunzip " + gz
+            sys.stderr.write(unzip_cmd + "\n")
+            try:
+                subprocess.run(
+                    unzip_cmd,
+                    shell=sys.platform != "win32",
+                    check=True)
+            except Exception as e:
+                logger.error(e)
+                return 3
         return 0
