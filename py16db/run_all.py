@@ -666,6 +666,39 @@ def run_riboSeed_catch_errors(cmd, acc=None, args=None, status_file=None):
     return 0
 
 
+def write_this_config(args, this_config_file):
+    args_to_write = ["maxdist", "subassembler", "maxcov", "n_references"]
+    argd = vars(args)
+    with open(this_config_file, "w") as outf:
+        for arg in args_to_write:
+            outf.write("{}:{}\n".format(arg, argd[arg]))
+
+def different_args(args, this_config_file, logger):
+    """ Returns empty list if no args differ
+    """
+    diff_args = []
+    args_to_write = ["maxdist", "subassembler", "maxcov", "n_references"]
+    old_config_dict = {}
+    this_config_dict = vars(args)
+    if not os.path.exists(this_config_file):
+        raise ValueError("No previous config file found; rerunning")
+    with open(this_config_file,"r") as f:
+        for line in f:
+            (key, val) = line.strip().split(":")
+            old_config_dict[key] = val
+    if len(old_config_dict)  ==  0:
+        raise ValueError("Old config file empty; rerunning")
+    for arg in args_to_write:
+        # note that reading from the file makes all old args strings, so we
+        # accomodate that
+        if str(this_config_dict[arg]) != old_config_dict[arg]:
+            logger.info("New parameter value for " +
+                        "{} ({}) doesn't match old value ({})".format(
+                            arg, this_config_dict[arg], old_config_dict[arg]))
+            diff_args.append(arg)
+    return diff_args
+
+
 def main():
     args = get_args()
 
@@ -740,6 +773,20 @@ def main():
         write_pass_fail(args, status="FAIL", stage="global", note=message)
         sys.exit(1)
     genome_check_file = os.path.join(fDB.refdir, ".references_passed_checks")
+    ##########  Check to see if we have requested a different number of strains
+    this_config_file = os.path.join(args.output_dir, "config")
+    try:
+        updated_args = different_args(args, this_config_file, logger)
+    except ValueError as e:
+        logger.warning(e)
+        # if we have any issues finding orr reading the config, just rerun it all
+        updated_args = ["maxdist", "subassembler", "maxcov"]
+    # if "n_references" in updated_args:
+    #     if os.path.exists(genome_check_file):
+    #         os.remove(genome_check_file)
+    write_this_config(args, this_config_file)
+
+    ##########
     if not os.path.exists(genome_check_file):
         logger.info("checking reference genomes for rDNA counts")
         for pot_reference in glob.glob(os.path.join(fDB.refdir, "*.fna")):
@@ -771,6 +818,20 @@ def main():
         logger.info("Organism: %s; Accession: %s",
                     args.organism_name, accession)
         message = ""
+        ################ check updated args, update status file if needed
+        if "maxdist" in updated_args:
+            # plentyofbugs will rerun if this fileis missing
+            update_status_file(status_file, to_remove=["RIBOSEED COMPLETE"])
+            this_pob_results = os.path.join(this_results, "plentyofbugs", "best_reference")
+            if os.path.exists(this_pob_results):
+                os.remove(this_pob_results)
+        if "maxcov" in updated_args:
+            update_status_file(status_file,
+                           to_remove=["DOWNSAMPLED", "RIBOSEED COMPLETE"])
+        if "subassembler" in updated_args:
+            update_status_file(status_file, to_remove=["RIBOSEED COMPLETE"])
+
+        ################
         if "RIBOSEED COMPLETE" in parse_status_file(status_file) and not args.redo_assembly:
             logger.info("using existing results")
             ribo_contigs = os.path.join(this_results, "riboSeed", "seed",

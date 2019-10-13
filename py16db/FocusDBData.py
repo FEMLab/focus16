@@ -263,11 +263,14 @@ class FocusDBData(object):
         # it seems counter intuitive, but checking the dir we might have just
         # created is easier than checking if it exists/is intact twice
         os.makedirs(self.refdir, exist_ok=True)
-        if len(glob.glob(os.path.join(self.refdir, "*.fna"))) == 0:
+        ngenomes = len(glob.glob(os.path.join(self.refdir, "*.fna")))
+        # check how many we need - we need to have at least the number
+        #  in args.nstrains. If some exist, we re-rerun with the difference
+        if ngenomes == 0 or args.nstrains > ngenomes:
             logger.info('Downloading genomes')
             return(self.our_get_n_genomes(
                 org=args.organism_name,
-                nstrains=args.nstrains,
+                nstrains=args.nstrains - ngenomes,
                 thisseed=args.seed,
                 logger=logger)
             )
@@ -290,8 +293,8 @@ class FocusDBData(object):
             self.prokaryotes = os.path.join(self.dbdir, "prokaryotes.txt")
         if not os.path.exists(self.prokaryotes):
             gng.fetch_prokaryotes(dest=self.prokaryotes)
-        org_lines = gng.get_lines_of_interest_from_proks(path=self.prokaryotes,
-                                                         org=org)
+        org_lines = gng.get_lines_of_interest_from_proks(
+            path=self.prokaryotes, org=org)
         if len(org_lines) == 0:
             return 1
         if nstrains == 0:
@@ -311,6 +314,11 @@ class FocusDBData(object):
             return 1
         try:
             for i, cmd in enumerate(cmds):
+                # ignore if already there; the last par of the  command is the zipped genome:
+                thisgenome = cmd.split(" ")[-1].replace(".gz", "")
+                if os.path.exists(os.path.join(self.refdir,  thisgenome)):
+                    logger.debug(thisgenome + " already present, skipping")
+                    continue
                 sys.stderr.write("Downloading genome %i of %i\n%s\n" %
                                  (i + 1, len(cmds), cmd))
                 logger.debug(cmd)
