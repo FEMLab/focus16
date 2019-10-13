@@ -312,6 +312,7 @@ class FocusDBData(object):
         # I updated plentyofbugs to try to catch it, but still might happen
         if len(cmds) == 0:
             return 1
+        fetched = 0
         try:
             for i, cmd in enumerate(cmds):
                 # ignore if already there; the last par of the  command is the zipped genome:
@@ -319,6 +320,8 @@ class FocusDBData(object):
                 if os.path.exists(os.path.join(self.refdir,  thisgenome)):
                     logger.debug(thisgenome + " already present, skipping")
                     continue
+                else:
+                    fetched = fetched + 1
                 sys.stderr.write("Downloading genome %i of %i\n%s\n" %
                                  (i + 1, len(cmds), cmd))
                 logger.debug(cmd)
@@ -331,7 +334,8 @@ class FocusDBData(object):
         except Exception as e:
             logger.error(e)
             return 2
-
+        if fetched == 0:
+            return 0
         unzip_cmd = "gunzip " + os.path.join(self.refdir, "*.gz")
         sys.stderr.write(unzip_cmd + "\n")
         try:

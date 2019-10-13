@@ -667,7 +667,7 @@ def run_riboSeed_catch_errors(cmd, acc=None, args=None, status_file=None):
 
 
 def write_this_config(args, this_config_file):
-    args_to_write = ["maxdist", "subassembler", "maxcov", "n_references"]
+    args_to_write = ["maxdist", "subassembler", "maxcov"]
     argd = vars(args)
     with open(this_config_file, "w") as outf:
         for arg in args_to_write:
@@ -677,7 +677,7 @@ def different_args(args, this_config_file, logger):
     """ Returns empty list if no args differ
     """
     diff_args = []
-    args_to_write = ["maxdist", "subassembler", "maxcov", "n_references"]
+    args_to_write = ["maxdist", "subassembler", "maxcov"]
     old_config_dict = {}
     this_config_dict = vars(args)
     if not os.path.exists(this_config_file):
