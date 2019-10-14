@@ -18,6 +18,10 @@ thesedirs = {
     "badA":  [["_2.fastq"],
               False, False, False, "error"],
     "badB":  [[".fastq", "_2.fastq"],
+              False, False, False, "f"],
+    "okMate":  [["_1.fastq", "_3.fastq"],
+                True, False, False, ""],
+    "badMate":  [["_1.fastq", "_3.fastq"],
               False, False, False, "f"]
 }
 
@@ -41,10 +45,19 @@ def test_fastq_files():
     for k, v in thesedirs.items():
         base = os.path.join(testdir,  k)
         if k.startswith("bad"):
-            fwd, rev, mgs = fDB.check_fastq_dir(base, logger)
+            fwd, rev, mgs = fDB.check_fastq_dir(base, mate_as_single=False, logger=logger)
             assert mgs != "", "no error thrown"
+        elif k.startswith("good"):
+            fwd, rev, mgs = fDB.check_fastq_dir(base, mate_as_single=False, logger=logger)
+            if v[1]:
+                assert fwd == os.path.join(base, "test_1.fastq"), "missing forward library"
+            if v[2]:
+                assert rev == os.path.join(base, "test_2.fastq"), "missing rev library"
+            if v[3]:
+                assert fwd == os.path.join(base, "test.fastq"), "missing single library"
+        # for mate pairs that we allow
         else:
-            fwd, rev, mgs = fDB.check_fastq_dir(base, logger)
+            fwd, rev, mgs = fDB.check_fastq_dir(base, mate_as_single=True, logger=logger)
             if v[1]:
                 assert fwd == os.path.join(base, "test_1.fastq"), "missing forward library"
             if v[2]:

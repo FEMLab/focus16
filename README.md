@@ -16,6 +16,7 @@ Given an organism, focusDB does the following:
 	- Download all potential complete reference genomes.
 	For each SRA:
 		- use `plentyofbugs` to identify which reference genome would be the closest
+		- uses the mini assembly from of `plentyofbugs` to call taxonomy via kraken2
 		- run QC on reads, downsampling if neccessary
 		- run riboSeed assembly
 	Extract all the 16S seqeunces from reassembly
@@ -26,7 +27,7 @@ Given an organism, focusDB does the following:
 focusDB available via pypi. We recommend installing within a python environment.
 
 ```
-conda create --name focusDBenv python=3.5 seqtk sickle-trim sra-tools riboseed mash skesa barrnap parallel-fastq-dump iqtree mafft
+conda create --name focusDBenv python=3.5 seqtk sickle-trim sra-tools riboseed mash skesa barrnap parallel-fastq-dump iqtree mafft kraken2
 conda activate focusDBenv
 pip install focusDB
 

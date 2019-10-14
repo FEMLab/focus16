@@ -1,0 +1,50 @@
+100.00	164	7	R	1	root
+ 95.73	157	0	R1	131567	  cellular organisms
+ 95.73	157	2	D	2	    Bacteria
+ 94.51	155	0	P	1224	      Proteobacteria
+ 94.51	155	3	C	1236	        Gammaproteobacteria
+ 92.68	152	6	O	91347	          Enterobacterales
+ 89.02	146	29	F	543	            Enterobacteriaceae
+ 66.46	109	5	G	561	              Escherichia
+ 63.41	104	71	S	562	                Escherichia coli
+  3.05	5	5	S1	1358422	                  Escherichia coli PCN061
+  2.44	4	0	S1	83333	                  Escherichia coli K-12
+  2.44	4	1	S2	511145	                    Escherichia coli str. K-12 substr. MG1655
+  1.83	3	3	S3	879462	                      Escherichia coli str. K-12 substr. MG1655star
+  1.83	3	0	S1	83334	                  Escherichia coli O157:H7
+  0.61	1	1	S2	544404	                    Escherichia coli O157:H7 str. TW14359
+  0.61	1	1	S2	1328859	                    Escherichia coli O157:H7 str. SS17
+  0.61	1	1	S2	1330457	                    Escherichia coli O157:H7 str. SS52
+  1.22	2	2	S1	168807	                  Escherichia coli O127:H6
+  1.22	2	2	S1	1329907	                  Escherichia coli APEC IMT5155
+  1.22	2	2	S1	1050617	                  Escherichia coli UMNF18
+  1.22	2	2	S1	869729	                  Escherichia coli UM146
+  0.61	1	0	S1	2233553	                  Escherichia coli O43
+  0.61	1	1	S2	1055541	                    Escherichia coli O43 str. RM10042
+  0.61	1	1	S1	2048777	                  Escherichia coli O15:H11
+  0.61	1	1	S1	199310	                  Escherichia coli CFT073
+  0.61	1	0	S1	1603259	                  Escherichia coli O139:H28
+  0.61	1	1	S2	331111	                    Escherichia coli O139:H28 str. E24377A
+  0.61	1	1	S1	1412834	                  Escherichia coli FAP1
+  0.61	1	1	S1	1401688	                  Escherichia coli APEC O18
+  0.61	1	1	S1	1382700	                  Escherichia coli PMV-1
+  0.61	1	1	S1	1311757	                  Escherichia coli ACN001
+  0.61	1	1	S1	1078034	                  Escherichia coli O145:H28
+  0.61	1	1	S1	758831	                  Escherichia coli ECC-1470
+  0.61	1	1	S1	745156	                  Escherichia coli 1303
+  0.61	1	1	S1	696406	                  Escherichia coli UMNK88
+  0.61	1	1	S1	585397	                  Escherichia coli ED1a
+  1.83	3	0	G	570	              Klebsiella
+  1.83	3	3	S	573	                Klebsiella pneumoniae
+  1.22	2	1	G	547	              Enterobacter
+  0.61	1	1	S	1692238	                Enterobacter sp. FY-07
+  0.61	1	0	G	544	              Citrobacter
+  0.61	1	0	G1	1344959	                Citrobacter freundii complex
+  0.61	1	1	S	546	                  Citrobacter freundii
+  0.61	1	0	G	590	              Salmonella
+  0.61	1	0	S	28901	                Salmonella enterica
+  0.61	1	0	S1	59201	                  Salmonella enterica subsp. enterica
+  0.61	1	0	S2	108619	                    Salmonella enterica subsp. enterica serovar Newport
+  0.61	1	1	S3	858305	                      Salmonella enterica subsp. enterica serovar Newport str. CVM 22462
+  0.61	1	0	G	160674	              Raoultella
+  0.61	1	1	S	54291	                Raoultella ornithinolytica

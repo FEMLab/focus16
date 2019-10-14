@@ -15,12 +15,14 @@ class fasterqdumpError(Exception):
 
 class FocusDBData(object):
     def __init__(self, dbdir=None, refdir=None,
-                 sraFind_data=None, prokaryotes=None):
+                 sraFind_data=None, prokaryotes=None,
+                 krakendir=None):
         self.dbdir = dbdir
         self.refdir = refdir
         self.prokaryotes = prokaryotes
         self.sraFind_data = sraFind_data
         self.SRAs = {}
+        self.krakendir = krakendir
         # get/set location of data
         self.get_focusDB_dir()
         # make dirs/files as needed
@@ -38,6 +40,31 @@ class FocusDBData(object):
         if not os.path.exists(self.SRAs_manifest):
             with open(self.SRAs_manifest, "w") as outf:
                 outf.write("SRA_accession\tStatus\tOrganism\n")
+
+
+    def check_or_get_minikraken2(self, logger):
+        """
+        """
+        if self.krakendir is None:
+            self.krakendir = os.path.join(self.dbdir, "minikraken2_v2_8GB_201904_UPDATE", "")
+        if not os.path.exists(self.krakendir):
+            cmds = []
+            if not os.path.exists(self.dbdir + "mini.tar.gz"):
+                cmds.append(
+                    str(
+                        "wget ftp://ftp.ccb.jhu.edu/pub/data/kraken2_dbs/" +
+                        "minikraken2_v2_8GB_201904_UPDATE.tgz -O {}mini.tar.gz"
+                    ).format(self.dbdir))
+            cmds.append("tar xzf {0}mini.tar.gz -C {0}".format(self.dbdir))
+            for cmd in cmds:
+                logger.debug(cmd)
+                subprocess.run(
+                    cmd,
+                    shell=sys.platform != "win32",
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=True)
+
 
     def get_focusDB_dir(self):
         if self.dbdir is None:
@@ -128,7 +155,8 @@ class FocusDBData(object):
         suboutput_dir_raw = os.path.join(self.dbdir, SRA, "")
         logfile = os.path.join(suboutput_dir_raw, "download.log")
         rawreadsf, rawreadsr, download_error_message = \
-            self.check_fastq_dir(this_data=suboutput_dir_raw, logger=logger)
+            self.check_fastq_dir(this_data=suboutput_dir_raw,
+                                 mate_as_single=False, logger=logger)
         if download_error_message == "":
             self.update_manifest(
                 newacc=SRA,
@@ -194,7 +222,7 @@ class FocusDBData(object):
                 logger=logger)
             return (None, None, download_error_message)
 
-    def check_fastq_dir(self, this_data, logger):
+    def check_fastq_dir(self, this_data, mate_as_single, logger):
         # Double check the download worked.  If its a single lib,
         # it wont have a _1 prefix, so we check if that exists
         # and if so, adjust expeactations
@@ -202,23 +230,32 @@ class FocusDBData(object):
             # this never happens unless a run is aborted;
             # regardless, we want to make sure we attempt to re-download
             return(None, None, "No directory created for SRA during download")
-        fastqs = glob.glob(os.path.join(this_data, "", "*.fastq"))
+        fastqs = glob.glob(os.path.join(this_data, "", "*.f*"))
         logger.debug("fastqs detected: %s", " ".join(fastqs))
         if len(fastqs) == 0:
             return(None, None, "No fastq files downloaded")
+        if fastqs[0].endswith(".fastq"):
+            pre = ".fastq"
+        elif fastqs[0].endswith(".gz"):
+            pre = ".fastq.gz"
+        else:
+            return(
+                None, None,
+                "Unfamiliar prefix for %s: must be either fastq or .gz" %
+                fastqs[0])
         rawf, rawr = [], []
         rawreadsf, rawreadsr = None, None
         download_error_message = ""
         for fastq in fastqs:
-            if fastq.endswith("_1.fastq"):
+            if fastq.endswith("_1" + pre):
                 # not appending, cause we want to bump out any single libs t
                 # that may have been read in first
                 if len(rawf) != 0:
                     logger.warning("ignoring extra library %s", " ".join(rawf))
                 rawf = [fastq]
-            elif fastq.endswith("_2.fastq"):
+            elif fastq.endswith("_2" + pre):
                 rawr.append(fastq)
-            elif fastq.endswith(".fastq") and not fastq.endswith("_3.fastq"):
+            elif fastq.endswith(pre) and not fastq.endswith("_3" + pre):
                 if len(rawf) == 0:
                     # This is how we treat single libraries
                     rawf.append(fastq)
@@ -226,9 +263,14 @@ class FocusDBData(object):
                     logger.warning("ignoring extra library %s", fastq)
             else:
                 logger.error("Can only process paired or single-end reads")
-                logger.error(fastqs)
-                download_error_message = "Unexpected item in the bagging area"
-                download_error_message = "Unable to process library type"
+                if mate_as_single:
+                    logger.warning(
+                        "treating first read from mate-pair library as single")
+                else:
+                    logger.error(fastqs)
+                    download_error_message = "Unexpected item in the bagging area"
+                    download_error_message = "Unable to process library type"
+        logger.info(rawr)
         if len(set(rawf)) == 1:
             rawreadsf = rawf[0]
         elif len(set(rawf)) > 1:
@@ -244,9 +286,9 @@ class FocusDBData(object):
             rawreadsr = None
         # catch only .fastq and _2.fastq weird combo
         if rawreadsf is not None:
-            if not rawreadsf.endswith("_1.fastq") and rawreadsr is not None:
+            if not rawreadsf.endswith("_1" + pre) and rawreadsr is not None:
                 download_error_message = "cannot process a single library " + \
-                    "file and a reverse file"
+                    " (non-forward) file and a reverse file"
         return (rawreadsf, rawreadsr, download_error_message)
 
     #####################   Methods for dealing with reference genomes ########
@@ -306,7 +348,6 @@ class FocusDBData(object):
             thisseed=thisseed,
             genomes_dir=self.refdir,
             SHUFFLE=True)
-        print(cmds)
         # this can happen if tabs end up in metadata (see
         # AP019724.1 B. unifomis, and others
         # I updated plentyofbugs to try to catch it, but still might happen

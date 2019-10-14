@@ -25,6 +25,10 @@ class bestreferenceError(Exception):
     pass
 
 
+class kraken2Error(Exception):
+    pass
+
+
 class referenceNotGoodEnoughError(Exception):
     pass
 
@@ -112,6 +116,11 @@ def get_args():  # pragma: nocover
     parser.add_argument("--prokaryotes", action="store",
                         help="path to prokaryotes.txt; default is " +
                         "in ~/.focusDB/",
+                        default=None,
+                        required=False)
+    parser.add_argument("--kraken2_dir", action="store",
+                        help="path to kraken dir; default is " +
+                        "in ~/.focusDB/.  Will be created if doesn't exist",
                         default=None,
                         required=False)
     parser.add_argument("-S", "--n_SRAs", help="max number of SRAs to be run",
@@ -218,7 +227,8 @@ def check_programs(logger):
 
     required_programs = [
         "ribo", "barrnap", "fasterq-dump", "mash",
-        "skesa", "plentyofbugs", "iqtree"]
+        "skesa", "plentyofbugs", "iqtree", "seqtk",
+        "kraken2"]
     for program in required_programs:
         if shutil.which(program) is None:
             logger.critical('%s is not installed: exiting.', program)
@@ -465,12 +475,60 @@ def make_riboseed_cmd(sra, readsf, readsr, cores, subassembler, threads,
                   "--memory {memory}").format(**locals())
     return(cmd)
 
+def run_kraken2(contigs, dest_prefix, db, logger):
+    out = dest_prefix + ".output"
+    report = dest_prefix + ".report"
+    cmd = str(
+        "kraken2 --memory-mapping --db {db} --use-names --output {out} " +
+        "--report {report} {contigs}").format(**locals())
+    if not os.path.exists(report):
+        logger.debug(cmd)
+        subprocess.run(cmd,
+                       shell=sys.platform != "win32",
+                       stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE,
+                       check=True)
+    return report
+
+
+def parse_kraken_report(kraken2_report):
+    """column data:
+    https://ccb.jhu.edu/software/kraken2/index.shtml?t=manual
+    #standard-kraken-output-format
+    """
+    empty = [0, "-", ""]
+    tax = {'R': empty,
+           'D': empty,
+           'P': empty,
+           'C': empty,
+           'O': empty,
+           'F': empty,
+           'G': empty,
+           'S': empty}
+    with open(kraken2_report, "r") as inf:
+        for line in inf:
+            #print(line)
+            sline = line.split("\t")
+            if len(sline) != 6:
+                raise ValueError(
+                    "Malformed kraken2 report; should be 6 columns: %s" % line)
+            perc, n_in, n_at, lev, taxid, label = sline
+            if lev in tax.keys():
+                # only report the top hit
+                this = float(perc.strip()), taxid, label.strip()
+                if tax[lev][0] < this[0]:
+                    tax[lev] = float(perc.strip()), taxid, label.strip()
+    return tax
+
+
 
 def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
-                   this_output, args, logger, status_file):
-    """return a tuple of the riboSeed cmd and the path to contigs
+                   this_output, args, logger, status_file, kdir):
+    """return a tuple of the riboSeed cmd and the path to contigs,
+    and the taxonomy according to kraken
     """
     pob_dir = os.path.join(this_output, "plentyofbugs")
+    krak_dir = os.path.join(this_output, "kraken2", "")
     ribo_dir = os.path.join(this_output, "riboSeed")
     sickle_out = os.path.join(this_output, "sickle")
     best_reference = os.path.join(pob_dir, "best_reference")
@@ -490,6 +548,31 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
     with open(best_reference, "r") as infile:
         for line in infile:
             best_ref_fasta = line.split('\t')[0]
+            best_ref_dist = float(line.split('\t')[1])
+        if args.maxdist < best_ref_dist:
+            raise referenceNotGoodEnoughError(
+                "Reference similarity %s does not meet %s threshold" %
+                (best_ref_dist, args.maxdist))
+    report_output = krak_dir + "kraken2.report"
+    if "TAXONOMY" not in parse_status_file(status_file) or \
+       not os.path.exists(report_output):
+        if os.path.exists(krak_dir):
+              shutil.rmtree(krak_dir)
+        os.makedirs(krak_dir, exist_ok=True)
+        logger.info('Assigning taxonomy with kraken')
+        pob_assembly = os.path.join(pob_dir, "assembly", "contigs.fasta")
+        try:
+            report_output = run_kraken2(
+                contigs=pob_assembly,
+                dest_prefix=krak_dir + "kraken2",
+                db=kdir, logger=logger)
+            update_status_file(status_file, message="TAXONOMY")
+        except Exception as e:
+            raise kraken2Error(e)
+    if os.path.getsize(report_output) == 0:
+            raise kraken2Error("Kraken output file  exists but is empty")
+    tax_dict = parse_kraken_report(kraken2_report=report_output)
+    logger.debug(tax_dict)
 
     if args.approx_length is None:
         genome_length = os.path.join(pob_dir, "genome_length")
@@ -550,10 +633,10 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
     if "RIBOSEED COMPLETE" not in parse_status_file(status_file):
         if os.path.exists(ribo_dir):
             shutil.rmtree(ribo_dir)
-        return(riboseed_cmd, ribo_contigs)
+        return(riboseed_cmd, ribo_contigs, tax_dict)
     else:
         logger.info("Skipping riboSeed")
-        return (None, ribo_contigs)
+        return (None, ribo_contigs, tax_dict)
 
 
 def check_riboSeed_outcome(status_file, contigs):
@@ -561,7 +644,8 @@ def check_riboSeed_outcome(status_file, contigs):
     if os.path.exists(contigs):
         update_status_file(status_file, message="RIBOSEED COMPLETE")
     else:
-        this_output = os.path.dirname(contigs)
+        this_output = os.path.dirname(
+            os.path.dirname(os.path.dirname(contigs)))
         raise riboSeedUnsuccessfulError(str(
             "riboSeed completed but was not successful; " +
             "for details, see log file at %s") %
@@ -584,9 +668,28 @@ def run_barrnap(assembly,  results, logger):
 
 
 def extract_16s_from_assembly(assembly, gff, sra, output, output_summary,
-                              args, singleline,logger):
-
-    results16s = {}  # [sra_#, chromosome, start, end, reverse complimented]
+                              args, singleline, tax_d, logger):
+    tax_string = tax_d["S"][2]
+    # if no label, gibe the next one
+    if len(tax_string.replace(" ", "")) == 0:
+        tax_string = tax_d["G"][2] + "sp."
+        if len(tax_string.replace(" ", "").replace(".sp", "")) == 0:
+            tax_string = tax_d["F"][2]
+            if len(tax_string.replace(" ", "")) == 0:
+                tax_string = tax_d["O"][2]
+                if len(tax_string.replace(" ", "")) == 0:
+                    tax_string = tax_d["C"][2]
+                    if len(tax_string.replace(" ", "")) == 0:
+                        tax_string = tax_d["P"][2]
+    score_string = str(tax_d["D"][0])
+    taxid_string = tax_d["D"][1]
+    big_tax_string = tax_d["D"][2]
+    for lev in ["P", "C", "O", "F", "G", "S"]:
+        score_string = score_string + ";" + str(tax_d[lev][0])
+        taxid_string = taxid_string + ";" + tax_d[lev][1]
+        big_tax_string = big_tax_string + ";" + tax_d[lev][2]
+    results16s = {}  # [sra_#, chromosome, start, end, reverse complimented,
+                     #  big_tax_string, score_string, taxid_string, tax_string]
     nseqs = 0
     with open(gff, "r") as rrn, open(output, "a") as outf, \
          open(output_summary, "a") as outsum:
@@ -617,25 +720,26 @@ def extract_16s_from_assembly(assembly, gff, sra, output, output_summary,
                             seq = seq.reverse_complement()
                         thisidcoords = "{thisid}.{start}.{end}".format(
                             **locals())
-                        thisdesc = args.organism_name
-                        # Need to diable linewrapping for use with SILVA, etc
+                        # Need to disable linewrapping for use with SILVA, etc
                         if singleline:
                             seqstr = str(seq)
                             outf.write(
-                                ">{thisidcoords} {thisdesc}\n{seqstr}\n".format(
+                                ">{thisidcoords} {tax_string}\n{seqstr}\n".format(
                                     **locals()))
                         else:
                             SeqIO.write(
                                 SeqRecord(
-                                    seq, id=thisidcoords, description=thisdesc
-                                ), outf,  "fasta")
+                                    seq, id=thisidcoords,
+                                    description=tax_string),
+                                outf,  "fasta")
                         outsum.write(
                             str(
                                 "{thisid}\t{assembly}\t" +
-                                "{chrom}\t{start}\t{end}\n"
+                                "{chrom}\t{start}\t{end}\t{big_tax_string}\t" +
+                                "{score_string}\t{taxid_string}\t" +
+                                "{tax_string}\n"
                             ).format(**locals()))
                         nseqs = nseqs + 1
-
     return nseqs
 
 
@@ -673,6 +777,7 @@ def write_this_config(args, this_config_file):
         for arg in args_to_write:
             outf.write("{}:{}\n".format(arg, argd[arg]))
 
+
 def different_args(args, this_config_file, logger):
     """ Returns empty list if no args differ
     """
@@ -681,7 +786,8 @@ def different_args(args, this_config_file, logger):
     old_config_dict = {}
     this_config_dict = vars(args)
     if not os.path.exists(this_config_file):
-        raise ValueError("No previous config file found; rerunning")
+        raise ValueError(
+            "No previous config file found %s; rerunning" % this_config_file)
     with open(this_config_file,"r") as f:
         for line in f:
             (key, val) = line.strip().split(":")
@@ -720,9 +826,11 @@ def main():
         dbdir=args.focusDB_data,
         refdir=args.genomes_dir,
         sraFind_data=args.sra_path,
+        krakendir=args.kraken2_dir,
         prokaryotes=args.prokaryotes)
     fDB.check_genomes_dir(org=args.organism_name)
     fDB.fetch_sraFind_data(logger=logger)
+    fDB.check_or_get_minikraken2(logger=logger)
 
     # process data 1 of 4 ways: specific SRA(s), a file of SRA(s),
     #  specific read file (stored as a faux SRA), or the default
@@ -836,9 +944,14 @@ def main():
             logger.info("using existing results")
             ribo_contigs = os.path.join(this_results, "riboSeed", "seed",
                                         "final_long_reads", "riboSeedContigs.fasta")
-            riboSeed_jobs.append([accession, None,
-                                  ribo_contigs,  status_file])
-            continue
+            kraken2_report_output = os.path.join(this_results, "kraken2", "kraken2.report")
+            # double check files exist before we skip this one
+            if all([os.path.exists(p) and os.path.getsize(p) != 0
+                    for p in [ribo_contigs, kraken2_report_output]]):
+                riboSeed_jobs.append(
+                    [accession, None, ribo_contigs,  status_file,
+                     parse_kraken_report(kraken2_report_output)])
+                continue
 
         try:
             rawreadsf, rawreadsr, download_error_message = \
@@ -875,15 +988,21 @@ def main():
         #  heres the meat of the main, catching errors for
         #  anything but the riboSeed step
         try:
-            riboSeed_cmd, contigs_path = process_strain(
-                rawreadsf, rawreadsr, read_length,
-                fDB.refdir, this_results, args, logger, status_file)
+            riboSeed_cmd, contigs_path, taxonomy_d = process_strain(
+                rawreadsf, rawreadsr, read_length, fDB.refdir,
+                this_results, args, logger, status_file, fDB.krakendir)
             riboSeed_jobs.append([accession, riboSeed_cmd,
-                                  contigs_path,  status_file])
+                                  contigs_path,  status_file, taxonomy_d])
         except bestreferenceError as e:
             write_pass_fail(args, status="FAIL",
                             stage=accession,
                             note="Unknown error selecting reference")
+            logger.error(e)
+            continue
+        except kraken2Error as e:
+            write_pass_fail(args, status="FAIL",
+                            stage=accession,
+                            note="Unknown error runing kraken")
             logger.error(e)
             continue
         except referenceNotGoodEnoughError as e:
@@ -902,7 +1021,7 @@ def main():
 
     #######################################################################
     logger.info("Processing %i riboSeed runs", len(riboSeed_jobs))
-    all_assemblies = []
+    all_assemblies = []  # [contigs, tax{}]
     ribo_cmds = [x[1] for x in riboSeed_jobs if x[1] is not None]
     # split_cores = int(args.cores / (len(ribo_cmds) / 2))
     # if split_cores < 1:
@@ -917,7 +1036,7 @@ def main():
                          {"args": args,
                           "acc": acc,
                           "status_file": sfile})
-        for acc, cmd, contigs, sfile in riboSeed_jobs]
+        for acc, cmd, contigs, sfile, tax_d  in riboSeed_jobs]
     pool.close()
     pool.join()
     ribo_results_sum = sum([r.get() for r in riboSeed_pool_results])
@@ -928,7 +1047,7 @@ def main():
             check_riboSeed_outcome(status_file, v[2])
             update_status_file(v[3], message="RIBOSEED COMPLETE")
             write_pass_fail(args, status="PASS", stage=v[0], note="")
-            all_assemblies.append(v[2])
+            all_assemblies.append([v[2], v[4]])
         except riboSeedUnsuccessfulError as e:
             update_status_file(v[3], message="RIBOSEED COMPLETE")
             write_pass_fail(args, status="FAIL",
@@ -937,10 +1056,6 @@ def main():
             logger.error(e)
 
     #######################################################################
-    # all_assemblies =  glob.glob(
-    #     os.path.join(args.output_dir, "*", "results", "riboSeed",
-    #                  "seed", "final_long_reads", "riboSeedContigs.fasta"))
-    ###########################################################################
     extract16soutput = os.path.join(
         args.output_dir,
         "{}_ribo16s.fasta".format(args.organism_name.replace(" ", "_")))
@@ -951,14 +1066,14 @@ def main():
     logger.info("attempting to extract 16S sequences for re-assemblies")
     n_extracted_seqs = 0
     singleline = True
-    for assembly in all_assemblies:
+    for assembly, tax_d in all_assemblies:
         sra = str(Path(assembly).parents[4].name)
         barr_gff = os.path.join(args.output_dir, sra, "barrnap.gff")
         try:
             run_barrnap(assembly, barr_gff, logger)
             this_extracted_seqs = extract_16s_from_assembly(
                 assembly, barr_gff, sra, extract16soutput, out_summary,args,
-                singleline, logger)
+                singleline, tax_d, logger)
             n_extracted_seqs = n_extracted_seqs + this_extracted_seqs
         except extracting16sError as e:
             logger.error(e)

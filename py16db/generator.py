@@ -224,3 +224,8 @@ class sralist_Test(unittest.TestCase):
             file.write("ERX3289350\n")
             file.write("ERX3289335\n")
             file.write("SRX2141371\n")
+
+# TODO
+
+# heres how we got the kraken report:
+# kraken2 --memory-mapping --db ~/.focusDB/minikraken2_v2_8GB_201904_UPDATE/ --use-names --output tmpout_full --report tmpreport_full  ./test_data/kraken2.report
