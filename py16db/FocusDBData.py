@@ -206,7 +206,8 @@ class FocusDBData(object):
                             logfile)
             raise fasterqdumpError
         rawreadsf, rawreadsr, download_error_message = \
-            self.check_fastq_dir(this_data=suboutput_dir_raw, logger=logger)
+            self.check_fastq_dir(this_data=suboutput_dir_raw,
+                                 mate_as_single=False, logger=logger)
         if download_error_message == "":
             self.update_manifest(
                 newacc=SRA,
