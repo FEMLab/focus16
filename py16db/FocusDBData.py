@@ -56,6 +56,7 @@ class FocusDBData(object):
                         "minikraken2_v2_8GB_201904_UPDATE.tgz -O {}mini.tar.gz"
                     ).format(self.dbdir))
             cmds.append("tar xzf {0}mini.tar.gz -C {0}".format(self.dbdir))
+            logger.info("Downloading and preparing minikraken2 DB")
             for cmd in cmds:
                 logger.debug(cmd)
                 subprocess.run(

@@ -123,6 +123,11 @@ def get_args():  # pragma: nocover
                         "in ~/.focusDB/.  Will be created if doesn't exist",
                         default=None,
                         required=False)
+    parser.add_argument("--kraken_mem_mapping", action="store_true",
+                        help="use this flag to load kraken2 db via disk " +
+                        "instead of RAM for taxonomic assignment. " +
+                        "automatically enabled if --memory < 20GB",
+                        required=False)
     parser.add_argument("-S", "--n_SRAs", help="max number of SRAs to be run",
                         type=int, required=False)
     parser.add_argument("-R", "--n_references",
@@ -475,11 +480,16 @@ def make_riboseed_cmd(sra, readsf, readsr, cores, subassembler, threads,
                   "--memory {memory}").format(**locals())
     return(cmd)
 
-def run_kraken2(contigs, dest_prefix, db, logger):
+def run_kraken2(args, contigs, dest_prefix, db, logger):
     out = dest_prefix + ".output"
     report = dest_prefix + ".report"
+    if args.memory < 20 or args.kraken_mem_mapping:
+        memstring = "--memory-mapping "
+    else:
+        memstring = ""
     cmd = str(
-        "kraken2 --memory-mapping --db {db} --use-names --output {out} " +
+        "kraken2 {memstring}--db {db} --threads {args.cores} " +
+        "--use-names --output {out} " +
         "--report {report} {contigs}").format(**locals())
     if not os.path.exists(report):
         logger.debug(cmd)
@@ -563,6 +573,7 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
         pob_assembly = os.path.join(pob_dir, "assembly", "contigs.fasta")
         try:
             report_output = run_kraken2(
+                args,
                 contigs=pob_assembly,
                 dest_prefix=krak_dir + "kraken2",
                 db=kdir, logger=logger)
@@ -1000,6 +1011,9 @@ def main():
             logger.error(e)
             continue
         except kraken2Error as e:
+            if not args.kraken_mem_mapping:
+                logger.error("Kraken error; try rerunning with " +
+                             "--kraken_mem_mapping")
             write_pass_fail(args, status="FAIL",
                             stage=accession,
                             note="Unknown error runing kraken")
