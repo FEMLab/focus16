@@ -162,6 +162,12 @@ def get_args():  # pragma: nocover
                         "during subassemblies",
                         default=4,
                         required=False, type=int)
+    parser.add_argument("--timeout",
+                        help="Download SRAs can stall out periodically; " +
+                        "it typically takes " +
+                        "default 108000s (30 mins)",
+                        default=108000,
+                        required=False, type=int)
     parser.add_argument("--threads",
                         action="store",
                         default=1, type=int,
@@ -970,6 +976,7 @@ def main():
                     org=args.organism_name,
                     SRA=accession,
                     logger=logger,
+                    timeout=args.timeout,
                     tool=args.fastqtool)
         except fasterqdumpError:
             message = 'Error downloading %s' % accession

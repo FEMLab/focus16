@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import os
 import sys
+import time
 import shutil
 import subprocess
 import glob
@@ -140,7 +141,7 @@ class FocusDBData(object):
 
         pass
 
-    def get_SRA_data(self, SRA, org, logger, tool="fasterq-dump"):
+    def get_SRA_data(self, SRA, org, logger,timeout, tool="fasterq-dump"):
         """download_SRA_if_needed
         This doesnt check the manifest right off the bad to make it easier for
         users to move data into the .focusdb dir manually
@@ -194,8 +195,7 @@ class FocusDBData(object):
         try:
             subprocess.run(cmd,
                            shell=sys.platform != "win32",
-                           stdout=subprocess.PIPE,
-                           stderr=subprocess.PIPE,
+                           timeout=timeout,
                            check=True)
         except subprocess.CalledProcessError:
             self.update_manifest(
@@ -205,6 +205,22 @@ class FocusDBData(object):
                 logger=logger)
             logger.critical("Error running fasterq-dump; see log file at %s",
                             logfile)
+            raise fasterqdumpError
+        except subprocess.TimeoutExpired:
+            self.update_manifest(
+                newacc=SRA,
+                newstatus="DOWNLOAD ERROR",
+                organism=org,
+                logger=logger)
+            logger.critical("fasterq-dump timed out downloading %s",
+                            SRA)
+            # delete any partial files;  if we try this right away,
+            # fastq-dump doesn;t dump out fast enough, and we have nothing to
+            # delete, but files apear later.  So we sleep for a few
+            logger.debug("removing incomplete files from fast(er)q-dump")
+            time.sleep(10)
+            for f in glob.glob(suboutput_dir_raw + "*.fastq"):
+                os.remove(f)
             raise fasterqdumpError
         rawreadsf, rawreadsr, download_error_message = \
             self.check_fastq_dir(this_data=suboutput_dir_raw,
