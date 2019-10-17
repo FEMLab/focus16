@@ -141,7 +141,8 @@ class FocusDBData(object):
 
         pass
 
-    def get_SRA_data(self, SRA, org, logger,timeout, tool="fasterq-dump"):
+    def get_SRA_data(self, SRA, org, logger,timeout, process_partial,
+                     retry_partial, tool="fasterq-dump"):
         """download_SRA_if_needed
         This doesnt check the manifest right off the bad to make it easier for
         users to move data into the .focusdb dir manually
@@ -156,6 +157,10 @@ class FocusDBData(object):
             "unrecognized download tool"
         suboutput_dir_raw = os.path.join(self.dbdir, SRA, "")
         logfile = os.path.join(suboutput_dir_raw, "download.log")
+        if retry_partial and SRA in self.SRAs.keys():
+            if self.SRAs[SRA]["status"] == "PARTIAL DOWNLOAD":
+                if os.path.exists(suboutput_dir_raw):
+                    shutil.rmtree(suboutput_dir_raw)
         rawreadsf, rawreadsr, download_error_message = \
             self.check_fastq_dir(this_data=suboutput_dir_raw,
                                  mate_as_single=False, logger=logger)
@@ -207,21 +212,30 @@ class FocusDBData(object):
                             logfile)
             raise fasterqdumpError
         except subprocess.TimeoutExpired:
-            self.update_manifest(
-                newacc=SRA,
-                newstatus="DOWNLOAD ERROR",
-                organism=org,
-                logger=logger)
-            logger.critical("fasterq-dump timed out downloading %s",
-                            SRA)
-            # delete any partial files;  if we try this right away,
-            # fastq-dump doesn;t dump out fast enough, and we have nothing to
-            # delete, but files apear later.  So we sleep for a few
-            logger.debug("removing incomplete files from fast(er)q-dump")
-            time.sleep(10)
-            for f in glob.glob(suboutput_dir_raw + "*.fastq"):
-                os.remove(f)
-            raise fasterqdumpError
+            if not process_partial:
+                self.update_manifest(
+                    newacc=SRA,
+                    newstatus="DOWNLOAD ERROR",
+                    organism=org,
+                    logger=logger)
+                logger.critical("fasterq-dump timed out downloading %s",
+                                SRA)
+                # delete any partial files;  if we try this right away,
+                # fastq-dump doesn;t dump out fast enough, and we have nothing to
+                # delete, but files apear later.  So we sleep for a few
+                logger.debug("removing incomplete files from fast(er)q-dump")
+                time.sleep(10)
+                for f in glob.glob(suboutput_dir_raw + "*.fastq"):
+                    os.remove(f)
+                raise fasterqdumpError
+            else:
+                logger.warning("Downloaded %s partially; continuing", SRA)
+                time.sleep(10)
+                self.update_manifest(
+                    newacc=SRA,
+                    newstatus="PARTIAL DOWNLOAD",
+                    organism=org,
+                    logger=logger)
         rawreadsf, rawreadsr, download_error_message = \
             self.check_fastq_dir(this_data=suboutput_dir_raw,
                                  mate_as_single=False, logger=logger)
@@ -288,7 +302,6 @@ class FocusDBData(object):
                     logger.error(fastqs)
                     download_error_message = "Unexpected item in the bagging area"
                     download_error_message = "Unable to process library type"
-        logger.info(rawr)
         if len(set(rawf)) == 1:
             rawreadsf = rawf[0]
         elif len(set(rawf)) > 1:

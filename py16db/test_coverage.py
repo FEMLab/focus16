@@ -55,6 +55,7 @@ class coverageTests(unittest.TestCase):
             fastq1=self.readsgunzipd1,
             fastq2=self.readsgunzipd2,
             destination=self.downsample_dir,
+            mincoverage=.5,
             maxcoverage=2,
             run=True,
             logger=logger)
@@ -74,6 +75,7 @@ class coverageTests(unittest.TestCase):
             fastq1=self.readsgunzipd1,
             fastq2=self.readsgunzipd2,
             destination=self.downsample_dir,
+            mincoverage=.5,
             maxcoverage=2,
             run=True,
             logger=logger)

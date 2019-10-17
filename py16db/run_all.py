@@ -25,6 +25,10 @@ class bestreferenceError(Exception):
     pass
 
 
+class coverageError(Exception):
+    pass
+
+
 class kraken2Error(Exception):
     pass
 
@@ -86,93 +90,124 @@ def setup_logging(args):  # pragma: nocover
 
 
 def get_args():  # pragma: nocover
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-o", "--output_dir",
+    parser = argparse.ArgumentParser(
+        description="For a given genus or species, " +
+        "focusDB orchestrates downloading whole-genome sequencing SRA, " +
+        "running quality conrol, taxonimic assignment, reassembling with " +
+        "riboSeed and extraction of 16s sequences",
+        add_help=False)  # to allow for custom help
+    mainargs = parser.add_argument_group('Main options')
+    parargs = parser.add_argument_group('Parameters')
+    jobargs = parser.add_argument_group('Job Handling')
+    configargs = parser.add_argument_group('Configuration')
+    expargs = parser.add_argument_group('Expert')
+    mainargs.add_argument("-o", "--output_dir",
                         help="path to output", required=True)
-    parser.add_argument("-n", "--organism_name",
+    mainargs.add_argument("-n", "--organism_name",
                         help="genus or genus species in quotes",
                         required=True)
-    parser.add_argument("--SRA_list",
+    expargs.add_argument("--SRA_list",
                         help="path to file containing list of sras " +
-                        "for assembly[one column]",
+                        "for assembly [one column]",
                         required=False)
-    parser.add_argument("--version", action='version',
+    mainargs.add_argument("--SRAs", default=None, nargs="+",
+                          help="negates -n_SRAs; " +
+                          "run pipeline on this (these) SRA(s) only",
+                          required=False)
+    mainargs.add_argument("-h", "--help",
+                          action="help", default=argparse.SUPPRESS,
+                          help="Displays this help message")
+
+    parargs.add_argument("-S", "--n_SRAs", help="max number of SRAs to be run",
+                        type=int, required=False)
+    parargs.add_argument("-R", "--n_references",
+                        help="max number of reference strains to consider. " +
+                        "default (0) is download all",
+                        type=int, required=False, default=0)
+
+    configargs.add_argument("--version", action='version',
                         version='%(prog)s {version}'.format(
                             version=__version__))
-    parser.add_argument("-l", "--approx_length",
+    parargs.add_argument("-l", "--approx_length",
                         help="Integer for approximate genome length",
                         required=False, type=int)
-    parser.add_argument("--sraFind_path", dest="sra_path",
+    configargs.add_argument("--sraFind_path", dest="sra_path",
                         help="path to sraFind file; default is in ~/.focusDB/",
                         default=None,
                         required=False)
-    parser.add_argument("--focusDB_data", dest="focusDB_data",
+    configargs.add_argument("--focusDB_data", dest="focusDB_data",
                         help="path to data storage area; default ~/.focusDB/",
                         default=None)
-    parser.add_argument("--SRAs", default=None, nargs="+",
-                        help="run pipeline on this (these) SRA(s) only",
-                        required=False)
-    parser.add_argument("--genomes_dir",
+    configargs.add_argument("--genomes_dir",
                         help="path to where reference genomes are/will be " +
                         "stored . Default location " +
                         "is ~/.focusDB/references/genus_species/")
     #  Note  this arg doesn't get called, but is inheirited by get_n_genomes
-    parser.add_argument("--prokaryotes", action="store",
+    configargs.add_argument("--prokaryotes", action="store",
                         help="path to prokaryotes.txt; default is " +
                         "in ~/.focusDB/",
                         default=None,
                         required=False)
-    parser.add_argument("--kraken2_dir", action="store",
+    configargs.add_argument("--kraken2_dir", action="store",
                         help="path to kraken dir; default is " +
                         "in ~/.focusDB/.  Will be created if doesn't exist",
                         default=None,
                         required=False)
-    parser.add_argument("--kraken_mem_mapping", action="store_true",
+    configargs.add_argument("--kraken_mem_mapping", action="store_true",
                         help="use this flag to load kraken2 db via disk " +
                         "instead of RAM for taxonomic assignment. " +
                         "automatically enabled if --memory < 20GB",
                         required=False)
-    parser.add_argument("-S", "--n_SRAs", help="max number of SRAs to be run",
-                        type=int, required=False)
-    parser.add_argument("-R", "--n_references",
-                        help="max number of reference strains to consider. " +
-                        "default (0) is download all",
-                        type=int, required=False, default=0)
-    parser.add_argument("--get_all",
+    expargs.add_argument("--get_all",
                         help="if a biosample is associated with " +
                         "multiple libraries, default behaviour is to " +
                         "download the first only.  Use --get_all to " +
                         "analyse each library",
                         action="store_true", required=False)
-    parser.add_argument("--maxdist",
+    parargs.add_argument("--maxdist",
                         help="maximum mash distance allowed for reference " +
                         "genome; defaults to .05 (see Mash paper), which " +
                         "roughly corresponds to species level similarity. " +
                         "If desired, this can be relaxed",
                         default=.05,
                         type=float)
-    parser.add_argument("--njobs",
+    jobargs.add_argument("--njobs",
                         help="how many jobs to run concurrently " +
                         "via multiprocessing. --cores and --memory is per job",
                         default=1, type=int)
-    parser.add_argument("--cores",
+    jobargs.add_argument("--cores",
                         help="PER JOB: how many cores you wish to use",
                         default=1,
                         required=False, type=int)
-    parser.add_argument("--memory",
+    jobargs.add_argument("--memory",
                         help="PER JOB: amount of RAM to be used. riboSeed " +
                         "needs 10GB ram to run optimally; less, riboSeed " +
                         "runs in --serialize mode to prevent memory errors" +
                         "during subassemblies",
                         default=4,
                         required=False, type=int)
-    parser.add_argument("--timeout",
+    jobargs.add_argument("--timeout",
                         help="Download SRAs can stall out periodically; " +
                         "it typically takes 5-15 minutes for an average SRA" +
                         "default 1800s (30 mins)",
                         default=1800,
                         required=False, type=int)
-    parser.add_argument("--threads",
+    expargs.add_argument("--process_partial",
+                        help="If fastq-dump (NOT fasterq-dump) times out, " +
+                        "process what has been downloaded so far. This is " +
+                        "useful when timeout exceeds cause an SRA is very " +
+                        "large.  Becasue we will downsample later, enabling " +
+                        "this option allows processing of the partial " +
+                        "file(s). Default is to delete the partial files " +
+                        "and retry next time. Consider increasing --mincov  " +
+                         "to ensure that you only process partial files of " +
+                         "sensible size. EXPERTS ONLY",
+                        required=False, action="store_true")
+    expargs.add_argument("--retry_partial",
+                        help="If a partial download is encountered during " +
+                        "this run, delete and attempt to re-download",
+                        required=False, action="store_true")
+    jobargs.add_argument("--threads",
                         action="store",
                         default=1, type=int,
                         choices=[1, 2, 4],
@@ -181,24 +216,29 @@ def get_args():  # pragma: nocover
                         "If unsure, see 'cat /proc/cpuinfo' under 'cpu " +
                         "cores', or 'lscpu' under 'Thread(s) per core'." +
                         ": %(default)s")
-    parser.add_argument("--maxcov",
-                        help="integer for maximum coverage of reads",
+    parargs.add_argument("--maxcov",
+                        help="integer for maximum desired read depth" +
+                         "after downsampling",
                         default=50,
                         required=False, type=int)
-    parser.add_argument("--fastqtool",
+    parargs.add_argument("--mincov",
+                        help="integer for minimum  read depth",
+                        default=15,
+                        required=False, type=int)
+    jobargs.add_argument("--fastqtool",
                         help="either fastq-dump or fasterq-dump",
                         default="fasterq-dump",
                         choices=["fastq-dump", "fasterq-dump"],
                         required=False)
-    parser.add_argument("--custom_reads",
+    expargs.add_argument("--custom_reads",
                         help="input of custom reads", nargs='+',
                         required=False, type=str)
-    parser.add_argument("--custom_name",
+    expargs.add_argument("--custom_name",
                         help="if using --custom_reads, store as this name",
                         required=False, type=str)
-    parser.add_argument("--redo_assembly", action="store_true",
+    expargs.add_argument("--redo_assembly", action="store_true",
                         help="redo the assembly step, ignoring status file")
-    parser.add_argument("--subassembler",
+    jobargs.add_argument("--subassembler",
                         help="which program should riboseed " +
                         "use for sub assemblies",
                         choices=["spades", "skesa"],
@@ -206,10 +246,10 @@ def get_args():  # pragma: nocover
     # this is needed for plentyofbugs, should not be user set
     parser.add_argument("--nstrains", help=argparse.SUPPRESS,
                         type=int, required=False)
-    parser.add_argument("--seed",
-                        help="random seed for subsampling referencese",
+    expargs.add_argument("--seed",
+                        help="random seed for subsampling references and SRAs",
                         type=int, default=12345)
-    parser.add_argument("-v", "--verbosity", dest='verbosity',
+    jobargs.add_argument("-v", "--verbosity", dest='verbosity',
                         action="store",
                         default=2, type=int, choices=[1, 2, 3, 4, 5],
                         help="Logger writes debug to file in output dir; " +
@@ -234,6 +274,10 @@ def get_args():  # pragma: nocover
                 print("if not running with --SRAs, " +
                       "then --n_SRAs must be provided!")
                 sys.exit(1)
+    # catch process partial and fasterq-dump
+    if args.process_partial and args.fastqtool == "fasterq-dump":
+        print("--process_partial can only be used with --fastqtool fastq-dump")
+        sys.exit(1)
     return(args)
 
 
@@ -409,7 +453,7 @@ def get_coverage(read_length, approx_length, fastq1, fastq2, logger):
 
 
 def downsample(read_length, approx_length, fastq1, fastq2,
-               maxcoverage, destination, logger, run):
+               mincoverage, maxcoverage, destination, logger, run):
     """downsample for optimal assembly
     Given the coverage from coverage(), downsamples the reads if over
     the max coverage set by args.maxcov. Default 50.
@@ -435,6 +479,9 @@ def downsample(read_length, approx_length, fastq1, fastq2,
             return(downpath1, downpath2)
     coverage = get_coverage(read_length, approx_length,
                             fastq1, fastq2, logger=logger)
+    if coverage < mincoverage:
+        raise coverageError("%sx coverage fails to meet minimum (%s)" %
+                            (coverage, mincoverage ))
     # seqtk either works with a number of reads, or a fractional value
     # for how many reads to retain.  Here we calculate the later based
     # on what we have currently
@@ -634,6 +681,7 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
         approx_length=approx_length,
         fastq1=trimmed_fastq1,
         fastq2=trimmed_fastq2,
+        mincoverage=args.mincov,
         maxcoverage=args.maxcov,
         destination=os.path.join(this_output, "downsampled"),
         read_length=read_length,
@@ -984,6 +1032,8 @@ def main():
                     SRA=accession,
                     logger=logger,
                     timeout=args.timeout,
+                    process_partial=args.process_partial,
+                    retry_partial=args.retry_partial,
                     tool=args.fastqtool)
         except fasterqdumpError:
             message = 'Error downloading %s' % accession
@@ -1018,6 +1068,12 @@ def main():
                 this_results, args, logger, status_file, fDB.krakendir)
             riboSeed_jobs.append([accession, riboSeed_cmd,
                                   contigs_path,  status_file, taxonomy_d])
+        except coverageError as e:
+            write_pass_fail(args, status="FAIL",
+                            stage=accession,
+                            note="Insufficient coverage")
+            logger.error(e)
+            continue
         except bestreferenceError as e:
             write_pass_fail(args, status="FAIL",
                             stage=accession,
@@ -1026,11 +1082,11 @@ def main():
             continue
         except kraken2Error as e:
             if not args.kraken_mem_mapping:
-                logger.error("Kraken error; try rerunning with " +
+                logger.error("Kraken2 error; try rerunning with " +
                              "--kraken_mem_mapping")
             write_pass_fail(args, status="FAIL",
                             stage=accession,
-                            note="Unknown error runing kraken")
+                            note="Unknown error runing kraken2")
             logger.error(e)
             continue
         except referenceNotGoodEnoughError as e:
