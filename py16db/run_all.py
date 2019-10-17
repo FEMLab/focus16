@@ -56,6 +56,10 @@ class barrnapError(Exception):
     pass
 
 
+class libraryError(Exception):
+    pass
+
+
 def setup_logging(args):  # pragma: nocover
     if (args.verbosity * 10) not in range(10, 60, 10):
         raise ValueError('Invalid log level: %s' % args.verbosity)
@@ -164,9 +168,9 @@ def get_args():  # pragma: nocover
                         required=False, type=int)
     parser.add_argument("--timeout",
                         help="Download SRAs can stall out periodically; " +
-                        "it typically takes " +
-                        "default 108000s (30 mins)",
-                        default=108000,
+                        "it typically takes 5-15 minutes for an average SRA" +
+                        "default 1800s (30 mins)",
+                        default=1800,
                         required=False, type=int)
     parser.add_argument("--threads",
                         action="store",
@@ -429,7 +433,6 @@ def downsample(read_length, approx_length, fastq1, fastq2,
             return(fastq1, fastq2)
         else:
             return(downpath1, downpath2)
-
     coverage = get_coverage(read_length, approx_length,
                             fastq1, fastq2, logger=logger)
     # seqtk either works with a number of reads, or a fractional value
@@ -617,7 +620,11 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
     update_status_file(status_file, message="TRIMMED")
     logger.debug('Quality trimmed f reads: %s', trimmed_fastq1)
     logger.debug('Quality trimmed r reads: %s', trimmed_fastq2)
-
+    if os.path.getsize(trimmed_fastq1) == 0:
+        raise libraryError("Error occured when trimming. This could be due " +
+                           "to incorrect metadata about pairing. " +
+                           "For more information, see Sickle results in " +
+                           sickle_out)
     logger.debug('Downsampling reads')
     if "DOWNSAMPLED" not in parse_status_file(status_file):
         update_status_file(status_file, to_remove=["RIBOSEED COMPLETE"])
