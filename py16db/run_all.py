@@ -878,6 +878,13 @@ def different_args(args, this_config_file, logger):
     return diff_args
 
 
+def add_key_or_increment(d, k):
+    if k in d.keys():
+        d[k] = d[k] + 1
+    else:
+        d[k] = 1
+
+
 def main():
     args = get_args()
 
@@ -951,7 +958,7 @@ def main():
         else:
             pass
         logger.critical(message)
-        write_pass_fail(args, status="FAIL", stage="global", note=message)
+        write_pass_fail(args, status="ERROR", stage="global", note=message)
         sys.exit(1)
     genome_check_file = os.path.join(fDB.refdir, ".references_passed_checks")
     ##########  Check to see if we have requested a different number of strains
@@ -992,7 +999,7 @@ def main():
 
     riboSeed_jobs = []  # [accession, cmd, contigs, status_file]
     nsras = len(filtered_sras)
-    print(filtered_sras)
+    n_errors = {}
     for i, accession in enumerate(filtered_sras):
         this_output = os.path.join(args.output_dir, accession)
         this_results = os.path.join(this_output, "results")
@@ -1040,11 +1047,12 @@ def main():
                     tool=args.fastqtool)
         except fasterqdumpError:
             message = 'Error downloading %s' % accession
-            write_pass_fail(args, status="FAIL", stage=accession, note=message)
+            write_pass_fail(args, status="ERROR", stage=accession, note=message)
             logger.error(message)
+            add_key_or_increment(n_errors, "Downloading")
             continue
         if download_error_message != "":
-            write_pass_fail(args, status="FAIL", stage=accession,
+            write_pass_fail(args, status="ERROR", stage=accession,
                             note=download_error_message)
             logger.error(
                 "Error either downloading or parsing the file " +
@@ -1060,7 +1068,7 @@ def main():
                 message = "Reads were shorter than 65bp threshold"
             else:
                 message = "Reads were longer than 300bp threshold"
-            write_pass_fail(args, status="FAIL", stage=accession, note=message)
+            write_pass_fail(args, status="ERROR", stage=accession, note=message)
             logger.error(message)
             continue
         #  heres the meat of the main, catching errors for
@@ -1078,18 +1086,20 @@ def main():
             logger.error(e)
             continue
         except bestreferenceError as e:
-            write_pass_fail(args, status="FAIL",
+            write_pass_fail(args, status="ERROR",
                             stage=accession,
                             note="Unknown error selecting reference")
             logger.error(e)
+            add_key_or_increment(n_errors, "plentyofbugs")
             continue
         except kraken2Error as e:
             if not args.kraken_mem_mapping:
                 logger.error("Kraken2 error; try rerunning with " +
                              "--kraken_mem_mapping")
-            write_pass_fail(args, status="FAIL",
+            write_pass_fail(args, status="ERROR",
                             stage=accession,
                             note="Unknown error runing kraken2")
+            add_key_or_increment(n_errors, "Taxonomy")
             logger.error(e)
             continue
         except referenceNotGoodEnoughError as e:
@@ -1100,14 +1110,26 @@ def main():
             logger.error(e)
             continue
         except downsamplingError as e:
-            write_pass_fail(args, status="FAIL",
+            write_pass_fail(args, status="ERROR",
                             stage=accession,
                             note="Unknown error downsampling")
             logger.error(e)
+            add_key_or_increment(n_errors, "Downsampling")
+            continue
+        except Exception as e:
+            logger.error(e)
+            logger.error(
+                "Unknown error occured; please raise issue on GitHub " +
+                "attaching the log file found in %s .", this_res
+                )
+            add_key_or_increment(n_errors, "Unknown")
+            write_pass_fail(args, status="FAIL",
+                            stage=accession,
+                            note="Unknown critial error")
             continue
 
     #######################################################################
-    logger.info("Processing %i riboSeed runs", len(riboSeed_jobs))
+    logger.info("Processing %i riboSeed runs; this can take a while", len(riboSeed_jobs))
     all_assemblies = []  # [contigs, tax{}]
     ribo_cmds = [x[1] for x in riboSeed_jobs if x[1] is not None]
     # split_cores = int(args.cores / (len(ribo_cmds) / 2))
@@ -1164,15 +1186,19 @@ def main():
             n_extracted_seqs = n_extracted_seqs + this_extracted_seqs
         except extracting16sError as e:
             logger.error(e)
-            write_pass_fail(args, status="FAIL", stage=sra,
+            write_pass_fail(args, status="ERROR", stage=sra,
                             note="unknown error extracting 16S")
         except barrnapError as e:
             logger.error(e)
-            write_pass_fail(args, status="FAIL", stage=sra,
+            write_pass_fail(args, status="ERROR", stage=sra,
                             note="Error running barrnap")
 
     ###########################################################################
     logger.info("Wrote out %i sequences", n_extracted_seqs)
+    if len(n_errors) != 0 :
+        logger.warning("Errors during run:")
+        for k, v in n_errors.items():
+            logger.warning("   " + k + " errors: " + str(v))
     if n_extracted_seqs == 0:
         write_pass_fail(args, status="FAIL", stage="global",
                         note="No 16s sequences detected in re-assemblies")

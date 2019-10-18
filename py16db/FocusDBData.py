@@ -113,7 +113,11 @@ class FocusDBData(object):
             # if we still haven't written out our new SRA (ie, if we are adding
             # a new one, not updating)
             outf.write("{}\t{}\t{}\n".format(newacc, newstatus, organism))
-        os.remove(tmp)
+        try:
+            os.remove(tmp)
+        except FileNotFoundError:
+            logger.warning("Missing backup manifest; multiple processes " +
+                           "could be trying to update it.")
         self.read_SRA_manifest()
 
     def fetch_sraFind_data(self, logger):
@@ -185,7 +189,7 @@ class FocusDBData(object):
             shutil.rmtree(suboutput_dir_raw)
         else:
             pass
-        os.makedirs(suboutput_dir_raw)
+        os.makedirs(suboutput_dir_raw, exist_ok=True)
         # defaults to 6 threads or whatever is convenient;
         # we suspect I/O limits using more in most cases,
         # so we don't give the user the option to increase this
@@ -218,8 +222,8 @@ class FocusDBData(object):
                     newstatus="DOWNLOAD ERROR",
                     organism=org,
                     logger=logger)
-                logger.critical("fasterq-dump timed out downloading %s",
-                                SRA)
+                logger.critical("%s timed out downloading %s",
+                                tool, SRA)
                 # delete any partial files;  if we try this right away,
                 # fastq-dump doesn;t dump out fast enough, and we have nothing to
                 # delete, but files apear later.  So we sleep for a few
