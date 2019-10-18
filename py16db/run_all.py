@@ -667,11 +667,12 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
     update_status_file(status_file, message="TRIMMED")
     logger.debug('Quality trimmed f reads: %s', trimmed_fastq1)
     logger.debug('Quality trimmed r reads: %s', trimmed_fastq2)
-    if os.path.getsize(trimmed_fastq1) == 0:
-        raise libraryError("Error occured when trimming. This could be due " +
-                           "to incorrect metadata about pairing. " +
-                           "For more information, see Sickle results in " +
-                           sickle_out)
+
+    # if if os.path.getsize(trimmed_fastq1) == 0:
+    #     raise libraryError("Error occured when trimming. This could be due " +
+    #                        "to incorrect metadata about pairing. " +
+    #                        "For more information, see Sickle results in " +
+    #                        sickle_out)
     logger.debug('Downsampling reads')
     if "DOWNSAMPLED" not in parse_status_file(status_file):
         update_status_file(status_file, to_remove=["RIBOSEED COMPLETE"])
@@ -990,13 +991,15 @@ def main():
         sys.exit(0)
 
     riboSeed_jobs = []  # [accession, cmd, contigs, status_file]
+    nsras = len(filtered_sras)
+    print(filtered_sras)
     for i, accession in enumerate(filtered_sras):
         this_output = os.path.join(args.output_dir, accession)
         this_results = os.path.join(this_output, "results")
         os.makedirs(this_output, exist_ok=True)
         status_file = os.path.join(this_output, "status")
-        logger.info("Organism: %s; Accession: %s",
-                    args.organism_name, accession)
+        logger.info("Organism: %s; Accession: %s (%s of %s)",
+                    args.organism_name, accession, i + 1, nsras )
         message = ""
         ################ check updated args, update status file if needed
         if "maxdist" in updated_args:
