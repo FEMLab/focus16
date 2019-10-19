@@ -593,10 +593,10 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
     """return a tuple of the riboSeed cmd and the path to contigs,
     and the taxonomy according to kraken
     """
-    pob_dir = os.path.join(this_output, "plentyofbugs")
+    pob_dir = os.path.join(this_output, "plentyofbugs", "")
     krak_dir = os.path.join(this_output, "kraken2", "")
-    ribo_dir = os.path.join(this_output, "riboSeed")
-    sickle_out = os.path.join(this_output, "sickle")
+    ribo_dir = os.path.join(this_output, "riboSeed", "")
+    sickle_out = os.path.join(this_output, "sickle",  "")
     best_reference = os.path.join(pob_dir, "best_reference")
 
     # Note thhat the status file is checked before each step.
@@ -827,8 +827,11 @@ def write_pass_fail(args, stage, status, note):
         failfile.write("{}\t{}\t{}\t{}\n".format(org, status, stage, note))
 
 
-def run_riboSeed_catch_errors(cmd, acc=None, args=None, status_file=None):
+def run_riboSeed_catch_errors(cmd, acc=None, args=None, status_file=None, riboSeed_jobs=None):
     if cmd is None:
+        for j in riboSeed_jobs:
+            if j[0] == acc:
+                j[4] = 0
         return 0
     try:
         subprocess.run(cmd,
@@ -837,9 +840,16 @@ def run_riboSeed_catch_errors(cmd, acc=None, args=None, status_file=None):
                        stderr=subprocess.PIPE,
                        check=True)
     except subprocess.CalledProcessError:
+        for j in riboSeed_jobs:
+            if j[0] == acc:
+                j[4] = 1
+
         write_pass_fail(args, status="FAIL",
                         stage=acc,
                         note="Unknown failure running riboSeed")
+    for j in riboSeed_jobs:
+        if j[0] == acc:
+            j[4] = 0
     return 0
 
 
@@ -997,7 +1007,7 @@ def main():
                         note="No references had more than 1 rDNA")
         sys.exit(0)
 
-    riboSeed_jobs = []  # [accession, cmd, contigs, status_file]
+    riboSeed_jobs = []  # [accession, cmd, contigs, status_file, return_code]
     nsras = len(filtered_sras)
     n_errors = {}
     for i, accession in enumerate(filtered_sras):
@@ -1035,7 +1045,7 @@ def main():
                     for p in [ribo_contigs, kraken2_report_output]]):
                 riboSeed_jobs.append(
                     [accession, None, ribo_contigs,  status_file,
-                     parse_kraken_report(kraken2_report_output)])
+                     parse_kraken_report(kraken2_report_output), 0])
                 continue
 
         try:
@@ -1081,7 +1091,7 @@ def main():
                 rawreadsf, rawreadsr, read_length, fDB.refdir,
                 this_results, args, logger, status_file, fDB.krakendir)
             riboSeed_jobs.append([accession, riboSeed_cmd,
-                                  contigs_path,  status_file, taxonomy_d])
+                                  contigs_path,  status_file, taxonomy_d, None])
         except coverageError as e:
             write_pass_fail(args, status="FAIL",
                             stage=accession,
@@ -1132,12 +1142,13 @@ def main():
             continue
 
     #######################################################################
-    logger.info("Processing %i riboSeed runs; this can take a while", len(riboSeed_jobs))
     all_assemblies = []  # [contigs, tax{}]
     ribo_cmds = [x[1] for x in riboSeed_jobs if x[1] is not None]
     # split_cores = int(args.cores / (len(ribo_cmds) / 2))
     # if split_cores < 1:
     #     split_cores = 1
+    if len(riboSeed_jobs) > 0:
+        logger.info("Processing %i riboSeed runs; this can take a while", len(riboSeed_jobs))
 
     pool = multiprocessing.Pool(processes=args.njobs)
     logger.debug("running the following commands:")
@@ -1147,8 +1158,9 @@ def main():
                          (cmd,),
                          {"args": args,
                           "acc": acc,
-                          "status_file": sfile})
-        for acc, cmd, contigs, sfile, tax_d  in riboSeed_jobs]
+                          "status_file": sfile,
+                          "riboSeed_jobs": riboSeed_jobs})
+        for acc, cmd, contigs, sfile, tax_d, _  in riboSeed_jobs]
     pool.close()
     pool.join()
     ribo_results_sum = sum([r.get() for r in riboSeed_pool_results])
@@ -1161,11 +1173,17 @@ def main():
             write_pass_fail(args, status="PASS", stage=v[0], note="")
             all_assemblies.append([v[2], v[4]])
         except riboSeedUnsuccessfulError as e:
-            update_status_file(v[3], message="RIBOSEED COMPLETE")
-            write_pass_fail(args, status="FAIL",
-                            stage=v[0],
-                            note="riboSeed unsuccessful")
-            logger.error(e)
+            if v[4] == 1:
+                write_pass_fail(args, status="ERROR",
+                                stage=v[0],
+                                note="riboSeed Error")
+                logger.error(e)
+            else:
+                update_status_file(v[3], message="RIBOSEED COMPLETE")
+                write_pass_fail(args, status="FAIL",
+                                stage=v[0],
+                                note="riboSeed unsuccessful")
+                logger.error(e)
 
     #######################################################################
     extract16soutput = os.path.join(

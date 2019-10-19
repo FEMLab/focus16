@@ -145,7 +145,7 @@ class FocusDBData(object):
 
         pass
 
-    def get_SRA_data(self, SRA, org, logger,timeout, process_partial,
+    def get_SRA_data(self, SRA, org, logger, timeout, process_partial,
                      retry_partial, tool="fasterq-dump"):
         """download_SRA_if_needed
         This doesnt check the manifest right off the bad to make it easier for
@@ -164,7 +164,8 @@ class FocusDBData(object):
         if retry_partial and SRA in self.SRAs.keys():
             if self.SRAs[SRA]["status"] == "PARTIAL DOWNLOAD":
                 if os.path.exists(suboutput_dir_raw):
-                    shutil.rmtree(suboutput_dir_raw)
+                    for f in glob.glob(suboutput_dir_raw, "*.fastq"):
+                        os.remove(f)
         rawreadsf, rawreadsr, download_error_message = \
             self.check_fastq_dir(this_data=suboutput_dir_raw,
                                  mate_as_single=False, logger=logger)
@@ -181,12 +182,14 @@ class FocusDBData(object):
                                  "previously processed files")
             elif self.SRAs[SRA]['status'] == "DOWNLOAD ERROR":
                 if os.path.exists(suboutput_dir_raw):
-                    shutil.rmtree(suboutput_dir_raw)
+                    for f in glob.glob(suboutput_dir_raw, "*.fastq"):
+                        os.remove(f)
             elif self.SRAs[SRA]['status'] == "LIBRARY TYPE ERROR":
                 # dont try to reprocess
                 return (None, None, "Library type Error")
         elif os.path.exists(suboutput_dir_raw):
-            shutil.rmtree(suboutput_dir_raw)
+            for f in glob.glob(suboutput_dir_raw, "*.fastq"):
+                os.remove(f)
         else:
             pass
         os.makedirs(suboutput_dir_raw, exist_ok=True)
@@ -351,17 +354,18 @@ class FocusDBData(object):
                 thisseed=args.seed,
                 logger=logger)
             )
-        if len(glob.glob(os.path.join(self.refdir, "*.fna.gz"))) != 0:
-            logger.warning('Genome downloading may have been interupted; ' +
-                           'downloading fresh')
-            shutil.rmtree(self.refdir)
-            os.makedirs(self.refdir)
-            return(self.our_get_n_genomes(
-                org=args.organism_name,
-                nstrains=args.nstrains,
-                thisseed=args.seed,
-                logger=logger)
-            )
+        # if len(glob.glob(os.path.join(self.refdir, "*.fna.gz"))) != 0:
+        #     logger.warning('Genome downloading may have been interupted; ' +
+        #                    'downloading fresh')
+        #     assert self.refdir != self.dbdir, "critical: refdir and dbdir should never be the same!"
+        #     shutil.rmtree(self.refdir)
+        #     os.makedirs(self.refdir)
+        #     return(self.our_get_n_genomes(
+        #         org=args.organism_name,
+        #         nstrains=args.nstrains,
+        #         thisseed=args.seed,
+        #         logger=logger)
+        #     )
         return 0
 
     def our_get_n_genomes(self, org, nstrains,  thisseed, logger):
