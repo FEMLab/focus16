@@ -37,12 +37,12 @@ class FocusDBData(object):
         """ if needed, create directory and write header for status file
         focusDB saves all data to a .focusDB dir in ones home folder
         """
+        if not os.path.exists(self.dbdir):
+            os.makedirs(self.dbdir)
         conn = sqlite3.connect(self.db)
         c = conn.cursor()
         c.execute("CREATE TABLE IF NOT EXISTS SRAs (accession text PRIMARY KEY, status text, genus text, species text )")
         c.execute("CREATE TABLE IF NOT EXISTS Genomes (accssions text PRIMARY KEY, status text, genus text, species text)")
-        if not os.path.exists(self.dbdir):
-            os.makedirs(self.dbdir)
         # if not os.path.exists(self.SRAs_manifest):
         #     with open(self.SRAs_manifest, "w") as outf:
         #         outf.write("SRA_accession\tStatus\tOrganism\n")
