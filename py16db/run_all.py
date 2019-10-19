@@ -1001,6 +1001,9 @@ def main():
     nsras = len(filtered_sras)
     n_errors = {}
     for i, accession in enumerate(filtered_sras):
+        # trying to troublshoot a potential race condition deleting all references.
+        assert len(glob.glob(os.path.join(fDB.refdir, "*.fna"))) != 0, \
+            "as of SRA %s (%i of %i), genomes dir empty" % (accession, i + 1 , nsras)
         this_output = os.path.join(args.output_dir, accession)
         this_results = os.path.join(this_output, "results")
         os.makedirs(this_output, exist_ok=True)
@@ -1160,7 +1163,7 @@ def main():
         except riboSeedUnsuccessfulError as e:
             update_status_file(v[3], message="RIBOSEED COMPLETE")
             write_pass_fail(args, status="FAIL",
-                            stage=accession,
+                            stage=v[0],
                             note="riboSeed unsuccessful")
             logger.error(e)
 
