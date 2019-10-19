@@ -6,7 +6,7 @@ import time
 import shutil
 import subprocess
 import glob
-
+import sqlite3
 from plentyofbugs import get_n_genomes as gng
 
 
@@ -22,13 +22,14 @@ class FocusDBData(object):
         self.refdir = refdir
         self.prokaryotes = prokaryotes
         self.sraFind_data = sraFind_data
-        self.SRAs = {}
+        self.SRAs = {}  # acc, status, genus species
         self.krakendir = krakendir
         # get/set location of data
         self.get_focusDB_dir()
         # make dirs/files as needed
         self.refs_manifest = os.path.join(self.dbdir, "reference_genomes.tab")
         self.SRAs_manifest = os.path.join(self.dbdir, "SRAs_manifest.tab")
+        self.db = os.path.join(self.dbdir, "focus.db")
         self.setup_if_needed()
         self.read_SRA_manifest()
 
@@ -36,11 +37,16 @@ class FocusDBData(object):
         """ if needed, create directory and write header for status file
         focusDB saves all data to a .focusDB dir in ones home folder
         """
+        conn = sqlite3.connect(self.db)
+        c = conn.cursor()
+        c.execute("CREATE TABLE IF NOT EXISTS SRAs (accession text PRIMARY KEY, status text, genus text, species text )")
+        c.execute("CREATE TABLE IF NOT EXISTS Genomes (accssions text PRIMARY KEY, status text, genus text, species text)")
         if not os.path.exists(self.dbdir):
             os.makedirs(self.dbdir)
-        if not os.path.exists(self.SRAs_manifest):
-            with open(self.SRAs_manifest, "w") as outf:
-                outf.write("SRA_accession\tStatus\tOrganism\n")
+        # if not os.path.exists(self.SRAs_manifest):
+        #     with open(self.SRAs_manifest, "w") as outf:
+        #         outf.write("SRA_accession\tStatus\tOrganism\n")
+        conn.close()
 
 
     def check_or_get_minikraken2(self, logger):
@@ -86,38 +92,51 @@ class FocusDBData(object):
             os.makedirs(self.refdir)
 
     def read_SRA_manifest(self):
-        with open(self.SRAs_manifest, "r") as inf:
-            for i, line in enumerate(inf):
-                try:
-                    acc, status, org = line.strip().split("\t")
-                except ValueError as e:
-                    print(self.SRAs_manifest)
-                    print(line)
-                    raise e
-                if i != 0:
-                    self.SRAs[acc] = {
-                        "status": status,
-                        "organism": org,
-                    }
+        conn = sqlite3.connect(self.db)
+        c = conn.cursor()
+        try:
+            for acc, status, genus, species  in c.execute('SELECT * FROM SRAs'):
+                # with open(self.SRAs_manifest, "r") as inf:
+                # for i, line in enumerate(inf):
+                # acc, status, org = line.strip().split("\t")
+                self.SRAs[acc] = {
+                    "status": status,
+                    "genus": genus,
+                    "species": species
+                }
+        except Exception as e:
+            raise e
+        conn.close()
 
     def update_manifest(self, newacc, newstatus, organism, logger):
-        tmp = self.SRAs_manifest + ".bak"
-        shutil.move(self.SRAs_manifest, tmp)
-        with open(tmp, "r") as inf, open(self.SRAs_manifest, "w") as outf:
-            for i, line in enumerate(inf):
-                acc, status, lineorg = line.strip().split("\t")
-                if acc == newacc:
-                    pass
-                else:
-                    outf.write("{}\t{}\t{}\n".format(acc, status, lineorg))
+        if " " in organism:
+            genus, species = organism.split(" ")
+        else:
+            genus, species = organism, ""
+        conn = sqlite3.connect(self.db)
+        c = conn.cursor()
+
+        #tmp = self.SRAs_manifest + ".bak"
+        #shutil.move(self.SRAs_manifest, tmp)
+        vals = (newacc, newstatus, genus, species, )
+        c.execute('INSERT OR REPLACE INTO SRAs VALUES (?, ?, ?, ?)', vals)
+        # with open(tmp, "r") as inf, open(self.SRAs_manifest, "w") as outf:
+        #     for i, line in enumerate(inf):
+        #         acc, status, lineorg = line.strip().split("\t")
+        #         if acc == newacc:
+        #             pass
+        #         else:
+        #             outf.write("{}\t{}\t{}\n".format(acc, status, lineorg))
             # if we still haven't written out our new SRA (ie, if we are adding
-            # a new one, not updating)
-            outf.write("{}\t{}\t{}\n".format(newacc, newstatus, organism))
-        try:
-            os.remove(tmp)
-        except FileNotFoundError:
-            logger.warning("Missing backup manifest; multiple processes " +
-                           "could be trying to update it.")
+        # a new one, not updating)
+            # outf.write("{}\t{}\t{}\n".format(newacc, newstatus, organism))
+        # try:
+        #     os.remove(tmp)
+        # except FileNotFoundError:
+        #     logger.warning("Missing backup manifest; multiple processes " +
+                           # " could be trying to update it.")
+        conn.commit()
+        conn.close()
         self.read_SRA_manifest()
 
     def fetch_sraFind_data(self, logger):
@@ -142,7 +161,6 @@ class FocusDBData(object):
                 check=True)
 
     def run_prefetch_data(self, SRA_list, org, logger):
-
         pass
 
     def get_SRA_data(self, SRA, org, logger, timeout, process_partial,
@@ -164,7 +182,7 @@ class FocusDBData(object):
         if retry_partial and SRA in self.SRAs.keys():
             if self.SRAs[SRA]["status"] == "PARTIAL DOWNLOAD":
                 if os.path.exists(suboutput_dir_raw):
-                    for f in glob.glob(suboutput_dir_raw, "*.fastq"):
+                    for f in glob.glob(os.path.join(suboutput_dir_raw, "*.fastq")):
                         os.remove(f)
         rawreadsf, rawreadsr, download_error_message = \
             self.check_fastq_dir(this_data=suboutput_dir_raw,
@@ -182,13 +200,13 @@ class FocusDBData(object):
                                  "previously processed files")
             elif self.SRAs[SRA]['status'] == "DOWNLOAD ERROR":
                 if os.path.exists(suboutput_dir_raw):
-                    for f in glob.glob(suboutput_dir_raw, "*.fastq"):
+                    for f in glob.glob(os.path.join(suboutput_dir_raw, "*.fastq")):
                         os.remove(f)
             elif self.SRAs[SRA]['status'] == "LIBRARY TYPE ERROR":
                 # dont try to reprocess
                 return (None, None, "Library type Error")
         elif os.path.exists(suboutput_dir_raw):
-            for f in glob.glob(suboutput_dir_raw, "*.fastq"):
+            for f in glob.glob(os.path.join(suboutput_dir_raw, "*.fastq")):
                 os.remove(f)
         else:
             pass

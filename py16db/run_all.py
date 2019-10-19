@@ -101,11 +101,20 @@ def get_args():  # pragma: nocover
     jobargs = parser.add_argument_group('Job Handling')
     configargs = parser.add_argument_group('Configuration')
     expargs = parser.add_argument_group('Expert')
+    #  these args are solely used internally
+    hiddenargs = parser.add_argument_group('Hidden')
     mainargs.add_argument("-o", "--output_dir",
                         help="path to output", required=True)
-    mainargs.add_argument("-n", "--organism_name",
+    mainargs.add_argument("-", "--organism_name",
                         help="genus or genus species in quotes",
                         required=True)
+
+    hiddenargs.add_argument("-g", "--genus",
+                          help=argparse.SUPPRESS,
+                          required=False)
+    hiddenargs.add_argument("-s", "--species",
+                          help=argparse.SUPPRESS,
+                          required=False)
     expargs.add_argument("--SRA_list",
                         help="path to file containing list of sras " +
                         "for assembly [one column]",
@@ -244,13 +253,13 @@ def get_args():  # pragma: nocover
                         choices=["spades", "skesa"],
                         required=False, default="spades")
     # this is needed for plentyofbugs, should not be user set
-    parser.add_argument("--nstrains", help=argparse.SUPPRESS,
-                        type=int, required=False)
+    hiddenargs.add_argument("--nstrains", help=argparse.SUPPRESS,
+                            type=int, required=False)
     expargs.add_argument("--seed",
-                        help="random seed for subsampling references and SRAs",
-                        type=int, default=12345)
+                         help="random seed for subsampling references and SRAs",
+                         type=int, default=12345)
     jobargs.add_argument("-v", "--verbosity", dest='verbosity',
-                        action="store",
+                         action="store",
                         default=2, type=int, choices=[1, 2, 3, 4, 5],
                         help="Logger writes debug to file in output dir; " +
                         "this sets verbosity level sent to stderr. " +
@@ -258,6 +267,10 @@ def get_args():  # pragma: nocover
                         "4 = error() and 5 = critical(); " +
                         "default: %(default)s")
     args = parser.parse_args()
+    if " " in args.organism_name:
+        args.genus, args.species = args.organism_name.split(" ")
+    else:
+        args.genus, args.species = args.organism_name, ""
     if args.custom_reads is not None:
         if args.custom_name is None:
             print("--custom_name is required using custom reads")
@@ -1052,6 +1065,8 @@ def main():
             rawreadsf, rawreadsr, download_error_message = \
                 fDB.get_SRA_data(
                     org=args.organism_name,
+                    # genus=args.genus,    # TODO if needed
+                    # species=args.species
                     SRA=accession,
                     logger=logger,
                     timeout=args.timeout,
