@@ -142,10 +142,10 @@ class FocusDBData(object):
     def fetch_sraFind_data(self, logger):
         if self.sraFind_data is None:
             self.sraFind_data = os.path.join(
-                self.dbdir, "sraFind-All-biosample-with-SRA-hits.txt")
+                self.dbdir, "sraFind.tab")
         sraFind_results = str(
             "https://raw.githubusercontent.com/nickp60/sraFind/master/" +
-            "results/sraFind-All-biosample-with-SRA-hits.txt"
+            "sraFind.tab"
         )
         # gets just the file name
         if not os.path.exists(self.sraFind_data):
