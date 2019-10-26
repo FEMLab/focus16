@@ -462,19 +462,19 @@ def get_and_check_ave_read_len_from_fastq(fastq1, minlen, maxlen, logger=None):
     from LP: taken from github.com/nickp60/riboSeed/riboSeed/classes.py;
     """
     nreads = None
-    nreads = 30
+    # nreads = 30
     tot = 0
     if os.path.splitext(fastq1)[-1] in ['.gz', '.gzip']:
         open_fun = gzip.open
     else:
         open_fun = open
-    logger.debug("Obtaining average read length from first 30 reads")
+    logger.debug("Obtaining average read length")
     with open_fun(fastq1, "rt") as file_handle:
         data = SeqIO.parse(file_handle, "fastq")
         for i, read in enumerate(data):
             tot += len(read)
             if nreads is not None:
-                if i  > nreads:
+                if i  >= nreads:
                     break
 
     ave_read_len = float(tot / i)
