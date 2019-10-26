@@ -19,20 +19,23 @@ class avereadlenTest(unittest.TestCase):
 
     def test_get_ave(self):
         reads = self.readsgunzipd
-        code, test_result = get_and_check_ave_read_len_from_fastq(fastq1=reads, logger=logger, minlen=50, maxlen=300)
+        code, test_result = get_and_check_ave_read_len_from_fastq(
+            fastq1=reads, logger=logger, minlen=50, maxlen=300)
         assert 150 == math.floor(test_result)
         assert code == 0
 
     def test_get_ave_too_long(self):
         reads = self.readsgunzipd
-        code, test_result = get_and_check_ave_read_len_from_fastq(fastq1=reads, logger=logger, minlen=50, maxlen=100)
+        code, test_result = get_and_check_ave_read_len_from_fastq(
+            fastq1=reads, logger=logger, minlen=50, maxlen=100)
         print(test_result)
         assert 150 == math.floor(test_result)
         assert code == 2
 
     def test_get_ave_too_short(self):
         reads = self.readsgunzipd
-        code, test_result = get_and_check_ave_read_len_from_fastq(fastq1=reads, logger=logger, minlen=200, maxlen=1000)
+        code, test_result = get_and_check_ave_read_len_from_fastq(
+            fastq1=reads, logger=logger, minlen=200, maxlen=1000)
         print(test_result)
         assert 150 == math.floor(test_result)
         assert code == 1

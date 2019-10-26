@@ -42,11 +42,11 @@ class coverageTests(unittest.TestCase):
         sra = (self.sra)
 
         test_result = make_riboseed_cmd(sra=sra, readsf=readsf,
-                                   readsr=readsr, cores="4", threads="1",
-                                   subassembler="spades",
-                                   memory=8,
-                                   output=output_dir, logger=logger)
-        target_cmd = "ribo run -r /Users/alexandranolan/Desktop/16db/py16db/test_data/ecoli/NC_011750.1.fna -F /Users/alexandranolan/Desktop/16db/py16db/test_data/test_reads1.fq -R /Users/alexandranolan/Desktop/16db/py16db/test_data/test_reads2.fq --cores 4 --threads 1 -v 1 -o /Users/alexandranolan/Desktop/16db/py16db/riboSeed --serialize --subassembler spades --just_seed --memory 8"
+                                        readsr=readsr, cores="4", threads="1",
+                                        subassembler="spades",
+                                        memory=8, just_seed=True,
+                                        output=output_dir, logger=logger)
+        target_cmd = "ribo run -r /Users/alexandranolan/Desktop/16db/py16db/test_data/ecoli/NC_011750.1.fna -F /Users/alexandranolan/Desktop/16db/py16db/test_data/test_reads1.fq -R /Users/alexandranolan/Desktop/16db/py16db/test_data/test_reads2.fq --cores 4 --threads 1 -v 1 -o /Users/alexandranolan/Desktop/16db/py16db/riboSeed --serialize --subassembler spades --just_seed --skip_control --stages none --memory 8"
         for part in range(len(target_cmd.split(" "))):
             if part not in [3, 5, 7, 15]:
                 print(test_result.split(" ")[part] )
