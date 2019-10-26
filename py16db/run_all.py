@@ -103,172 +103,211 @@ def get_args():  # pragma: nocover
     expargs = parser.add_argument_group('Expert')
     #  these args are solely used internally
     hiddenargs = parser.add_argument_group('Hidden')
-    mainargs.add_argument("-o", "--output_dir",
-                        help="path to output", required=True)
-    mainargs.add_argument("-", "--organism_name",
-                        help="genus or genus species in quotes",
-                        required=True)
+    mainargs.add_argument(
+        "-o", "--output_dir",
+        help="path to output", required=True)
+    mainargs.add_argument(
+        "-", "--organism_name",
+        help="genus or genus species in quotes",
+        required=True)
 
-    hiddenargs.add_argument("-g", "--genus",
-                          help=argparse.SUPPRESS,
-                          required=False)
-    hiddenargs.add_argument("-s", "--species",
-                          help=argparse.SUPPRESS,
-                          required=False)
-    expargs.add_argument("--SRA_list",
-                        help="path to file containing list of sras " +
-                        "for assembly [one column]",
-                        required=False)
-    mainargs.add_argument("--SRAs", default=None, nargs="+",
-                          help="negates -n_SRAs; " +
-                          "run pipeline on this (these) SRA(s) only",
-                          required=False)
-    mainargs.add_argument("-h", "--help",
-                          action="help", default=argparse.SUPPRESS,
-                          help="Displays this help message")
+    hiddenargs.add_argument(
+        "-g", "--genus",
+        help=argparse.SUPPRESS,
+        required=False)
+    hiddenargs.add_argument(
+        "-s", "--species",
+        help=argparse.SUPPRESS,
+        required=False)
+    expargs.add_argument(
+        "--SRA_list",
+        help="path to file containing list of sras " +
+        "for assembly [one column]",
+        required=False)
+    mainargs.add_argument(
+        "--SRAs", default=None, nargs="+",
+        help="negates -n_SRAs; " +
+        "run pipeline on this (these) SRA(s) only",
+        required=False)
+    mainargs.add_argument(
+        "-h", "--help",
+        action="help", default=argparse.SUPPRESS,
+        help="Displays this help message")
 
-    parargs.add_argument("-S", "--n_SRAs", help="max number of SRAs to be run",
-                        type=int, required=False)
-    parargs.add_argument("-R", "--n_references",
-                        help="max number of reference strains to consider. " +
-                        "default (0) is download all",
-                        type=int, required=False, default=0)
+    parargs.add_argument(
+        "-S", "--n_SRAs", help="max number of SRAs to be run",
+        type=int, required=False)
+    parargs.add_argument(
+        "-R", "--n_references",
+        help="max number of reference strains to consider. " +
+        "default (0) is download all",
+        type=int, required=False, default=0)
 
-    configargs.add_argument("--version", action='version',
-                        version='%(prog)s {version}'.format(
-                            version=__version__))
-    parargs.add_argument("-l", "--approx_length",
-                        help="Integer for approximate genome length",
-                        required=False, type=int)
-    parargs.add_argument("--just_seed", action="store_true",
-                        help="run just the subassemblies; shorter execution time",
-                        required=False)
-    configargs.add_argument("--sraFind_path", dest="sra_path",
-                        help="path to sraFind file; default is in ~/.focusDB/",
-                        default=None,
-                        required=False)
-    configargs.add_argument("--focusDB_data", dest="focusDB_data",
-                        help="path to data storage area; default ~/.focusDB/",
-                        default=None)
-    configargs.add_argument("--genomes_dir",
-                        help="path to where reference genomes are/will be " +
-                        "stored . Default location " +
-                        "is ~/.focusDB/references/genus_species/")
+    configargs.add_argument(
+        "--version", action='version',
+        version='%(prog)s {version}'.format(
+            version=__version__))
+    parargs.add_argument(
+        "-l", "--approx_length",
+        help="Integer for approximate genome length",
+        required=False, type=int)
+    parargs.add_argument(
+        "--just_seed", action="store_true",
+        help="run just the subassemblies; " +
+        "shorter execution time",
+        required=False)
+    configargs.add_argument(
+        "--sraFind_path", dest="sra_path",
+        help="path to sraFind file; " +
+        "default is in ~/.focusDB/",
+        default=None,
+        required=False)
+    configargs.add_argument(
+        "--focusDB_data", dest="focusDB_data",
+        help="path to data storage area; default ~/.focusDB/",
+        default=None)
+    configargs.add_argument(
+        "--genomes_dir",
+        help="path to where reference genomes are/will be " +
+        "stored . Default location " +
+        "is ~/.focusDB/references/genus_species/")
     #  Note  this arg doesn't get called, but is inheirited by get_n_genomes
-    configargs.add_argument("--prokaryotes", action="store",
-                        help="path to prokaryotes.txt; default is " +
-                        "in ~/.focusDB/",
-                        default=None,
-                        required=False)
-    configargs.add_argument("--kraken2_dir", action="store",
-                        help="path to kraken dir; default is " +
-                        "in ~/.focusDB/.  Will be created if doesn't exist",
-                        default=None,
-                        required=False)
-    configargs.add_argument("--kraken_mem_mapping", action="store_true",
-                        help="use this flag to load kraken2 db via disk " +
-                        "instead of RAM for taxonomic assignment. " +
-                        "automatically enabled if --memory < 20GB",
-                        required=False)
-    expargs.add_argument("--get_all",
-                        help="if a biosample is associated with " +
-                        "multiple libraries, default behaviour is to " +
-                        "download the first only.  Use --get_all to " +
-                        "analyse each library",
-                        action="store_true", required=False)
-    parargs.add_argument("--maxdist",
-                        help="maximum mash distance allowed for reference " +
-                        "genome; defaults to .05 (see Mash paper), which " +
-                        "roughly corresponds to species level similarity. " +
-                        "If desired, this can be relaxed",
-                        default=.05,
-                        type=float)
-    jobargs.add_argument("--njobs",
-                        help="how many jobs to run concurrently " +
-                        "via multiprocessing. --cores and --memory is per job",
-                        default=1, type=int)
-    jobargs.add_argument("--cores",
-                        help="PER JOB: how many cores you wish to use",
-                        default=1,
-                        required=False, type=int)
-    jobargs.add_argument("--memory",
-                        help="PER JOB: amount of RAM to be used. riboSeed " +
-                        "needs 10GB ram to run optimally; less, riboSeed " +
-                        "runs in --serialize mode to prevent memory errors" +
-                        "during subassemblies",
-                        default=4,
-                        required=False, type=int)
-    jobargs.add_argument("--timeout",
-                        help="Download SRAs can stall out periodically; " +
-                        "it typically takes 5-15 minutes for an average SRA" +
-                        "default 1800s (30 mins)",
-                        default=1800,
-                        required=False, type=int)
-    expargs.add_argument("--process_partial",
-                        help="If fastq-dump (NOT fasterq-dump) times out, " +
-                        "process what has been downloaded so far. This is " +
-                        "useful when timeout exceeds cause an SRA is very " +
-                        "large.  Becasue we will downsample later, enabling " +
-                        "this option allows processing of the partial " +
-                        "file(s). Default is to delete the partial files " +
-                        "and retry next time. Consider increasing --mincov  " +
-                         "to ensure that you only process partial files of " +
-                         "sensible size. EXPERTS ONLY",
-                        required=False, action="store_true")
-    expargs.add_argument("--retry_partial",
-                        help="If a partial download is encountered during " +
-                        "this run, delete and attempt to re-download",
-                        required=False, action="store_true")
-    jobargs.add_argument("--threads",
-                        action="store",
-                        default=1, type=int,
-                        choices=[1, 2, 4],
-                        help="if your cores are hyperthreaded, set number" +
-                        " threads to the number of threads per processer." +
-                        "If unsure, see 'cat /proc/cpuinfo' under 'cpu " +
-                        "cores', or 'lscpu' under 'Thread(s) per core'." +
-                        ": %(default)s")
-    parargs.add_argument("--maxcov",
-                        help="integer for maximum desired read depth" +
-                         "after downsampling",
-                        default=50,
-                        required=False, type=int)
-    parargs.add_argument("--mincov",
-                        help="integer for minimum  read depth",
-                        default=15,
-                        required=False, type=int)
-    jobargs.add_argument("--fastqtool",
-                        help="either fastq-dump or fasterq-dump",
-                        default="fasterq-dump",
-                        choices=["fastq-dump", "fasterq-dump"],
-                        required=False)
-    expargs.add_argument("--custom_reads",
-                        help="input of custom reads", nargs='+',
-                        required=False, type=str)
-    expargs.add_argument("--custom_name",
-                        help="if using --custom_reads, store as this name",
-                        required=False, type=str)
-    expargs.add_argument("--redo_assembly", action="store_true",
-                        help="redo the assembly step, ignoring status file")
-    jobargs.add_argument("--subassembler",
-                        help="which program should riboseed " +
-                        "use for sub assemblies",
-                        choices=["spades", "skesa"],
-                        required=False, default="spades")
+    configargs.add_argument(
+        "--prokaryotes", action="store",
+        help="path to prokaryotes.txt; default is " +
+        "in ~/.focusDB/",
+        default=None,
+        required=False)
+    configargs.add_argument(
+        "--kraken2_dir", action="store",
+        help="path to kraken dir; default is " +
+        "in ~/.focusDB/.  Will be created if doesn't exist",
+        default=None,
+        required=False)
+    configargs.add_argument(
+        "--kraken_mem_mapping", action="store_true",
+        help="use this flag to load kraken2 db via disk " +
+        "instead of RAM for taxonomic assignment. " +
+        "automatically enabled if --memory < 20GB",
+        required=False)
+    expargs.add_argument(
+        "--get_all",
+        help="if a biosample is associated with " +
+        "multiple libraries, default behaviour is to " +
+        "download the first only.  Use --get_all to " +
+        "analyse each library",
+        action="store_true", required=False)
+    parargs.add_argument(
+        "--maxdist",
+        help="maximum mash distance allowed for reference " +
+        "genome; defaults to .05 (see Mash paper), which " +
+        "roughly corresponds to species level similarity. " +
+        "If desired, this can be relaxed",
+        default=.05,
+        type=float)
+    jobargs.add_argument(
+        "--njobs",
+        help="how many jobs to run concurrently " +
+        "via multiprocessing. --cores and --memory is per job",
+        default=1, type=int)
+    jobargs.add_argument(
+        "--cores",
+        help="PER JOB: how many cores you wish to use",
+        default=1,
+        required=False, type=int)
+    jobargs.add_argument(
+        "--memory",
+        help="PER JOB: amount of RAM to be used. riboSeed " +
+        "needs 10GB ram to run optimally; less, riboSeed " +
+        "runs in --serialize mode to prevent memory errors" +
+        "during subassemblies",
+        default=4,
+        required=False, type=int)
+    jobargs.add_argument(
+        "--timeout",
+        help="Download SRAs can stall out periodically; " +
+        "it typically takes 5-15 minutes for an average SRA" +
+        "default 1800s (30 mins)",
+        default=1800,
+        required=False, type=int)
+    expargs.add_argument(
+        "--process_partial",
+        help="If fastq-dump (NOT fasterq-dump) times out, " +
+        "process what has been downloaded so far. This is " +
+        "useful when timeout exceeds cause an SRA is very " +
+        "large.  Becasue we will downsample later, enabling " +
+        "this option allows processing of the partial " +
+        "file(s). Default is to delete the partial files " +
+        "and retry next time. Consider increasing --mincov  " +
+        "to ensure that you only process partial files of " +
+        "sensible size. EXPERTS ONLY",
+        required=False, action="store_true")
+    expargs.add_argument(
+        "--retry_partial",
+        help="If a partial download is encountered during " +
+        "this run, delete and attempt to re-download",
+        required=False, action="store_true")
+    jobargs.add_argument(
+        "--threads",
+        action="store",
+        default=1, type=int,
+        choices=[1, 2, 4],
+        help="if your cores are hyperthreaded, set number" +
+        " threads to the number of threads per processer." +
+        "If unsure, see 'cat /proc/cpuinfo' under 'cpu " +
+        "cores', or 'lscpu' under 'Thread(s) per core'." +
+        ": %(default)s")
+    parargs.add_argument(
+        "--maxcov",
+        help="integer for maximum desired read depth" +
+        "after downsampling",
+        default=50,
+        required=False, type=int)
+    parargs.add_argument(
+        "--mincov",
+        help="integer for minimum  read depth",
+        default=15,
+        required=False, type=int)
+    jobargs.add_argument(
+        "--fastqtool",
+        help="either fastq-dump or fasterq-dump",
+        default="fasterq-dump",
+        choices=["fastq-dump", "fasterq-dump"],
+        required=False)
+    expargs.add_argument(
+        "--custom_reads",
+        help="input of custom reads", nargs='+',
+        required=False, type=str)
+    expargs.add_argument(
+        "--custom_name",
+        help="if using --custom_reads, store as this name",
+        required=False, type=str)
+    expargs.add_argument(
+        "--redo_assembly", action="store_true",
+        help="redo the assembly step, ignoring status file")
+    jobargs.add_argument(
+        "--subassembler",
+        help="which program should riboseed " +
+        "use for sub assemblies",
+        choices=["spades", "skesa"],
+        required=False, default="spades")
     # this is needed for plentyofbugs, should not be user set
-    hiddenargs.add_argument("--nstrains", help=argparse.SUPPRESS,
-                            type=int, required=False)
-    expargs.add_argument("--seed",
-                         help="random seed for subsampling references and SRAs",
-                         type=int, default=12345)
-    jobargs.add_argument("-v", "--verbosity", dest='verbosity',
-                         action="store",
-                        default=2, type=int, choices=[1, 2, 3, 4, 5],
-                        help="Logger writes debug to file in output dir; " +
-                        "this sets verbosity level sent to stderr. " +
-                        " 1 = debug(), 2 = info(), 3 = warning(), " +
-                        "4 = error() and 5 = critical(); " +
-                        "default: %(default)s")
+    hiddenargs.add_argument(
+        "--nstrains", help=argparse.SUPPRESS,
+        type=int, required=False)
+    expargs.add_argument(
+        "--seed",
+        help="random seed for subsampling references and SRAs",
+        type=int, default=12345)
+    jobargs.add_argument(
+        "-v", "--verbosity", dest='verbosity',
+        action="store",
+        default=2, type=int, choices=[1, 2, 3, 4, 5],
+        help="Logger writes debug to file in output dir; " +
+        "this sets verbosity level sent to stderr. " +
+        " 1 = debug(), 2 = info(), 3 = warning(), " +
+        "4 = error() and 5 = critical(); " +
+        "default: %(default)s")
     args = parser.parse_args()
     if " " in args.organism_name:
         args.genus, args.species = args.organism_name.split(" ")
@@ -381,7 +420,8 @@ def pob(genomes_dir, readsf, output_dir, maxdist, logger):
             logger.debug("Reference genome mash distance: %s", sim)
             if sim > maxdist:
                 raise referenceNotGoodEnoughError(
-                    "Reference similarity %s does not meet %s threshold" % (sim, maxdist))
+                    "Reference similarity %s does not meet %s threshold" %
+                    (sim, maxdist))
             length_path = os.path.join(output_dir, "genome_length")
             cmd = "wc -c {ref} > {length_path}".format(**locals())
             subprocess.run(cmd,
@@ -421,6 +461,8 @@ def get_and_check_ave_read_len_from_fastq(fastq1, minlen, maxlen, logger=None):
     """return average read length in fastq1 file from first N reads
     from LP: taken from github.com/nickp60/riboSeed/riboSeed/classes.py;
     """
+    nreads = None
+    nreads = 30
     tot = 0
     if os.path.splitext(fastq1)[-1] in ['.gz', '.gzip']:
         open_fun = gzip.open
@@ -431,6 +473,9 @@ def get_and_check_ave_read_len_from_fastq(fastq1, minlen, maxlen, logger=None):
         data = SeqIO.parse(file_handle, "fastq")
         for i, read in enumerate(data):
             tot += len(read)
+            if nreads is not None:
+                if i  > nreads:
+                    break
 
     ave_read_len = float(tot / i)
     if ave_read_len < minlen:
@@ -494,7 +539,7 @@ def downsample(read_length, approx_length, fastq1, fastq2,
                             fastq1, fastq2, logger=logger)
     if coverage < mincoverage:
         raise coverageError("%sx coverage fails to meet minimum (%s)" %
-                            (coverage, mincoverage ))
+                            (coverage, mincoverage))
     # seqtk either works with a number of reads, or a fractional value
     # for how many reads to retain.  Here we calculate the later based
     # on what we have currently
@@ -543,15 +588,18 @@ def make_riboseed_cmd(sra, readsf, readsr, cores, subassembler, threads,
         seed_str = ""
     cmd = str("ribo run -r {sra} -F {readsf} -R {readsr} --cores {cores} " +
               "--threads {threads} -v 1 -o {output} {serialize}" +
-              "--subassembler {subassembler} {seed_str}" +
+              "--subassembler {subassembler} {seed_str}--skip_control " +
+              "--stages none " +
               "--memory {memory}").format(**locals())
 
     if readsr is None:
         cmd = str("ribo run -r {sra} -S1 {readsf} --cores {cores} " +
                   "--threads {threads} -v 1 -o {output} {serialize}" +
-                  "--subassembler {subassembler} {seed_str}" +
+                  "--subassembler {subassembler} {seed_str}--skip_control " +
+                  "--stages none " +
                   "--memory {memory}").format(**locals())
     return(cmd)
+
 
 def run_kraken2(args, contigs, dest_prefix, db, logger):
     out = dest_prefix + ".output"
@@ -590,7 +638,7 @@ def parse_kraken_report(kraken2_report):
            'S': empty}
     with open(kraken2_report, "r") as inf:
         for line in inf:
-            #print(line)
+            # print(line)
             sline = line.split("\t")
             if len(sline) != 6:
                 raise ValueError(
@@ -602,7 +650,6 @@ def parse_kraken_report(kraken2_report):
                 if tax[lev][0] < this[0]:
                     tax[lev] = float(perc.strip()), taxid, label.strip()
     return tax
-
 
 
 def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
@@ -627,7 +674,6 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
         pob(genomes_dir=genomes_dir, readsf=rawreadsf,
             output_dir=pob_dir, maxdist=args.maxdist, logger=logger)
 
-
     with open(best_reference, "r") as infile:
         for line in infile:
             best_ref_fasta = line.split('\t')[0]
@@ -640,7 +686,7 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
     if "TAXONOMY" not in parse_status_file(status_file) or \
        not os.path.exists(report_output):
         if os.path.exists(krak_dir):
-              shutil.rmtree(krak_dir)
+            shutil.rmtree(krak_dir)
         os.makedirs(krak_dir, exist_ok=True)
         logger.info('Assigning taxonomy with kraken')
         pob_assembly = os.path.join(pob_dir, "assembly", "contigs.fasta")
@@ -654,7 +700,7 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
         except Exception as e:
             raise kraken2Error(e)
     if os.path.getsize(report_output) == 0:
-            raise kraken2Error("Kraken output file  exists but is empty")
+        raise kraken2Error("Kraken output file  exists but is empty")
     tax_dict = parse_kraken_report(kraken2_report=report_output)
     logger.debug(tax_dict)
 
@@ -765,10 +811,10 @@ def run_barrnap(assembly,  results, logger):
 
 
 def extract_16s_from_assembly(assembly, gff, sra, output, output_summary,
-                              args, singleline, tax_d, logger):
+                              args, singleline, tax_d, min_length, logger):
     tax_string = tax_d["S"][2]
     # if no label, gibe the next one
-    if len(tax_string.replace(" ", "")) == 0:
+    if len(tax_string.replace(" ", "")) == 0:  # if genus only
         tax_string = tax_d["G"][2] + "sp."
         if len(tax_string.replace(" ", "").replace(".sp", "")) == 0:
             tax_string = tax_d["F"][2]
@@ -785,8 +831,11 @@ def extract_16s_from_assembly(assembly, gff, sra, output, output_summary,
         score_string = score_string + ";" + str(tax_d[lev][0])
         taxid_string = taxid_string + ";" + tax_d[lev][1]
         big_tax_string = big_tax_string + ";" + tax_d[lev][2]
-    results16s = {}  # [sra_#, chromosome, start, end, reverse complimented,
-                     #  big_tax_string, score_string, taxid_string, tax_string]
+
+    # struction of results16s:
+    # [sra_#, chromosome, start, end, reverse complimented,
+    #  big_tax_string, score_string, taxid_string, tax_string]
+    results16s = {}
     nseqs = 0
     with open(gff, "r") as rrn, open(output, "a") as outf, \
          open(output_summary, "a") as outsum:
@@ -806,6 +855,10 @@ def extract_16s_from_assembly(assembly, gff, sra, output, output_summary,
                 ori = line[6]
                 start = int(line[3])
                 end = int(line[4])
+                if (end - start) < 1000:
+                    logger.info("ignoring short rRNA:")
+                    logger.info(line)
+                    continue
                 thisid = "{}_{}".format(sra, rrn_num)
                 results16s[thisid] = [chrom, start, end, line[6]]
                 with open(assembly, "r") as asmb:
@@ -821,8 +874,8 @@ def extract_16s_from_assembly(assembly, gff, sra, output, output_summary,
                         if singleline:
                             seqstr = str(seq)
                             outf.write(
-                                ">{thisidcoords} {tax_string}\n{seqstr}\n".format(
-                                    **locals()))
+                                str(">{thisidcoords} {tax_string}\n" +
+                                    "{seqstr}\n").format(**locals()))
                         else:
                             SeqIO.write(
                                 SeqRecord(
@@ -851,7 +904,8 @@ def write_pass_fail(args, stage, status, note):
         failfile.write("{}\t{}\t{}\t{}\n".format(org, status, stage, note))
 
 
-def run_riboSeed_catch_errors(cmd, acc=None, args=None, status_file=None, riboSeed_jobs=None):
+def run_riboSeed_catch_errors(cmd, acc=None, args=None, status_file=None,
+                              riboSeed_jobs=None):
     if cmd is None:
         for j in riboSeed_jobs:
             if j[0] == acc:
@@ -878,7 +932,7 @@ def run_riboSeed_catch_errors(cmd, acc=None, args=None, status_file=None, riboSe
 
 
 def write_this_config(args, this_config_file):
-    args_to_write = ["maxdist", "subassembler", "maxcov"]
+    args_to_write = ["maxdist", "subassembler", "maxcov", "just_seed"]
     argd = vars(args)
     with open(this_config_file, "w") as outf:
         for arg in args_to_write:
@@ -889,25 +943,31 @@ def different_args(args, this_config_file, logger):
     """ Returns empty list if no args differ
     """
     diff_args = []
-    args_to_write = ["maxdist", "subassembler", "maxcov"]
+    args_to_write = ["maxdist", "subassembler", "maxcov", "just_seed"]
     old_config_dict = {}
     this_config_dict = vars(args)
     if not os.path.exists(this_config_file):
         raise ValueError(
             "No previous config file found %s; rerunning" % this_config_file)
-    with open(this_config_file,"r") as f:
+    with open(this_config_file, "r") as f:
         for line in f:
             (key, val) = line.strip().split(":")
             old_config_dict[key] = val
-    if len(old_config_dict)  ==  0:
+    if len(old_config_dict) == 0:
         raise ValueError("Old config file empty; rerunning")
     for arg in args_to_write:
         # note that reading from the file makes all old args strings, so we
         # accomodate that
-        if str(this_config_dict[arg]) != old_config_dict[arg]:
-            logger.info("New parameter value for " +
-                        "{} ({}) doesn't match old value ({})".format(
-                            arg, this_config_dict[arg], old_config_dict[arg]))
+        try:
+            if str(this_config_dict[arg]) != old_config_dict[arg]:
+                logger.info(
+                    "New parameter value for " +
+                    "{} ({}) doesn't match old value ({})".format(
+                        arg, this_config_dict[arg], old_config_dict[arg]))
+                diff_args.append(arg)
+        except KeyError:
+            logger.info("New parameter value for --just_seed")
+            # this can happen after updates -- play it safe and redo it
             diff_args.append(arg)
     return diff_args
 
@@ -995,20 +1055,20 @@ def main():
         write_pass_fail(args, status="ERROR", stage="global", note=message)
         sys.exit(1)
     genome_check_file = os.path.join(fDB.refdir, ".references_passed_checks")
-    ##########  Check to see if we have requested a different number of strains
+    # ########  Check to see if we have requested a different number of strains
     this_config_file = os.path.join(args.output_dir, "config")
     try:
         updated_args = different_args(args, this_config_file, logger)
     except ValueError as e:
         logger.warning(e)
-        # if we have any issues finding orr reading the config, just rerun it all
-        updated_args = ["maxdist", "subassembler", "maxcov"]
+        # if we have any issues finding or reading the config, rerun it all
+        updated_args = ["maxdist", "subassembler", "maxcov", "just_seed"]
     # if "n_references" in updated_args:
     #     if os.path.exists(genome_check_file):
     #         os.remove(genome_check_file)
     write_this_config(args, this_config_file)
 
-    ##########
+    # #########
     if not os.path.exists(genome_check_file):
         logger.info("checking reference genomes for rDNA counts")
         for pot_reference in glob.glob(os.path.join(fDB.refdir, "*.fna")):
@@ -1035,35 +1095,48 @@ def main():
     nsras = len(filtered_sras)
     n_errors = {}
     for i, accession in enumerate(filtered_sras):
-        # trying to troublshoot a potential race condition deleting all references.
+        # trying to troublshoot a potential race condition
+        # deleting all references.
         assert len(glob.glob(os.path.join(fDB.refdir, "*.fna"))) != 0, \
-            "as of SRA %s (%i of %i), genomes dir empty" % (accession, i + 1 , nsras)
+            "as of SRA %s (%i of %i), genomes dir empty" % (
+                accession, i + 1, nsras)
         this_output = os.path.join(args.output_dir, accession)
         this_results = os.path.join(this_output, "results")
         os.makedirs(this_output, exist_ok=True)
         status_file = os.path.join(this_output, "status")
         logger.info("Organism: %s; Accession: %s (%s of %s)",
-                    args.organism_name, accession, i + 1, nsras )
+                    args.organism_name, accession, i + 1, nsras)
         message = ""
-        ################ check updated args, update status file if needed
+        # ############### check updated args, update status file if needed
         if "maxdist" in updated_args:
             # plentyofbugs will rerun if this fileis missing
             update_status_file(status_file, to_remove=["RIBOSEED COMPLETE"])
-            this_pob_results = os.path.join(this_results, "plentyofbugs", "best_reference")
+            this_pob_results = os.path.join(
+                this_results, "plentyofbugs", "best_reference")
             if os.path.exists(this_pob_results):
                 os.remove(this_pob_results)
         if "maxcov" in updated_args:
             update_status_file(status_file,
-                           to_remove=["DOWNSAMPLED", "RIBOSEED COMPLETE"])
+                               to_remove=["DOWNSAMPLED", "RIBOSEED COMPLETE"])
         if "subassembler" in updated_args:
+            update_status_file(status_file, to_remove=["RIBOSEED COMPLETE"])
+        if "just_seed" in updated_args:
             update_status_file(status_file, to_remove=["RIBOSEED COMPLETE"])
 
         ################
-        if "RIBOSEED COMPLETE" in parse_status_file(status_file) and not args.redo_assembly:
+        if "RIBOSEED COMPLETE" in parse_status_file(status_file) and \
+           not args.redo_assembly:
             logger.info("using existing results")
-            ribo_contigs = os.path.join(this_results, "riboSeed", "seed",
-                                        "final_long_reads", "riboSeedContigs.fasta")
-            kraken2_report_output = os.path.join(this_results, "kraken2", "kraken2.report")
+            if args.just_seed:
+                ribo_contigs = os.path.join(
+                    this_results, "riboSeed", "seed",
+                    "final_long_reads", "riboSeedContigs.fasta")
+            else:
+                ribo_contigs = os.path.join(
+                    this_results, "riboSeed", "seed",
+                    "final_de_fere_novo_assembly", "contigs.fasta")
+            kraken2_report_output = os.path.join(
+                this_results, "kraken2", "kraken2.report")
             # double check files exist before we skip this one
             if all([os.path.exists(p) and os.path.getsize(p) != 0
                     for p in [ribo_contigs, kraken2_report_output]]):
@@ -1086,7 +1159,8 @@ def main():
                     tool=args.fastqtool)
         except fasterqdumpError:
             message = 'Error downloading %s' % accession
-            write_pass_fail(args, status="ERROR", stage=accession, note=message)
+            write_pass_fail(
+                args, status="ERROR", stage=accession, note=message)
             logger.error(message)
             add_key_or_increment(n_errors, "Downloading")
             continue
@@ -1107,7 +1181,8 @@ def main():
                 message = "Reads were shorter than 65bp threshold"
             else:
                 message = "Reads were longer than 300bp threshold"
-            write_pass_fail(args, status="ERROR", stage=accession, note=message)
+            write_pass_fail(
+                args, status="ERROR", stage=accession, note=message)
             logger.error(message)
             continue
         #  heres the meat of the main, catching errors for
@@ -1116,8 +1191,9 @@ def main():
             riboSeed_cmd, contigs_path, taxonomy_d = process_strain(
                 rawreadsf, rawreadsr, read_length, fDB.refdir,
                 this_results, args, logger, status_file, fDB.krakendir)
-            riboSeed_jobs.append([accession, riboSeed_cmd,
-                                  contigs_path,  status_file, taxonomy_d, None])
+            riboSeed_jobs.append(
+                [accession, riboSeed_cmd,
+                 contigs_path,  status_file, taxonomy_d, None])
         except coverageError as e:
             write_pass_fail(args, status="FAIL",
                             stage=accession,
@@ -1159,7 +1235,7 @@ def main():
             logger.error(e)
             logger.error(
                 "Unknown error occured; please raise issue on GitHub " +
-                "attaching the log file found in %s .", this_res
+                "attaching the log file found in %s ", this_results
                 )
             add_key_or_increment(n_errors, "Unknown")
             write_pass_fail(args, status="FAIL",
@@ -1174,7 +1250,8 @@ def main():
     # if split_cores < 1:
     #     split_cores = 1
     if len(riboSeed_jobs) > 0:
-        logger.info("Processing %i riboSeed runs; this can take a while", len(riboSeed_jobs))
+        logger.info("Processing %i riboSeed runs; this can take a while",
+                    len(riboSeed_jobs))
 
     pool = multiprocessing.Pool(processes=args.njobs)
     logger.debug("running the following commands:")
@@ -1186,7 +1263,7 @@ def main():
                           "acc": acc,
                           "status_file": sfile,
                           "riboSeed_jobs": riboSeed_jobs})
-        for acc, cmd, contigs, sfile, tax_d, _  in riboSeed_jobs]
+        for acc, cmd, contigs, sfile, tax_d, _ in riboSeed_jobs]
     pool.close()
     pool.join()
     ribo_results_sum = sum([r.get() for r in riboSeed_pool_results])
@@ -1222,14 +1299,15 @@ def main():
     logger.info("attempting to extract 16S sequences for re-assemblies")
     n_extracted_seqs = 0
     singleline = True
+    min_length = 1000  # minimum length seqeunce to extract
     for assembly, tax_d in all_assemblies:
         sra = str(Path(assembly).parents[4].name)
         barr_gff = os.path.join(args.output_dir, sra, "barrnap.gff")
         try:
             run_barrnap(assembly, barr_gff, logger)
             this_extracted_seqs = extract_16s_from_assembly(
-                assembly, barr_gff, sra, extract16soutput, out_summary,args,
-                singleline, tax_d, logger)
+                assembly, barr_gff, sra, extract16soutput, out_summary, args,
+                singleline, tax_d, min_length, logger)
             n_extracted_seqs = n_extracted_seqs + this_extracted_seqs
         except extracting16sError as e:
             logger.error(e)
@@ -1242,7 +1320,7 @@ def main():
 
     ###########################################################################
     logger.info("Wrote out %i sequences", n_extracted_seqs)
-    if len(n_errors) != 0 :
+    if len(n_errors) != 0:
         logger.warning("Errors during run:")
         for k, v in n_errors.items():
             logger.warning("   " + k + " errors: " + str(v))
