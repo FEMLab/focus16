@@ -140,6 +140,9 @@ def get_args():  # pragma: nocover
     parargs.add_argument("-l", "--approx_length",
                         help="Integer for approximate genome length",
                         required=False, type=int)
+    parargs.add_argument("--just_seed", action="store_true",
+                        help="run just the subassemblies; shorter execution time",
+                        required=False)
     configargs.add_argument("--sraFind_path", dest="sra_path",
                         help="path to sraFind file; default is in ~/.focusDB/",
                         default=None,
@@ -418,21 +421,18 @@ def get_and_check_ave_read_len_from_fastq(fastq1, minlen, maxlen, logger=None):
     """return average read length in fastq1 file from first N reads
     from LP: taken from github.com/nickp60/riboSeed/riboSeed/classes.py;
     """
-    count, tot = 0, 0
+    tot = 0
     if os.path.splitext(fastq1)[-1] in ['.gz', '.gzip']:
         open_fun = gzip.open
     else:
         open_fun = open
+    logger.debug("Obtaining average read length from first 30 reads")
     with open_fun(fastq1, "rt") as file_handle:
         data = SeqIO.parse(file_handle, "fastq")
-        logger.debug("Obtaining average read length from first 30 reads")
-        for read in data:
-            count += 1
+        for i, read in enumerate(data):
             tot += len(read)
-            if count == 30:
-                break
 
-    ave_read_len = float(tot / 30)
+    ave_read_len = float(tot / i)
     if ave_read_len < minlen:
         logger.error("Average read length is too short: %s; skipping...",
                      ave_read_len)
@@ -531,21 +531,25 @@ def downsample(read_length, approx_length, fastq1, fastq2,
 
 
 def make_riboseed_cmd(sra, readsf, readsr, cores, subassembler, threads,
-                      output, memory, logger):
+                      output, memory, just_seed, logger):
     """Runs riboSeed to reassemble reads """
     if memory < 10:
         serialize = "--serialize "
     else:
         serialize = ""
+    if just_seed:
+        seed_str = "--just_seed "
+    else:
+        seed_str = ""
     cmd = str("ribo run -r {sra} -F {readsf} -R {readsr} --cores {cores} " +
               "--threads {threads} -v 1 -o {output} {serialize}" +
-              "--subassembler {subassembler} --just_seed " +
+              "--subassembler {subassembler} {seed_str}" +
               "--memory {memory}").format(**locals())
 
     if readsr is None:
         cmd = str("ribo run -r {sra} -S1 {readsf} --cores {cores} " +
                   "--threads {threads} -v 1 -o {output} {serialize}" +
-                  "--subassembler {subassembler} --just_seed " +
+                  "--subassembler {subassembler} {seed_str}" +
                   "--memory {memory}").format(**locals())
     return(cmd)
 
@@ -709,13 +713,20 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
                                      memory=args.memory,
                                      subassembler=args.subassembler,
                                      threads=args.threads, output=ribo_dir,
+                                     just_seed=args.just_seed,
                                      logger=logger)
     # do we want to redo the assembly?
     if args.redo_assembly:
         update_status_file(status_file, to_remove=["RIBOSEED COMPLETE"])
     # file that will contain riboseed contigs
-    ribo_contigs = os.path.join(this_output, "riboSeed", "seed",
-                                "final_long_reads", "riboSeedContigs.fasta")
+    if args.just_seed:
+        ribo_contigs = os.path.join(
+            this_output, "riboSeed", "seed",
+            "final_long_reads", "riboSeedContigs.fasta")
+    else:
+        ribo_contigs = os.path.join(
+            this_output, "riboSeed", "seed",
+            "final_de_fere_novo_assembly", "contigs.fasta")
     if "RIBOSEED COMPLETE" not in parse_status_file(status_file):
         if os.path.exists(ribo_dir):
             shutil.rmtree(ribo_dir)

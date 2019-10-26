@@ -5,12 +5,17 @@ def filter_SRA(sraFind, organism_name, strains, get_all, thisseed, logger):
     """sraFind [github.com/nickp60/srafind], contains"""
     results = []
     with open(sraFind, "r") as infile:
-        for line in infile:
+        for i, line in enumerate(infile):
+            if i == 0:
+                header = line.strip().replace('"', '').replace("'", "").split("\t")
+                org_col = header.index("organism_ScientificName")
+                plat_col  = header.index("platform")
+                run_SRAs = header.index("run_SRAs")
             split_line = [x.replace('"', '').replace("'", "") for x
                           in line.strip().split("\t")]
-            if split_line[11].startswith(organism_name):
-                if split_line[8].startswith("ILLUMINA"):
-                    results.append(split_line[17])
+            if split_line[org_col].startswith(organism_name):
+                if split_line[plat_col].startswith("ILLUMINA"):
+                    results.append(split_line[run_SRAs])
     random.seed(thisseed)
     random.shuffle(results)
 
