@@ -107,7 +107,7 @@ def get_args():  # pragma: nocover
         "-o", "--output_dir",
         help="path to output", required=True)
     mainargs.add_argument(
-        "-", "--organism_name",
+        "-n", "--organism_name",
         help="genus or genus species in quotes",
         required=True)
 
@@ -299,6 +299,12 @@ def get_args():  # pragma: nocover
         "--seed",
         help="random seed for subsampling references and SRAs",
         type=int, default=12345)
+    expargs.add_argument(
+        "--use_available", action="store_true",
+        help="just use any applicable SRAs already downloaded.  " +
+        "This can be useful after sraFind updates, and random " +
+        "seeding tries to pull other genomes",
+        )
     jobargs.add_argument(
         "-v", "--verbosity", dest='verbosity',
         action="store",
@@ -462,7 +468,7 @@ def get_and_check_ave_read_len_from_fastq(fastq1, minlen, maxlen, logger=None):
     from LP: taken from github.com/nickp60/riboSeed/riboSeed/classes.py;
     """
     nreads = None
-    # nreads = 30
+    nreads = 1000
     tot = 0
     if os.path.splitext(fastq1)[-1] in ['.gz', '.gzip']:
         open_fun = gzip.open
@@ -1029,6 +1035,7 @@ def main():
             organism_name=args.organism_name,
             strains=args.n_SRAs,
             thisseed=args.seed,
+            use_available=args.use_available,
             logger=logger,
             get_all=args.get_all)
 
@@ -1176,6 +1183,7 @@ def main():
             minlen=65,
             maxlen=301,
             fastq1=rawreadsf, logger=logger)
+
         if read_len_status != 0:
             if read_len_status == 1:
                 message = "Reads were shorter than 65bp threshold"

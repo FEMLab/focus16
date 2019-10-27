@@ -41,6 +41,8 @@ class FocusDBData(object):
             os.makedirs(self.dbdir)
         conn = sqlite3.connect(self.db)
         c = conn.cursor()
+        # TODO store read len in DB
+        # c.execute("CREATE TABLE IF NOT EXISTS SRAs (accession text PRIMARY KEY, status text, genus text, species text, readlen integer )")
         c.execute("CREATE TABLE IF NOT EXISTS SRAs (accession text PRIMARY KEY, status text, genus text, species text )")
         c.execute("CREATE TABLE IF NOT EXISTS Genomes (accssions text PRIMARY KEY, status text, genus text, species text)")
         # if not os.path.exists(self.SRAs_manifest):
