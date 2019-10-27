@@ -14,9 +14,10 @@ class filter_SRATest(unittest.TestCase):
 
     def test_filter_SRA(self):
         test_result = filter_SRA(sraFind=self.sra_find,
-                                     organism_name="Lactobacillus oryzae",
-                                     thisseed=1,
-                                     strains=1, get_all=True, logger=logger)
+                                 organism_name="Lactobacillus oryzae",
+                                 thisseed=1,
+                                 use_available=False,
+                                 strains=1, get_all=True, logger=logger)
         assert ["DRR021662"] == test_result
 
 

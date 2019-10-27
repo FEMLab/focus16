@@ -53,6 +53,12 @@ def get_args():
                         help="batches for aspera calls",
                         default=10,
                         type=int, required=False)
+    parser.add_argument(
+        "--use_available", action="store_true",
+        help="just use any applicable SRAs already downloaded.  " +
+        "This can be useful after sraFind updates, and random " +
+        "seeding tries to pull other genomes",
+    )
     # We hide these options cause this script doesn't download the organisms
     parser.add_argument("--genomes_dir",
                         help=argparse.SUPPRESS)
@@ -86,6 +92,7 @@ def main():
         strains=args.n_SRAs,
         thisseed=args.seed,
         logger=logger,
+        use_available=args.use_available,
         get_all=args.get_all)
     fDB.fetch_sraFind_data(logger=logger)
     cmds = []
