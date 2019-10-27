@@ -197,6 +197,7 @@ class FocusDBData(object):
                 logger=logger)
             return (rawreadsf, rawreadsr, download_error_message)
         elif SRA in self.SRAs.keys():
+            logger.debug(download_error_message)
             if self.SRAs[SRA]['status'] == "-":
                 raise ValueError("Corrupted manifest; unable to find " +
                                  "previously processed files")

@@ -17,6 +17,7 @@ def filter_SRA(sraFind, organism_name, strains, get_all, thisseed,
             if split_line[org_col].startswith(organism_name):
                 if split_line[plat_col].startswith("ILLUMINA"):
                     results.append(split_line[run_SRAs])
+    results = [x for x in results if x != ""]
     random.seed(thisseed)
     random.shuffle(results)
     # log  a sane amount
@@ -27,12 +28,26 @@ def filter_SRA(sraFind, organism_name, strains, get_all, thisseed,
 
     if use_available:
         focusDB_dir = os.path.dirname(sraFind)
+        # if dir exists
         possible_sras  = [x for x in results if os.path.exists(os.path.join(focusDB_dir, x))]
+        # if data in dir
+        possible_sras  = [x for x in  possible_sras if os.listdir(os.path.join(focusDB_dir, x))]
         logger.debug("using locally available SRAs; found %i", len(possible_sras))
+        if strains == 0:
+            pass  # just use  as many available as possible
+        else:
+            # in case we dont have enough locally, make an "set" from (the ones
+            # we have extended with the ones we dont), and get the first N;
+            # this puts tthe local ones first in the list.
+            # dont rrefactor with a set -- they are unordered
+            possible_sras.extend([x for x in results if x not in possible_sras])
+            possible_sras = possible_sras[0: strains]
+        logger.debug(possible_sras)
     else:
-        possible_sras = results
-    if strains != 0:
-        possible_sras = possible_sras[0:strains]
+        if strains != 0:
+            possible_sras = results[0:strains]
+        else:
+            possible_sras = results
     logger.debug('Selected the following SRAs: %s', possible_sras)
 
     sras = []
@@ -44,4 +59,4 @@ def filter_SRA(sraFind, organism_name, strains, get_all, thisseed,
         else:
             sras.append(these_sras[0])
     logger.info('Processing the following SRAs: %s', sras)
-    return([x for x in sras if  x != ""])
+    return(sras)
