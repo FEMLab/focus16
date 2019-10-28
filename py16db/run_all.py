@@ -795,10 +795,29 @@ def check_riboSeed_outcome(status_file, contigs):
     else:
         this_output = os.path.dirname(
             os.path.dirname(os.path.dirname(contigs)))
-        raise riboSeedUnsuccessfulError(str(
-            "riboSeed completed but was not successful; " +
-            "for details, see log file at %s") %
-            os.path.join(this_output, "run_riboSeed.log"))
+        bad_error_occurred = False
+        # handle cases where no output dir was made or an empty outtput dir:
+        # these are bad, user will need to try running the command to see why
+        # it failed
+        if os.path.exists(this_output):
+            if not os.listdir(this_output):
+                bad_error_occurred = True
+            else:
+                pass
+        else:
+                bad_error_occurred = True
+        if bad_error_occurred:
+            raise riboSeedError(str(
+                "riboSeed output folder %s is empty or missing. " +
+                "A fatal error occurred when trying to run riboSeed. Try " +
+                "running 'ribo --help' to ensurethat the installation is " +
+                "functioning, then try rerunning the 'ribo run...'  command " +
+                " from the focusDB log file.") % this_output )
+        else:
+            raise riboSeedUnsuccessfulError(str(
+                "riboSeed completed but was not successful; " +
+                "for details, see log file at %s") %
+                    os.path.join(this_output, "run_riboSeed.log"))
 
 
 def run_barrnap(assembly,  results, logger):
@@ -918,6 +937,7 @@ def run_riboSeed_catch_errors(cmd, acc=None, args=None, status_file=None,
                 j[4] = 0
         return 0
     try:
+        print("Executing riboSeed run for %s in multiprocessed pool" % acc)
         subprocess.run(cmd,
                        shell=sys.platform != "win32",
                        stdout=subprocess.PIPE,
@@ -931,6 +951,7 @@ def run_riboSeed_catch_errors(cmd, acc=None, args=None, status_file=None,
         write_pass_fail(args, status="FAIL",
                         stage=acc,
                         note="Unknown failure running riboSeed")
+        return 1
     for j in riboSeed_jobs:
         if j[0] == acc:
             j[4] = 0
@@ -1257,44 +1278,47 @@ def main():
     # split_cores = int(args.cores / (len(ribo_cmds) / 2))
     # if split_cores < 1:
     #     split_cores = 1
-    if len(riboSeed_jobs) > 0:
+    if len([x for x in riboSeed_jobs if x[1] is not None]  ) > 0:
         logger.info("Processing %i riboSeed runs; this can take a while",
                     len(riboSeed_jobs))
 
-    pool = multiprocessing.Pool(processes=args.njobs)
-    logger.debug("running the following commands:")
-    logger.debug("\n".join(ribo_cmds))
-    riboSeed_pool_results = [
-        pool.apply_async(run_riboSeed_catch_errors,
-                         (cmd,),
-                         {"args": args,
-                          "acc": acc,
-                          "status_file": sfile,
-                          "riboSeed_jobs": riboSeed_jobs})
-        for acc, cmd, contigs, sfile, tax_d, _ in riboSeed_jobs]
-    pool.close()
-    pool.join()
-    ribo_results_sum = sum([r.get() for r in riboSeed_pool_results])
-    logger.debug("Sum of return codes (should be 0): %i", ribo_results_sum)
-
+        pool = multiprocessing.Pool(processes=args.njobs)
+        logger.debug("running the following commands:")
+        logger.debug("\n".join(ribo_cmds))
+        riboSeed_pool_results = [
+            pool.apply_async(run_riboSeed_catch_errors,
+                             (cmd,),
+                             {"args": args,
+                              "acc": acc,
+                              "status_file": sfile,
+                              "riboSeed_jobs": riboSeed_jobs})
+            for acc, cmd, contigs, sfile, tax_d, _ in riboSeed_jobs]
+        pool.close()
+        pool.join()
+        ribo_results_sum = sum([r.get() for r in riboSeed_pool_results])
+        logger.debug("Sum of return codes (should be 0): %i", ribo_results_sum)
+    else:
+        logger.info("No assemblies need to be run")
     for v in riboSeed_jobs:
         try:
             check_riboSeed_outcome(status_file, v[2])
             update_status_file(v[3], message="RIBOSEED COMPLETE")
             write_pass_fail(args, status="PASS", stage=v[0], note="")
             all_assemblies.append([v[2], v[4]])
+        except riboSeedError as e:
+            #  assert v[4] == 1, "unknown error running riboSeed found by focusDB"
+            write_pass_fail(args, status="ERROR",
+                            stage=v[0],
+                            note="riboSeed Error")
+            logger.error(e)
+            sys.exit(1)
         except riboSeedUnsuccessfulError as e:
-            if v[4] == 1:
-                write_pass_fail(args, status="ERROR",
-                                stage=v[0],
-                                note="riboSeed Error")
-                logger.error(e)
-            else:
-                update_status_file(v[3], message="RIBOSEED COMPLETE")
-                write_pass_fail(args, status="FAIL",
-                                stage=v[0],
-                                note="riboSeed unsuccessful")
-                logger.error(e)
+            # assert v[4] == 1, "unknown error running riboSeed found by focusDB"
+            update_status_file(v[3], message="RIBOSEED COMPLETE")
+            write_pass_fail(args, status="FAIL",
+                            stage=v[0],
+                            note="riboSeed unsuccessful")
+            logger.error(e)
 
     #######################################################################
     extract16soutput = os.path.join(
