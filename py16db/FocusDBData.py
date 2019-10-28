@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import glob
 import sqlite3
+import random
 from plentyofbugs import get_n_genomes as gng
 
 
@@ -39,16 +40,28 @@ class FocusDBData(object):
         """
         if not os.path.exists(self.dbdir):
             os.makedirs(self.dbdir)
-        conn = sqlite3.connect(self.db)
-        c = conn.cursor()
+        done_and_dusted = False
+        tries = 3
+        while tries > 0 and not done_and_dusted:
+            try:
+                conn = sqlite3.connect(self.db)
+                c = conn.cursor()
+                c.execute("CREATE TABLE IF NOT EXISTS SRAs (accession text PRIMARY KEY, status text, genus text, species text )")
+                c.execute("CREATE TABLE IF NOT EXISTS Genomes (accssions text PRIMARY KEY, status text, genus text, species text)")
+                conn.commit()
+                conn.close()
+                done_and_dusted = True
+            #  usually an I/O  too slow.
+            except sqlite3.OperationalError:
+                tries = tries - 1
+                time.sleep(random.randrange(5, 45))
+        if not done_and_dusted:
+            raise e
         # TODO store read len in DB
         # c.execute("CREATE TABLE IF NOT EXISTS SRAs (accession text PRIMARY KEY, status text, genus text, species text, readlen integer )")
-        c.execute("CREATE TABLE IF NOT EXISTS SRAs (accession text PRIMARY KEY, status text, genus text, species text )")
-        c.execute("CREATE TABLE IF NOT EXISTS Genomes (accssions text PRIMARY KEY, status text, genus text, species text)")
         # if not os.path.exists(self.SRAs_manifest):
         #     with open(self.SRAs_manifest, "w") as outf:
         #         outf.write("SRA_accession\tStatus\tOrganism\n")
-        conn.close()
 
 
     def check_or_get_minikraken2(self, logger):
@@ -94,34 +107,56 @@ class FocusDBData(object):
             os.makedirs(self.refdir)
 
     def read_SRA_manifest(self):
-        conn = sqlite3.connect(self.db)
-        c = conn.cursor()
-        try:
-            for acc, status, genus, species  in c.execute('SELECT * FROM SRAs'):
-                # with open(self.SRAs_manifest, "r") as inf:
-                # for i, line in enumerate(inf):
-                # acc, status, org = line.strip().split("\t")
-                self.SRAs[acc] = {
-                    "status": status,
-                    "genus": genus,
-                    "species": species
-                }
-        except Exception as e:
+        done_and_dusted = False
+        tries = 3
+        while tries > 0 and not done_and_dusted:
+            try:
+                conn = sqlite3.connect(self.db)
+                c = conn.cursor()
+                for acc, status, genus, species  in c.execute('SELECT * FROM SRAs'):
+                    # with open(self.SRAs_manifest, "r") as inf:
+                    # for i, line in enumerate(inf):
+                    # acc, status, org = line.strip().split("\t")
+                    self.SRAs[acc] = {
+                        "status": status,
+                        "genus": genus,
+                        "species": species
+                    }
+                conn.close()
+                done_and_dusted = True
+                #  usually an I/O  too slow.
+            except sqlite3.OperationalError:
+                tries = tries - 1
+                time.sleep(random.randrange(5, 45))
+        if not done_and_dusted:
             raise e
-        conn.close()
 
     def update_manifest(self, newacc, newstatus, organism, logger):
         if " " in organism:
             genus, species = organism.split(" ")
         else:
             genus, species = organism, ""
-        conn = sqlite3.connect(self.db)
-        c = conn.cursor()
+
+        done_and_dusted = False
+        tries = 3
+        while tries > 0 and not done_and_dusted:
+            try:
+                conn = sqlite3.connect(self.db)
+                c = conn.cursor()
+                vals = (newacc, newstatus, genus, species, )
+                c.execute('INSERT OR REPLACE INTO SRAs VALUES (?, ?, ?, ?)', vals)
+                conn.commit()
+                conn.close()
+                done_and_dusted = True
+                #  usually an I/O  too slow.
+            except sqlite3.OperationalError:
+                tries = tries - 1
+                time.sleep(random.randrange(5, 45))
+        if not done_and_dusted:
+            raise e
 
         #tmp = self.SRAs_manifest + ".bak"
         #shutil.move(self.SRAs_manifest, tmp)
-        vals = (newacc, newstatus, genus, species, )
-        c.execute('INSERT OR REPLACE INTO SRAs VALUES (?, ?, ?, ?)', vals)
         # with open(tmp, "r") as inf, open(self.SRAs_manifest, "w") as outf:
         #     for i, line in enumerate(inf):
         #         acc, status, lineorg = line.strip().split("\t")
@@ -137,8 +172,6 @@ class FocusDBData(object):
         # except FileNotFoundError:
         #     logger.warning("Missing backup manifest; multiple processes " +
                            # " could be trying to update it.")
-        conn.commit()
-        conn.close()
         self.read_SRA_manifest()
 
     def fetch_sraFind_data(self, logger):

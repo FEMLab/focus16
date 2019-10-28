@@ -327,6 +327,19 @@ def get_args():  # pragma: nocover
         "4 = error() and 5 = critical(); " +
         "default: %(default)s")
     args = parser.parse_args()
+    args.organism_name = args.organism_name.strip()
+    args.output_dir = args.output_dir.strip()
+    if args.organism_name.count(" ") > 0:
+        print("whitespace in output path. FocusDB relies on tools that "
+              "really dislike whitespace; please provide an alternative")
+        print("exiting...")
+        sys.exit(1)
+
+    if args.organism_name.count(" ") > 1:
+        print("invalid organism: %s" %args.organism_name)
+        print("Organism name must either be a genus or genus species")
+        print("exiting...")
+        sys.exit(1)
     if " " in args.organism_name:
         args.genus, args.species = args.organism_name.split(" ")
     else:
@@ -949,7 +962,8 @@ def run_riboSeed_catch_errors(cmd, acc=None, args=None, status_file=None,
                 j[4] = 0
         return 0
     try:
-        print("Executing riboSeed run for %s in multiprocessed pool" % acc)
+        sys.stderr.write("Executing riboSeed run for " +
+                         "%s in multiprocessed pool\n" % acc)
         subprocess.run(cmd,
                        shell=sys.platform != "win32",
                        stdout=subprocess.PIPE,
