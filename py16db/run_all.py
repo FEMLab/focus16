@@ -152,6 +152,18 @@ def get_args():  # pragma: nocover
         help="Integer for approximate genome length",
         required=False, type=int)
     parargs.add_argument(
+        "--minreadlen",
+        help="minimum read length; SRAs with average read length " +
+        "under this will be ignored.  Default is 65",
+        default=65,
+        required=False, type=int)
+    parargs.add_argument(
+        "--maxreadlen",
+        help="maximum read length; SRAs with average read length " +
+        "under this will be ignored.  Default is 303",
+        default=303,
+        required=False, type=int)
+    parargs.add_argument(
         "--just_seed", action="store_true",
         help="run just the subassemblies; " +
         "shorter execution time",
@@ -1201,15 +1213,15 @@ def main():
             logger.error(download_error_message)
             continue
         read_len_status, read_length = get_and_check_ave_read_len_from_fastq(
-            minlen=65,
-            maxlen=301,
+            minlen=args.minreadlen,
+            maxlen=args.maxreadlen,
             fastq1=rawreadsf, logger=logger)
 
         if read_len_status != 0:
             if read_len_status == 1:
-                message = "Reads were shorter than 65bp threshold"
+                message = "Reads under the  %i bp threshold" % args.minreadlen
             else:
-                message = "Reads were longer than 300bp threshold"
+                message = "Reads over the  %i bp threshold" % args.maxreadlen
             write_pass_fail(
                 args, status="ERROR", stage=accession, note=message)
             logger.error(message)
