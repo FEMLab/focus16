@@ -76,6 +76,9 @@ calculate-shannon-entropy calculate-shannon-entropy.py -i aligned_ecolidb.mafft.
 [--example_reads]: Input of user-given reads.
 [--subassembler]: Choice of mash or skesa for subassembly in riboSeed.
 ```
+### Running on an HPC with SGE
+Python's multiprocessing does not play well with SGE: to run efficiently, use `--sge` mode, provide the conda environment name with `--sge_env`.  FocusDB will write out a bash script for all the assemblies after processing all the reads.  `qsub` the script, and when it finishes, re-run focusDB with the same parameters, and it will finish processing the data
+
 
 ### Included Utilities:
 #### `combine-focusdb-and-silva`
