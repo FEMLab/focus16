@@ -1039,11 +1039,11 @@ def add_key_or_increment(d, k):
     else:
         d[k] = 1
 
-def write_sge_script(args, riboSeed_jobs, script_path):
+def write_sge_script(args, ntorun, riboSeed_jobs, script_path):
     end_message = "Done running assemblies. Rerun focusDB as before to " + \
         "will detect the assemblies and finish processing them.  Exiting.."
     header_lines = ["#!/bin/bash",
-                    "#$ -t 1-%i" % len(riboSeed_jobs),
+                    "#$ -t 1-%i" % ntorun,
                     "#$ -tc %i" % args.njobs,
                     "#$ -cwd",
                     "#$ -j yes",
@@ -1333,16 +1333,18 @@ def main():
     # split_cores = int(args.cores / (len(ribo_cmds) / 2))
     # if split_cores < 1:
     #     split_cores = 1
-    if len([x for x in riboSeed_jobs if x[1] is not None]  ) > 0:
+    n_assemblies_to_run = sum([1 for x in riboSeed_jobs if x[1] is not None])
+    if n_assemblies_to_run > 0:
         if args.sge:
             script_path = os.path.join(args.output_dir, "run_assemblies.sh")
-            write_sge_script(args, riboSeed_jobs, script_path)
+            write_sge_script(args, n_assemblies_to_run,
+                             riboSeed_jobs, script_path)
             logger.info(str(
                 "Constucted sge script %s for the %i riboSeed runs; " +
                 "qsub this, and when it is finished, rerun focusDB with the "+
                 "same command; if all runs finish, it will proceeed to " +
                 "parsing the results. Exiting...") % (
-                    script_path, len(riboSeed_jobs)))
+                    script_path, n_assemblies_to_run))
             sys.exit()
         # else
         logger.info("Processing %i riboSeed runs; this can take a while",
