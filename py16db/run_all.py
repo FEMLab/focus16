@@ -133,7 +133,15 @@ def get_args():  # pragma: nocover
         "-h", "--help",
         action="help", default=argparse.SUPPRESS,
         help="Displays this help message")
-
+    mainargs.add_argument(
+        "--sge", action="store_true",
+        help="how to handle resources. In --sge mode a script called " +
+        "`run_assemblies.sh` is written in the output dir, rather than " +
+        "dispatching the assemblies with multiprocessing.  If running in " +
+        "--sge mode, your workflow would be focusDB -> qsub " +
+        "run_assemblies.sh -> focusDB to parse the results. " +
+        " Future versions might do this automatically",
+        required=False)
     parargs.add_argument(
         "-S", "--n_SRAs", help="max number of SRAs to be run",
         type=int, required=False)
@@ -142,11 +150,6 @@ def get_args():  # pragma: nocover
         help="max number of reference strains to consider. " +
         "default (0) is download all",
         type=int, required=False, default=0)
-
-    configargs.add_argument(
-        "--version", action='version',
-        version='%(prog)s {version}'.format(
-            version=__version__))
     parargs.add_argument(
         "-l", "--approx_length",
         help="Integer for approximate genome length",
@@ -174,6 +177,10 @@ def get_args():  # pragma: nocover
         "default is in ~/.focusDB/",
         default=None,
         required=False)
+    configargs.add_argument(
+        "--version", action='version',
+        version='%(prog)s {version}'.format(
+            version=__version__))
     configargs.add_argument(
         "--focusDB_data", dest="focusDB_data",
         help="path to data storage area; default ~/.focusDB/",
@@ -220,7 +227,7 @@ def get_args():  # pragma: nocover
     jobargs.add_argument(
         "--njobs",
         help="how many jobs to run concurrently " +
-        "via multiprocessing. --cores and --memory is per job",
+        "via multiprocessing or SGE. --cores and --memory is per job",
         default=1, type=int)
     jobargs.add_argument(
         "--cores",
@@ -329,8 +336,9 @@ def get_args():  # pragma: nocover
     args = parser.parse_args()
     args.organism_name = args.organism_name.strip()
     args.output_dir = args.output_dir.strip()
-    if args.organism_name.count(" ") > 0:
-        print("whitespace in output path. FocusDB relies on tools that "
+    if args.output_dir.count(" ") > 0:
+        print("Error: whitespace in output path: %s." %args.output_dir)
+        print("FocusDB relies on tools that " +
               "really dislike whitespace; please provide an alternative")
         print("exiting...")
         sys.exit(1)
@@ -1031,6 +1039,27 @@ def add_key_or_increment(d, k):
     else:
         d[k] = 1
 
+def write_sge_script(args, riboSeed_jobs, script_path):
+    end_message = "Done running assemblies. Rerun focusDB as before to " + \
+        "will detect the assemblies and finish processing them.  Exiting.."
+    header_lines = ["#!/bin/bash",
+                    "#$ -t 1-%i" % len(riboSeed_jobs),
+                    "#$ -tc %i" % args.njobs,
+                    "#$ -cwd",
+                    "#$ -j yes",
+                    "#$ -N focusDB_assembs",
+                    "#$ -pe multi %i" % args.cores,
+                    "#$ -l h_vmem=%iG" % args.memory,
+                    "set -e"]
+    with open(script_path, "w") as outf:
+        for l in header_lines:
+            outf.write(l + "\n")
+        for j in riboSeed_jobs:
+            if j[1] is not None:
+                outf.write("echo 'running assembly for %s'\n" % j[0])
+                outf.write(j[1] + "\n")
+        outf.write("echo '" + end_message + "'\n" )
+
 
 def main():
     args = get_args()
@@ -1305,6 +1334,17 @@ def main():
     # if split_cores < 1:
     #     split_cores = 1
     if len([x for x in riboSeed_jobs if x[1] is not None]  ) > 0:
+        if args.sge:
+            script_path = os.path.join(args.output_dir, "run_assemblies.sh")
+            write_sge_script(args, riboSeed_jobs, script_path)
+            logger.info(str(
+                "Constucted sge script %s for the %i riboSeed runs; " +
+                "qsub this, and when it is finished, rerun focusDB with the "+
+                "same command; if all runs finish, it will proceeed to " +
+                "parsing the results. Exiting...") % (
+                    script_path, len(riboSeed_jobs)))
+            sys.exit()
+        # else
         logger.info("Processing %i riboSeed runs; this can take a while",
                     len(riboSeed_jobs))
 
