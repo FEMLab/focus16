@@ -1048,7 +1048,7 @@ def write_sge_script(args, ntorun, riboSeed_jobs, script_path):
                     "#$ -cwd",
                     "#$ -j yes",
                     "#$ -N focusDB_assembs",
-                    "#$ -pe multi %i" % args.cores,
+                    "#$ -pe mpi %i" % args.cores,
                     "#$ -l h_vmem=%iG" % args.memory,
                     "set -e"]
     with open(script_path, "w") as outf:
