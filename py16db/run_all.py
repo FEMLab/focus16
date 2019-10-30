@@ -627,9 +627,10 @@ def downsample(read_length, approx_length, fastq1, fastq2,
 
 
 def make_riboseed_cmd(sra, readsf, readsr, cores, subassembler, threads,
-                      output, memory, just_seed, logger):
+                      output, memory, just_seed, sge,  logger):
     """Runs riboSeed to reassemble reads """
-    if memory < 10:
+    # sge keeps from running mmulitprocessing:
+    if memory < 10 or sge:
         serialize = "--serialize "
     else:
         serialize = ""
@@ -811,6 +812,7 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
                                      subassembler=args.subassembler,
                                      threads=args.threads, output=ribo_dir,
                                      just_seed=args.just_seed,
+                                     sge=args.sge,
                                      logger=logger)
     # do we want to redo the assembly?
     if args.redo_assembly:
@@ -826,12 +828,15 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
         ribo_contigs = os.path.join(
             this_output, "riboSeed", "seed",
             "final_de_fere_novo_assembly", "contigs.fasta")
+    donef = os.path.join(os.path.basename(this_output, "SGE_COMPLETE"))
     if "RIBOSEED COMPLETE" not in parse_status_file(status_file):
-        if os.path.exists(ribo_contigs):
+        if os.path.exists(ribo_contigs) or os.path.exits(donef) :
             # after sge run
             update_status_file(status_file, message="RIBOSEED COMPLETE")
             return (None, ribo_contigs, tax_dict)
         else:
+            # print(ribo_dir)
+            # sys.exit(1)
             if os.path.exists(ribo_dir):
                 shutil.rmtree(ribo_dir)
             return(riboseed_cmd, ribo_contigs, tax_dict)
@@ -1075,8 +1080,9 @@ def write_sge_script(args, ntorun, riboSeed_jobs, script_path):
         "conda activate %s" % args.sge_env
     ]
     for i, job, in enumerate([x for x in riboSeed_jobs if x[1] is not None]):
+        donef = os.path.join(str(Path(job[2]).parents[4].name), "SGE_COMPLETE")
         lines.append(
-            'if [ "%i" -eq "$SGE_TASK_ID" ]; then echo "running %s" ; %s ; fi' %(i, job[0],  job[1]))
+            'if [ "%i" -eq "$SGE_TASK_ID" ]; then echo "running %s" ; %s ; echo "DONE" > %s ; fi' %(i + 1, job[0],  job[1], donef))
     with open(script_path, "w") as outf:
         for l in lines:
             outf.write(l + "\n")
