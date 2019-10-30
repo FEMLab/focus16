@@ -1061,7 +1061,7 @@ def add_key_or_increment(d, k):
 def write_sge_script(args, ntorun, riboSeed_jobs, script_path):
     end_message = "Done running assemblies. Rerun focusDB as before to " + \
         "will detect the assemblies and finish processing them.  Exiting.."
-    header_lines = [
+    lines = [
         "#!/bin/bash",
         "#$ -t 1-%i" % ntorun,
         "#$ -tc %i" % args.njobs,
@@ -1071,15 +1071,15 @@ def write_sge_script(args, ntorun, riboSeed_jobs, script_path):
         "#$ -pe mpi %i" % args.cores,
         "#$ -l h_vmem=%iG" % args.memory,
         "set -e",
+        # "counter = 1",
         "conda activate %s" % args.sge_env
     ]
+    for i, job, in enumerate([x for x in riboSeed_jobs if x[1] is not None]):
+        lines.append(
+            'if [ "%i" -eq "$SGE_TASK_ID" ]; then echo "running %s" ; %s ; fi' %(i, job[0],  job[1]))
     with open(script_path, "w") as outf:
-        for l in header_lines:
+        for l in lines:
             outf.write(l + "\n")
-        for j in riboSeed_jobs:
-            if j[1] is not None:
-                outf.write("echo 'running assembly for %s'\n" % j[0])
-                outf.write(j[1] + "\n")
         outf.write("echo '" + end_message + "'\n" )
 
 
