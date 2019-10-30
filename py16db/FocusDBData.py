@@ -46,8 +46,9 @@ class FocusDBData(object):
             try:
                 conn = sqlite3.connect(self.db)
                 c = conn.cursor()
-                c.execute("CREATE TABLE IF NOT EXISTS SRAs (accession text PRIMARY KEY, status text, genus text, species text )")
-                c.execute("CREATE TABLE IF NOT EXISTS Genomes (accssions text PRIMARY KEY, status text, genus text, species text)")
+                c.execute("CREATE TABLE IF NOT EXISTS SRAs (accession text PRIMARY KEY, status text, genus text, species text, readlen integer )")
+                #c.execute("CREATE TABLE IF NOT EXISTS SRAs (accession text PRIMARY KEY, status text, genus text, species text )")
+                # c.execute("CREATE TABLE IF NOT EXISTS Genomes (accssions text PRIMARY KEY, status text, genus text, species text)")
                 conn.commit()
                 conn.close()
                 done_and_dusted = True
@@ -58,12 +59,23 @@ class FocusDBData(object):
         if not done_and_dusted:
             raise e
         # TODO store read len in DB
-        # c.execute("CREATE TABLE IF NOT EXISTS SRAs (accession text PRIMARY KEY, status text, genus text, species text, readlen integer )")
         # if not os.path.exists(self.SRAs_manifest):
         #     with open(self.SRAs_manifest, "w") as outf:
         #         outf.write("SRA_accession\tStatus\tOrganism\n")
 
-
+    def recreate_fresh_db(self, logger):
+        """ Sometimes, things go wrong
+        """
+        # move old DB to backup
+        new_entries = []
+        # vals = (newacc, newstatus, genus, species, readlen, )
+        # for each SRA in db
+        
+        with open(self.sraFind, "r") as inf:
+            
+        get_read_len()
+        
+        
     def check_or_get_minikraken2(self, logger):
         """
         """
@@ -113,14 +125,15 @@ class FocusDBData(object):
             try:
                 conn = sqlite3.connect(self.db)
                 c = conn.cursor()
-                for acc, status, genus, species  in c.execute('SELECT * FROM SRAs'):
+                for acc, status, genus, species, readlen in c.execute('SELECT * FROM SRAs'):
                     # with open(self.SRAs_manifest, "r") as inf:
                     # for i, line in enumerate(inf):
                     # acc, status, org = line.strip().split("\t")
                     self.SRAs[acc] = {
                         "status": status,
                         "genus": genus,
-                        "species": species
+                        "species": species,
+                        "readlen": readlen
                     }
                 conn.close()
                 done_and_dusted = True
@@ -131,7 +144,7 @@ class FocusDBData(object):
         if not done_and_dusted:
             raise e
 
-    def update_manifest(self, newacc, newstatus, organism, logger):
+    def update_manifest(self, newacc, newstatus, organism, readlen, logger):
         if " " in organism:
             genus, species = organism.split(" ")
         else:
@@ -143,8 +156,8 @@ class FocusDBData(object):
             try:
                 conn = sqlite3.connect(self.db)
                 c = conn.cursor()
-                vals = (newacc, newstatus, genus, species, )
-                c.execute('INSERT OR REPLACE INTO SRAs VALUES (?, ?, ?, ?)', vals)
+                vals = (newacc, newstatus, genus, species, readlen, )
+                c.execute('INSERT OR REPLACE INTO SRAs VALUES (?, ?, ?, ?, ?)', vals)
                 conn.commit()
                 conn.close()
                 done_and_dusted = True
@@ -217,7 +230,7 @@ class FocusDBData(object):
         if retry_partial and SRA in self.SRAs.keys():
             if self.SRAs[SRA]["status"] == "PARTIAL DOWNLOAD":
                 if os.path.exists(suboutput_dir_raw):
-                    for f in glob.glob(os.path.join(suboutput_dir_raw, "*.fastq")):
+                    for f in glob.glob(os.path.join(suboutput_dir_raw, "*.fastq.gz")):
                         os.remove(f)
         rawreadsf, rawreadsr, download_error_message = \
             self.check_fastq_dir(this_data=suboutput_dir_raw,
@@ -236,13 +249,13 @@ class FocusDBData(object):
                                  "previously processed files")
             elif self.SRAs[SRA]['status'] == "DOWNLOAD ERROR":
                 if os.path.exists(suboutput_dir_raw):
-                    for f in glob.glob(os.path.join(suboutput_dir_raw, "*.fastq")):
+                    for f in glob.glob(os.path.join(suboutput_dir_raw, "*.fastq.gz")):
                         os.remove(f)
             elif self.SRAs[SRA]['status'] == "LIBRARY TYPE ERROR":
                 # dont try to reprocess
                 return (None, None, "Library type Error")
         elif os.path.exists(suboutput_dir_raw):
-            for f in glob.glob(os.path.join(suboutput_dir_raw, "*.fastq")):
+            for f in glob.glob(os.path.join(suboutput_dir_raw, "*.fastq.gz")):
                 os.remove(f)
         else:
             pass
@@ -253,7 +266,7 @@ class FocusDBData(object):
         # https://github.com/ncbi/sra-tools/wiki/HowTo:-fasterq-dump
         verb = "" if tool == "fastq-dump" else "-vvv "
         cmd = str(
-            "{tool} -O " +
+            "{tool} --gzip -O " +
             "{suboutput_dir_raw} --split-files {verb}{SRA} > {logfile}"
         ).format(**locals())
         logger.info("Downloading %s", SRA)
@@ -286,7 +299,7 @@ class FocusDBData(object):
                 # delete, but files apear later.  So we sleep for a few
                 logger.debug("removing incomplete files from fast(er)q-dump")
                 time.sleep(10)
-                for f in glob.glob(suboutput_dir_raw + "*.fastq"):
+                for f in glob.glob(suboutput_dir_raw + "*.fastq.gz"):
                     os.remove(f)
                 raise fasterqdumpError
             else:

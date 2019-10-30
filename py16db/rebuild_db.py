@@ -14,7 +14,7 @@ import logging as logger
 from . import __version__
 
 from py16db.FocusDBData import FocusDBData, fasterqdumpError
-from py16db.shared_methods import filter_sraFind
+from py16db.shared_methods import filter_SRA
 
 
 def get_args():
@@ -69,11 +69,6 @@ def get_args():
     return(parser.parse_args())
 
 
-def make_prefetch_cmd(args, sras):
-    cmd = "prefetch " + " ".join(sras)
-    return cmd
-
-
 def main():
     args = get_args()
     if shutil.which("prefetch") is None:
@@ -86,38 +81,7 @@ def main():
     fDB.check_genomes_dir(org=args.organism_name)
     fDB.fetch_sraFind_data(logger=logger)
 
-    filtered_sras = filter_sraFind(
-        sraFind=fDB.sraFind_data,
-        organism_name=args.organism_name,
-        strains=args.n_SRAs,
-        thisseed=args.seed,
-        logger=logger,
-        use_available=args.use_available,
-        get_all=args.get_all)
     fDB.fetch_sraFind_data(logger=logger)
-    cmds = []
-    for i in range(math.ceil(len(filtered_sras)/args.batch_size)):
-        lowlm = i * args.batch_size
-        uplm = min((i * args.batch_size) + args.batch_size, len(filtered_sras))
-        these_sras = filtered_sras[lowlm: uplm]
-        cmds.append(make_prefetch_cmd(args, these_sras))
-    if args.output_cmds:
-        with open(args.output_cmds, "w") as outf:
-            for i, cmd in enumerate(cmds):
-                if i % 2 == 0:
-                    outf.write(cmd.replace("prefetch", "prefetch -t https") + "\n")
-                else:
-                    outf.write(cmd + "\n")
-    else:
-        ncmds = len(cmds)
-        for i, cmd in enumerate(cmds):
-            if i % 5 == 0:
-                print("fetching %i of %i" % (i,  ncmds))
-            subprocess.run(cmd,
-                           shell=sys.platform != "win32",
-                           stdout=subprocess.PIPE,
-                           stderr=subprocess.PIPE,
-                           check=True)
 
 
 

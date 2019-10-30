@@ -18,7 +18,7 @@ from py16db.run_sickle import run_sickle
 
 from . import __version__
 from py16db.FocusDBData import FocusDBData, fasterqdumpError
-from py16db.shared_methods import filter_SRA
+from py16db.shared_methods import filter_sraFind
 
 
 class bestreferenceError(Exception):
@@ -828,9 +828,9 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
         ribo_contigs = os.path.join(
             this_output, "riboSeed", "seed",
             "final_de_fere_novo_assembly", "contigs.fasta")
-    donef = os.path.join(os.path.basename(this_output, "SGE_COMPLETE"))
+    donef = os.path.join(os.path.basename(this_output), "SGE_COMPLETE")
     if "RIBOSEED COMPLETE" not in parse_status_file(status_file):
-        if os.path.exists(ribo_contigs) or os.path.exits(donef) :
+        if os.path.exists(ribo_contigs) or os.path.exists(donef) :
             # after sge run
             update_status_file(status_file, message="RIBOSEED COMPLETE")
             return (None, ribo_contigs, tax_dict)
@@ -1080,7 +1080,9 @@ def write_sge_script(args, ntorun, riboSeed_jobs, script_path):
         "conda activate %s" % args.sge_env
     ]
     for i, job, in enumerate([x for x in riboSeed_jobs if x[1] is not None]):
-        donef = os.path.join(str(Path(job[2]).parents[4].name), "SGE_COMPLETE")
+        donef = os.path.join(args.output_dir, job[0],  "SGE_COMPLETE")
+        if os.path.exists(donef):
+            os.remove(donef)
         lines.append(
             'if [ "%i" -eq "$SGE_TASK_ID" ]; then echo "running %s" ; %s ; echo "DONE" > %s ; fi' %(i + 1, job[0],  job[1], donef))
     with open(script_path, "w") as outf:
@@ -1134,7 +1136,7 @@ def main():
             pass
         filtered_sras = [args.custom_name]
     else:
-        filtered_sras = filter_SRA(
+        filtered_sras = filter_sraFind(
             sraFind=fDB.sraFind_data,
             organism_name=args.organism_name,
             strains=args.n_SRAs,
@@ -1166,7 +1168,8 @@ def main():
         write_pass_fail(args, status="ERROR", stage="global", note=message)
         sys.exit(1)
     genome_check_file = os.path.join(fDB.refdir, ".references_passed_checks")
-    # ########  Check to see if we have requested a different number of strains
+
+    #  Check to see if we have requested a different number of strains
     this_config_file = os.path.join(args.output_dir, "config")
     try:
         updated_args = different_args(args, this_config_file, logger)
@@ -1358,9 +1361,6 @@ def main():
     #######################################################################
     all_assemblies = []  # [contigs, tax{}]
     ribo_cmds = [x[1] for x in riboSeed_jobs if x[1] is not None]
-    # split_cores = int(args.cores / (len(ribo_cmds) / 2))
-    # if split_cores < 1:
-    #     split_cores = 1
     n_assemblies_to_run = sum([1 for x in riboSeed_jobs if x[1] is not None])
     if n_assemblies_to_run > 0:
         if args.sge:
