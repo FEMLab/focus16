@@ -1,4 +1,4 @@
-from .run_all import check_rDNA_copy_number
+from .run_focusDB import check_rDNA_copy_number
 import os
 import unittest
 import shutil
@@ -24,4 +24,3 @@ class checkrDNATest(unittest.TestCase):
         os.makedirs(out)
         test_result = check_rDNA_copy_number(ref=ref, output=out, logger=logger)
         assert test_result == 7
-        

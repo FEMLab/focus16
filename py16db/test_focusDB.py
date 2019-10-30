@@ -1,4 +1,4 @@
-from .run_all import get_coverage, downsample
+from .run_focusDB import get_coverage, downsample
 import os
 import shutil
 import unittest
@@ -82,3 +82,14 @@ class coverageTests(unittest.TestCase):
         down_cov = get_coverage(read_length=150, approx_length=5132068, fastq1=reads1, fastq2=reads2, logger=logger)
         print(down_cov)
         assert round(1.00, 2 )  == round(down_cov, 2)
+
+
+class sralistTest(unittest.TestCase):
+    def setUp(self):
+        self.sralist = os.path.join(os.path.dirname(__file__), "test_data", "test_sralist.txt")
+
+
+    def test_sra_list(self):
+        test_result = sralist(list=self.sralist)
+        print(test_result)
+        assert test_result == ["ERX3310125", "ERX3289350", "ERX3289335", "SRX2141371"]

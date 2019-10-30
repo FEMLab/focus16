@@ -1,5 +1,5 @@
 import os
-from .run_all import parse_status_file, update_status_file
+from .run_focusDB import parse_status_file, update_status_file
 here = os.path.dirname(__file__)
 fpath = os.path.join(here, "sample_status_file")
 

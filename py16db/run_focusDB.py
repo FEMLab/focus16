@@ -508,37 +508,18 @@ def check_rDNA_copy_number(ref, output, logger):
     return rrn_num
 
 
-def get_and_check_ave_read_len_from_fastq(fastq1, minlen, maxlen, logger=None):
-    """return average read length in fastq1 file from first N reads
-    from LP: taken from github.com/nickp60/riboSeed/riboSeed/classes.py;
-    """
-    nreads = None
-    nreads = 1000
-    tot = 0
-    if os.path.splitext(fastq1)[-1] in ['.gz', '.gzip']:
-        open_fun = gzip.open
-    else:
-        open_fun = open
-    logger.debug("Obtaining average read length")
-    with open_fun(fastq1, "rt") as file_handle:
-        data = SeqIO.parse(file_handle, "fastq")
-        for i, read in enumerate(data):
-            tot += len(read)
-            if nreads is not None:
-                if i  >= nreads:
-                    break
-
-    ave_read_len = float(tot / i)
-    if ave_read_len < minlen:
+def check_read_len(read_len, minlen, maxlen, logger=None):
+    if read_len < minlen:
         logger.error("Average read length is too short: %s; skipping...",
-                     ave_read_len)
-        return (1, ave_read_len)
-    if ave_read_len > maxlen:
+                     read_len)
+        return 1
+    if read_len > maxlen:
         logger.critical("Average read length is too long: %s; skipping...",
-                        ave_read_len)
-        return (2, ave_read_len)
-    logger.debug("Average read length: %s", ave_read_len)
-    return (0, ave_read_len)
+                        read_len)
+        return 2
+    logger.debug("Average read length: %s", read_len)
+    return 0
+
 
 
 def get_coverage(read_length, approx_length, fastq1, fastq2, logger):
@@ -1260,7 +1241,7 @@ def main():
                 continue
 
         try:
-            rawreadsf, rawreadsr, download_error_message = \
+            rawreadsf, rawreadsr, read_length, download_error_message = \
                 fDB.get_SRA_data(
                     org=args.organism_name,
                     # genus=args.genus,    # TODO if needed
@@ -1286,10 +1267,11 @@ def main():
                 "name for this accession.")
             logger.error(download_error_message)
             continue
-        read_len_status, read_length = get_and_check_ave_read_len_from_fastq(
+        read_len_status = check_read_len(
+            read_len=read_length,
             minlen=args.minreadlen,
             maxlen=args.maxreadlen,
-            fastq1=rawreadsf, logger=logger)
+            logger=logger)
 
         if read_len_status != 0:
             if read_len_status == 1:

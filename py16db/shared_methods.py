@@ -1,5 +1,6 @@
 import random
 import os
+from Bio import SeqIO
 
 def filter_sraFind(sraFind, organism_name, strains, get_all, thisseed,
                use_available, logger):
@@ -46,8 +47,8 @@ def filter_sraFind(sraFind, organism_name, strains, get_all, thisseed,
             sras.append(these_sras[0])
     logger.info('Processing the following SRAs: %s', sras)
     return(sras)
-    
-    
+
+
 def get_lines_from_sraFind(sraFind, organism_name):
     """sraFind [github.com/nickp60/srafind], contains"""
     results = []
@@ -65,3 +66,24 @@ def get_lines_from_sraFind(sraFind, organism_name):
                     results.append(split_line[run_SRAs])
     results = [x for x in results if x != ""]
     return results
+
+
+def get_ave_read_len_from_fastq(fastq1, logger=None):
+    """return average read length in fastq1 file from first N reads
+    """
+    nreads = None
+    nreads = 1000
+    tot = 0
+    if os.path.splitext(fastq1)[-1] in ['.gz', '.gzip']:
+        open_fun = gzip.open
+    else:
+        open_fun = open
+    logger.debug("Obtaining average read length")
+    with open_fun(fastq1, "rt") as file_handle:
+        data = SeqIO.parse(file_handle, "fastq")
+        for i, read in enumerate(data):
+            tot += len(read)
+            if nreads is not None:
+                if i  >= nreads:
+                    break
+    return float(tot / i)

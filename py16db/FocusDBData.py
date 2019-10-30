@@ -9,7 +9,7 @@ import glob
 import sqlite3
 import random
 from plentyofbugs import get_n_genomes as gng
-
+from .shared_methods import get_ave_read_len_from_fastq
 
 class fasterqdumpError(Exception):
     pass
@@ -18,7 +18,7 @@ class fasterqdumpError(Exception):
 class FocusDBData(object):
     def __init__(self, dbdir=None, refdir=None,
                  sraFind_data=None, prokaryotes=None,
-                 krakendir=None):
+                 krakendir=None, setup=True):
         self.dbdir = dbdir
         self.refdir = refdir
         self.prokaryotes = prokaryotes
@@ -32,7 +32,8 @@ class FocusDBData(object):
         self.SRAs_manifest = os.path.join(self.dbdir, "SRAs_manifest.tab")
         self.db = os.path.join(self.dbdir, "focus.db")
         self.setup_if_needed()
-        self.read_SRA_manifest()
+        if setup:
+            self.read_SRA_manifest()
 
     def setup_if_needed(self):
         """ if needed, create directory and write header for status file
@@ -47,7 +48,7 @@ class FocusDBData(object):
                 conn = sqlite3.connect(self.db)
                 c = conn.cursor()
                 c.execute("CREATE TABLE IF NOT EXISTS SRAs (accession text PRIMARY KEY, status text, genus text, species text, readlen integer )")
-                #c.execute("CREATE TABLE IF NOT EXISTS SRAs (accession text PRIMARY KEY, status text, genus text, species text )")
+                # c.execute("CREATE TABLE IF NOT EXISTS SRAs (accession text PRIMARY KEY, status text, genus text, species text )")
                 # c.execute("CREATE TABLE IF NOT EXISTS Genomes (accssions text PRIMARY KEY, status text, genus text, species text)")
                 conn.commit()
                 conn.close()
@@ -63,19 +64,66 @@ class FocusDBData(object):
         #     with open(self.SRAs_manifest, "w") as outf:
         #         outf.write("SRA_accession\tStatus\tOrganism\n")
 
-    def recreate_fresh_db(self, logger):
+    def rebuild_fresh_db(self, logger):
         """ Sometimes, things go wrong
         """
         # move old DB to backup
-        new_entries = []
+        entries = []
         # vals = (newacc, newstatus, genus, species, readlen, )
-        # for each SRA in db
-        
-        with open(self.sraFind, "r") as inf:
-            
-        get_read_len()
-        
-        
+
+        shutil.move(self.db, self.db + ".bak")
+        these_sras =  [
+            x for x in
+            glob.glob(os.path.join(self.dbdir, "*/")) if
+            "references" not in x and "minikraken" not in  x
+        ]
+        logger.info("recreating data DB from %s SRAs" % len(these_sras))
+        for i, sra_dir in enumerate(these_sras):
+            if (i + 1) % 5 == 0:
+                logger.info("  %i of %i", i + 1, len(sra_dir) )
+            sra = os.path.basename(os.path.dirname(sra_dir))
+            genus, species = None, None
+            with open(self.sraFind_data, "r") as sraf:
+                for line in sraf:
+                    if sra in line:
+                        genus, species = \
+                            self.split_org(organism = line.split("\t")[12])
+            assert genus is not None,  "SRA not found in sraFind"
+            rawreadsf, rawreadsr, message = \
+                self.check_fastq_dir(
+                    this_data=sra_dir, mate_as_single=True, logger=logger)
+            if message == "":
+                read_len = get_ave_read_len_from_fastq(
+                    fastq1=rawreadsf, logger=logger)
+                entries.append(
+                    (sra, "PASS", genus, species, read_len, )
+                    )
+            else:
+                if message.startswith("No directory"):
+                    pass
+                elif message.startswith("No fastq"):
+                    if os.path.exists(sra_dir):
+                        shutil.rmtree(sra_dir)
+                elif message.startswith("Library error"):
+                    entries.append(
+                        (sra, "LIBRARY_ERROR", genus, species, 0, )
+                    )
+                elif message.startswith("Unfamiliar prefix"):
+                    # should we implement a blacklist?
+                    if os.path.exists(sra_dir):
+                        shutil.rmtree(sra_dir)
+                else:
+                    raise ValueError("Unfamiliar error message!")
+        self.setup_if_needed()
+        logger.info("adding the following entries to new db")
+        for entry in entries:
+            logger.info(entry)
+            self.update_manifest(newacc=entry[0],
+                            newstatus=entry[1],
+                            organism=entry[2] + " " + entry[3],
+                            readlen=entry[4],
+                            logger = logger)
+
     def check_or_get_minikraken2(self, logger):
         """
         """
@@ -144,12 +192,16 @@ class FocusDBData(object):
         if not done_and_dusted:
             raise e
 
-    def update_manifest(self, newacc, newstatus, organism, readlen, logger):
+    def split_org(self, organism):
+        organism = organism.replace('"', "")
         if " " in organism:
-            genus, species = organism.split(" ")
+            genus, species = organism.split(" ")[0], organism.split(" ")[1]
         else:
             genus, species = organism, ""
+        return (genus, species)
 
+    def update_manifest(self, newacc, newstatus, organism, readlen, logger):
+        genus, species = self.split_org(organism)
         done_and_dusted = False
         tries = 3
         while tries > 0 and not done_and_dusted:
@@ -235,13 +287,15 @@ class FocusDBData(object):
         rawreadsf, rawreadsr, download_error_message = \
             self.check_fastq_dir(this_data=suboutput_dir_raw,
                                  mate_as_single=False, logger=logger)
+
         if download_error_message == "":
             self.update_manifest(
                 newacc=SRA,
                 newstatus="PASS",
                 organism=org,
                 logger=logger)
-            return (rawreadsf, rawreadsr, download_error_message)
+            read_length = get_ave_read_len_from_fastq(fastq1=rawreadsf, logger=logger)
+            return (rawreadsf, rawreadsr, read_length, download_error_message)
         elif SRA in self.SRAs.keys():
             logger.debug(download_error_message)
             if self.SRAs[SRA]['status'] == "-":
@@ -253,7 +307,7 @@ class FocusDBData(object):
                         os.remove(f)
             elif self.SRAs[SRA]['status'] == "LIBRARY TYPE ERROR":
                 # dont try to reprocess
-                return (None, None, "Library type Error")
+                return (None, None, None, "Library type Error")
         elif os.path.exists(suboutput_dir_raw):
             for f in glob.glob(os.path.join(suboutput_dir_raw, "*.fastq.gz")):
                 os.remove(f)
@@ -319,14 +373,15 @@ class FocusDBData(object):
                 newstatus="PASS",
                 organism=org,
                 logger=logger)
-            return (rawreadsf, rawreadsr, download_error_message)
+            read_length = get_ave_read_len_from_fastq(fastq1=rawreadsf, logger=logger)
+            return (rawreadsf, rawreadsr, read_length, download_error_message)
         else:
             self.update_manifest(
                 newacc=SRA,
                 newstatus="LIBRARY TYPE ERROR",
                 organism=org,
                 logger=logger)
-            return (None, None, download_error_message)
+            return (None, None, None, download_error_message)
 
     def check_fastq_dir(self, this_data, mate_as_single, logger):
         # Double check the download worked.  If its a single lib,
@@ -374,25 +429,24 @@ class FocusDBData(object):
                         "treating first read from mate-pair library as single")
                 else:
                     logger.error(fastqs)
-                    download_error_message = "Unexpected item in the bagging area"
-                    download_error_message = "Unable to process library type"
+                    download_error_message = "Library error: Unable to process library type"
         if len(set(rawf)) == 1:
             rawreadsf = rawf[0]
         elif len(set(rawf)) > 1:
-            download_error_message = "multiple forward reads files detected"
+            download_error_message = "Library error: multiple forward reads files detected"
         else:
-            download_error_message = "No forward/single read files detected"
+            download_error_message = "Library error: No forward/single read files detected"
 
         if len(set(rawr)) == 1:
             rawreadsr = rawr[0]
         elif len(set(rawr)) > 1:
-            download_error_message = "multiple reverse reads files detected"
+            download_error_message = "Library error: multiple reverse reads files detected"
         else:
             rawreadsr = None
         # catch only .fastq and _2.fastq weird combo
         if rawreadsf is not None:
             if not rawreadsf.endswith("_1" + pre) and rawreadsr is not None:
-                download_error_message = "cannot process a single library " + \
+                download_error_message = "Library error: cannot process a single library " + \
                     " (non-forward) file and a reverse file"
         return (rawreadsf, rawreadsr, download_error_message)
 
@@ -421,18 +475,6 @@ class FocusDBData(object):
                 thisseed=args.seed,
                 logger=logger)
             )
-        # if len(glob.glob(os.path.join(self.refdir, "*.fna.gz"))) != 0:
-        #     logger.warning('Genome downloading may have been interupted; ' +
-        #                    'downloading fresh')
-        #     assert self.refdir != self.dbdir, "critical: refdir and dbdir should never be the same!"
-        #     shutil.rmtree(self.refdir)
-        #     os.makedirs(self.refdir)
-        #     return(self.our_get_n_genomes(
-        #         org=args.organism_name,
-        #         nstrains=args.nstrains,
-        #         thisseed=args.seed,
-        #         logger=logger)
-        #     )
         return 0
 
     def our_get_n_genomes(self, org, nstrains,  thisseed, logger):
