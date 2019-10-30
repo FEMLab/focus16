@@ -1,17 +1,13 @@
 import os
-import shutil
-import logging as logger
-
-from pathlib import Path
-from .run_all import parse_kraken_report
+from .run_focusDB import parse_kraken_report
 
 here = os.path.dirname(__file__)
 
 
-testfile = os.path.join(here, "test_data", "kraken2.report")
 
 
 def test_parse_kraken():
+    testfile = os.path.join(here, "test_data", "kraken2.report")
     full = parse_kraken_report(kraken2_report=testfile)
 
 

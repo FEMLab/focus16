@@ -31,7 +31,8 @@ def test_add_SRAs():
                       prokaryotes="proks",
                       sraFind_data="sraFind.txt")
     fDB.update_manifest(newacc="SRRtest123", newstatus="mostly_ok",
-                        organism = "test", logger=logger)
+                        organism = "test", readlen=123, logger=logger)
     print(fDB.SRAs)
     assert fDB.SRAs['SRRtest123']['status'] == "mostly_ok", \
         "error adding SRA to list"
+    assert fDB.SRAs['SRRtest123']['readlen'] == 123, "error adding read len"
