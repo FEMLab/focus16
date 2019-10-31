@@ -253,9 +253,11 @@ def get_args():  # pragma: nocover
         ": %(default)s")
     jobargs.add_argument(
         "--fastqtool",
-        help="either fastq-dump or fasterq-dump",
-        default="fasterq-dump",
-        choices=["fastq-dump", "fasterq-dump"],
+        # help="only fastq-dump, if you need to use fasterq-dump, " +
+        # "for using fasterq-dump, use --focusDB-prefetch",
+        help=argparse.SUPPRESS,
+        default="fastq-dump",
+        choices=["fastq-dump"], #, "fasterq-dump"],
         required=False)
     jobargs.add_argument(
         "--subassembler",
@@ -769,8 +771,8 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
     #                        "to incorrect metadata about pairing. " +
     #                        "For more information, see Sickle results in " +
     #                        sickle_out)
-    logger.debug('Downsampling reads')
     if "DOWNSAMPLED" not in parse_status_file(status_file):
+        logger.debug('Downsampling reads')
         update_status_file(status_file, to_remove=["RIBOSEED COMPLETE"])
         if os.path.exists(os.path.join(this_output, "downsampled")):
             shutil.rmtree(os.path.join(this_output, "downsampled"))
@@ -1133,7 +1135,6 @@ def main():
             use_available=args.use_available,
             logger=logger,
             get_all=args.get_all)
-    logger.debug("processing SRAs from the commandline")
     if filtered_sras == []:
         if args.custom_reads is None:
             logger.critical('No SRAs found on NCBI by sraFind')

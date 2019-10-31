@@ -150,7 +150,6 @@ class FocusDBData(object):
                     stderr=subprocess.PIPE,
                     check=True)
 
-
     def get_focusDB_dir(self):
         if self.dbdir is None:
             self.dbdir = os.path.join(os.path.expanduser("~"), ".focusDB", "")
@@ -280,48 +279,34 @@ class FocusDBData(object):
         assert tool in ["fastq-dump", "fasterq-dump"], \
             "unrecognized download tool"
         suboutput_dir_raw = os.path.join(self.dbdir, SRA, "")
-        if SRA in self.SRAs.keys():
-            logger.info("SRA data found in db")
-            rawreadsf, rawreadsr, download_error_message = \
-                self.check_fastq_dir(this_data=suboutput_dir_raw,
-                                     mate_as_single=False, logger=logger)
-            return (rawreadsf, rawreadsr, self.SRAs[SRA]["readlen"], download_error_message)
         logfile = os.path.join(suboutput_dir_raw, "download.log")
-        if retry_partial and SRA in self.SRAs.keys():
-            if self.SRAs[SRA]["status"] == "PARTIAL DOWNLOAD":
-                if os.path.exists(suboutput_dir_raw):
-                    for f in glob.glob(os.path.join(suboutput_dir_raw, "*.fastq.gz")):
-                        os.remove(f)
-        rawreadsf, rawreadsr, download_error_message = \
-            self.check_fastq_dir(this_data=suboutput_dir_raw,
-                                 mate_as_single=False, logger=logger)
 
-        if download_error_message == "":
-            read_length = get_ave_read_len_from_fastq(fastq1=rawreadsf, logger=logger)
-            self.update_manifest(
-                newacc=SRA,
-                newstatus="PASS",
-                organism=org,
-                readlen=read_length,
-                logger=logger)
-            return (rawreadsf, rawreadsr, read_length, download_error_message)
-        elif SRA in self.SRAs.keys():
-            logger.debug(download_error_message)
-            if self.SRAs[SRA]['status'] == "-":
-                raise ValueError("Corrupted manifest; unable to find " +
-                                 "previously processed files")
-            elif self.SRAs[SRA]['status'] == "DOWNLOAD ERROR":
+        #  first check if it has already been processed
+        if SRA in self.SRAs.keys():
+            # if we had a previous download failure, clobber the dir
+            if self.SRAs[SRA]["status"] == 'DOWNLOAD ERROR':
+                logger.debug("removing dir for failed download")
+                if os.path.exists(suboutput_dir_raw):
+                    shutil.rmtree(suboutput_dir_raw)
+            # check for cases where downloads need to bee retried, and if so,
+            elif retry_partial and self.SRAs[SRA]["status"] == "PARTIAL DOWNLOAD":
                 if os.path.exists(suboutput_dir_raw):
                     for f in glob.glob(os.path.join(suboutput_dir_raw, "*.fastq.gz")):
                         os.remove(f)
+            # deal with lib type errors by returning
             elif self.SRAs[SRA]['status'] == "LIBRARY TYPE ERROR":
                 # dont try to reprocess
                 return (None, None, None, "Library type Error")
-        elif os.path.exists(suboutput_dir_raw):
-            for f in glob.glob(os.path.join(suboutput_dir_raw, "*.fastq.gz")):
-                os.remove(f)
-        else:
-            pass
+            #otherwise, parse the status from the dir contents,
+            else:
+                # and return
+                logger.info("SRA data found in db")
+                rawreadsf, rawreadsr, download_error_message = \
+                    self.check_fastq_dir(this_data=suboutput_dir_raw,
+                                         mate_as_single=True, logger=logger)
+                return (rawreadsf, rawreadsr, self.SRAs[SRA]["readlen"], download_error_message)
+
+        # at this point, data should be ready to be reprocessed
         os.makedirs(suboutput_dir_raw, exist_ok=True)
         # defaults to 6 threads or whatever is convenient;
         # we suspect I/O limits using more in most cases,
@@ -370,13 +355,13 @@ class FocusDBData(object):
                 raise fasterqdumpError
             else:
                 logger.warning("Downloaded %s partially; continuing", SRA)
-                status = "PARTIAL"
+                status = "PARTIAL DOWNLOAD"
                 time.sleep(10)
-        read_length = get_ave_read_len_from_fastq(fastq1=rawreadsf,
-                                                  logger=logger)
         rawreadsf, rawreadsr, download_error_message = \
             self.check_fastq_dir(this_data=suboutput_dir_raw,
-                                 mate_as_single=False, logger=logger)
+                                 mate_as_single=True, logger=logger)
+        read_length = get_ave_read_len_from_fastq(fastq1=rawreadsf,
+                                                  logger=logger)
         if download_error_message == "":
             read_length = get_ave_read_len_from_fastq(fastq1=rawreadsf, logger=logger)
             self.update_manifest(
@@ -419,6 +404,7 @@ class FocusDBData(object):
         rawf, rawr = [], []
         rawreadsf, rawreadsr = None, None
         download_error_message = ""
+        found_mate_lib = False
         for fastq in fastqs:
             if fastq.endswith("_1" + pre):
                 # not appending, cause we want to bump out any single libs t
@@ -435,10 +421,11 @@ class FocusDBData(object):
                 else:
                     logger.warning("ignoring extra library %s", fastq)
             else:
-                logger.error("Can only process paired or single-end reads")
+                logger.warning("Can only process paired-end or single-end reads")
                 if mate_as_single:
                     logger.warning(
                         "treating first read from mate-pair library as single")
+                    found_mate_lib = True
                 else:
                     logger.error(fastqs)
                     download_error_message = "Library error: Unable to process library type"
@@ -460,6 +447,10 @@ class FocusDBData(object):
             if not rawreadsf.endswith("_1" + pre) and rawreadsr is not None:
                 download_error_message = "Library error: cannot process a single library " + \
                     " (non-forward) file and a reverse file"
+        # this keeps us from processing the linker _2 read as the reverse.
+        if mate_as_single and found_mate_lib:
+            rawreadsr = None
+        logger.debug("Reads: S/F: %s, R:%s", rawreadsf, rawreadsr)
         return (rawreadsf, rawreadsr, download_error_message)
 
     #####################   Methods for dealing with reference genomes ########
