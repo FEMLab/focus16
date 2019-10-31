@@ -492,7 +492,6 @@ class FocusDBData(object):
             return 1
         if nstrains == 0:
             nstrains = len(org_lines)
-        print(nstrains)
         cmds = gng.make_fetch_cmds(
             org_lines,
             nstrains=nstrains,
