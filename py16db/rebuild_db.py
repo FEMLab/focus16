@@ -50,7 +50,7 @@ def main():
     if shutil.which("prefetch") is None:
         raise ValueError("sra-tools must be installed and in PATH")
     fDB = FocusDBData(
-        dbdir=None,
+        dbdir=args.focusDB_data,
         refdir=args.genomes_dir,
         sraFind_data=args.sra_path,
         prokaryotes=args.prokaryotes,

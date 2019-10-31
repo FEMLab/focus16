@@ -23,7 +23,7 @@ class FocusDBData(object):
         self.refdir = refdir
         self.prokaryotes = prokaryotes
         self.sraFind_data = sraFind_data
-        self.SRAs = {}  # acc, status, genus species
+        self.SRAs = {}  # acc, status, genus, species, readlen
         self.krakendir = krakendir
         # get/set location of data
         self.get_focusDB_dir()
@@ -80,7 +80,7 @@ class FocusDBData(object):
         logger.info("recreating data DB from %s SRAs" % len(these_sras))
         for i, sra_dir in enumerate(these_sras):
             if (i + 1) % 5 == 0:
-                logger.info("  %i of %i", i + 1, len(sra_dir) )
+                logger.info("  %i of %i", i + 1, len(these_sras))
             sra = os.path.basename(os.path.dirname(sra_dir))
             genus, species = None, None
             with open(self.sraFind_data, "r") as sraf:
@@ -88,7 +88,9 @@ class FocusDBData(object):
                     if sra in line:
                         genus, species = \
                             self.split_org(organism = line.split("\t")[12])
-            assert genus is not None,  "SRA not found in sraFind"
+            if genus is None:
+                logger.warningg("SRA not found in sraFind:  %s",sra)
+                shutil.rmtree(sra_dir)
             rawreadsf, rawreadsr, message = \
                 self.check_fastq_dir(
                     this_data=sra_dir, mate_as_single=True, logger=logger)
@@ -278,6 +280,12 @@ class FocusDBData(object):
         assert tool in ["fastq-dump", "fasterq-dump"], \
             "unrecognized download tool"
         suboutput_dir_raw = os.path.join(self.dbdir, SRA, "")
+        if SRA in self.SRAs.keys():
+            logger.info("SRA data found in db")
+            rawreadsf, rawreadsr, download_error_message = \
+                self.check_fastq_dir(this_data=suboutput_dir_raw,
+                                     mate_as_single=False, logger=logger)
+            return (rawreadsf, rawreadsr, self.SRAs[SRA]["readlen"], download_error_message)
         logfile = os.path.join(suboutput_dir_raw, "download.log")
         if retry_partial and SRA in self.SRAs.keys():
             if self.SRAs[SRA]["status"] == "PARTIAL DOWNLOAD":
@@ -289,12 +297,13 @@ class FocusDBData(object):
                                  mate_as_single=False, logger=logger)
 
         if download_error_message == "":
+            read_length = get_ave_read_len_from_fastq(fastq1=rawreadsf, logger=logger)
             self.update_manifest(
                 newacc=SRA,
                 newstatus="PASS",
                 organism=org,
+                readlen=read_length,
                 logger=logger)
-            read_length = get_ave_read_len_from_fastq(fastq1=rawreadsf, logger=logger)
             return (rawreadsf, rawreadsr, read_length, download_error_message)
         elif SRA in self.SRAs.keys():
             logger.debug(download_error_message)
@@ -318,6 +327,7 @@ class FocusDBData(object):
         # we suspect I/O limits using more in most cases,
         # so we don't give the user the option to increase this
         # https://github.com/ncbi/sra-tools/wiki/HowTo:-fasterq-dump
+        status =  "PASS"
         verb = "" if tool == "fastq-dump" else "-vvv "
         cmd = str(
             "{tool} --gzip -O " +
@@ -335,6 +345,7 @@ class FocusDBData(object):
                 newacc=SRA,
                 newstatus="DOWNLOAD ERROR",
                 organism=org,
+                readlen=0,
                 logger=logger)
             logger.critical("Error running fasterq-dump; see log file at %s",
                             logfile)
@@ -345,6 +356,7 @@ class FocusDBData(object):
                     newacc=SRA,
                     newstatus="DOWNLOAD ERROR",
                     organism=org,
+                    readlen=0,
                     logger=logger)
                 logger.critical("%s timed out downloading %s",
                                 tool, SRA)
@@ -358,28 +370,28 @@ class FocusDBData(object):
                 raise fasterqdumpError
             else:
                 logger.warning("Downloaded %s partially; continuing", SRA)
+                status = "PARTIAL"
                 time.sleep(10)
-                self.update_manifest(
-                    newacc=SRA,
-                    newstatus="PARTIAL DOWNLOAD",
-                    organism=org,
-                    logger=logger)
+        read_length = get_ave_read_len_from_fastq(fastq1=rawreadsf,
+                                                  logger=logger)
         rawreadsf, rawreadsr, download_error_message = \
             self.check_fastq_dir(this_data=suboutput_dir_raw,
                                  mate_as_single=False, logger=logger)
         if download_error_message == "":
+            read_length = get_ave_read_len_from_fastq(fastq1=rawreadsf, logger=logger)
             self.update_manifest(
                 newacc=SRA,
-                newstatus="PASS",
+                newstatus=status,
                 organism=org,
+                readlen=read_length,
                 logger=logger)
-            read_length = get_ave_read_len_from_fastq(fastq1=rawreadsf, logger=logger)
             return (rawreadsf, rawreadsr, read_length, download_error_message)
         else:
             self.update_manifest(
                 newacc=SRA,
                 newstatus="LIBRARY TYPE ERROR",
                 organism=org,
+                readlen=0,
                 logger=logger)
             return (None, None, None, download_error_message)
 

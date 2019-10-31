@@ -1,6 +1,7 @@
 import random
 import os
 from Bio import SeqIO
+import gzip
 
 def filter_sraFind(sraFind, organism_name, strains, get_all, thisseed,
                use_available, logger):

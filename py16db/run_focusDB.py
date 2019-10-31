@@ -1089,24 +1089,31 @@ def main():
     check_programs(logger)
     # set up the data object
     # grooms path names or uses default location if unset
+    logger.debug("checking focusDB data directory")
     fDB = FocusDBData(
         dbdir=args.focusDB_data,
         refdir=args.genomes_dir,
         sraFind_data=args.sra_path,
         krakendir=args.kraken2_dir,
         prokaryotes=args.prokaryotes)
+    logger.debug("checking focusDB data reference genomes")
     fDB.check_genomes_dir(org=args.organism_name)
+    logger.debug("checking for sraFind")
     fDB.fetch_sraFind_data(logger=logger)
+    logger.debug("checking for minikraken2 db")
     fDB.check_or_get_minikraken2(logger=logger)
 
     # process data 1 of 4 ways: specific SRA(s), a file of SRA(s),
     #  specific read file (stored as a faux SRA), or the default
     #  to get a list of SRAs from sraFind for a given organism name
     if args.SRAs is not None:
+        logger.debug("processing SRAs from the commandline")
         filtered_sras = args.SRAs
     elif args.SRA_list is not None:
+        logger.debug("processing SRAs from file")
         filtered_sras = sralist(list=args.SRA_list)
     elif args.custom_reads is not None:
+        logger.debug("processing reads from the commandline")
         this_data_dir = os.path.join(fDB.dbdir, args.custom_name)
         if not os.path.exists(this_data_dir):
             os.makedirs(this_data_dir)
@@ -1117,6 +1124,7 @@ def main():
             pass
         filtered_sras = [args.custom_name]
     else:
+        logger.debug("processing SRAs by organism name")
         filtered_sras = filter_sraFind(
             sraFind=fDB.sraFind_data,
             organism_name=args.organism_name,
@@ -1125,7 +1133,7 @@ def main():
             use_available=args.use_available,
             logger=logger,
             get_all=args.get_all)
-
+    logger.debug("processing SRAs from the commandline")
     if filtered_sras == []:
         if args.custom_reads is None:
             logger.critical('No SRAs found on NCBI by sraFind')
@@ -1135,6 +1143,7 @@ def main():
                 note="No SRAs available")
             sys.exit(1)
 
+    logger.debug("Preparing reference genomes")
     pob_result = fDB.decide_skip_or_download_genomes(args, logger)
     if pob_result != 0:
         if pob_result == 1:
@@ -1258,7 +1267,6 @@ def main():
                 args, status="ERROR", stage=accession, note=message)
             logger.error(message)
             add_key_or_increment(n_errors, "Downloading")
-            continue
         if download_error_message != "":
             write_pass_fail(args, status="ERROR", stage=accession,
                             note=download_error_message)
