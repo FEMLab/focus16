@@ -388,13 +388,17 @@ def get_args():  # pragma: nocover
     return(args)
 
 
-def check_programs(logger):
+def check_programs(args, logger):
     """exits if the following programs are not installed"""
 
     required_programs = [
+        args.fastqtool,
+        args.subassembler, "spades.py",
         "ribo", "barrnap", "fasterq-dump", "mash",
-        "skesa", "plentyofbugs", "iqtree", "seqtk",
+        "skesa", "plentyofbugs", "seqtk",
         "kraken2"]
+    if args.sge:
+        required_programs.append("qsub")
     for program in required_programs:
         if shutil.which(program) is None:
             logger.critical('%s is not installed: exiting.', program)
@@ -849,10 +853,11 @@ def check_riboSeed_outcome(status_file, contigs):
         if bad_error_occurred:
             raise riboSeedError(str(
                 "riboSeed output folder %s is empty or missing. " +
-                "A fatal error occurred when trying to run riboSeed. Try " +
-                "running 'ribo --help' to ensurethat the installation is " +
+                "A fatal error occurred during final assemblies.. Try " +
+                "running 'ribo --help' to ensure that the installation is " +
                 "functioning, then try rerunning the 'ribo run...'  command " +
-                " from the focusDB log file.") % this_output )
+                " from the focusDB log file. If running with SGE, " +
+                "check the log files") % this_output )
         else:
             raise riboSeedUnsuccessfulError(str(
                 "riboSeed completed but was not successful; " +
@@ -1055,7 +1060,7 @@ def write_sge_script(args, ntorun, riboSeed_jobs, script_path):
         "#$ -tc %i" % args.njobs,
         "#$ -cwd",
         "#$ -j yes",
-        "#$ -N focusDB_assembs",
+        "#$ -N focusDB_%s" % args.organism_name.split(" ")[0].strip(),
         "#$ -pe mpi %i" % args.cores,
         "#$ -l h_vmem=%iG" % args.memory,
         "set -e",
@@ -1071,7 +1076,7 @@ def write_sge_script(args, ntorun, riboSeed_jobs, script_path):
     with open(script_path, "w") as outf:
         for l in lines:
             outf.write(l + "\n")
-        outf.write("echo '" + end_message + "'\n" )
+        # outf.write("echo '" + end_message + "'\n" )
 
 
 def main():
@@ -1088,7 +1093,7 @@ def main():
     logger.debug("All settings used:")
     for k, v in sorted(vars(args).items()):
         logger.debug("{0}: {1}".format(k, v))
-    check_programs(logger)
+    check_programs(args, logger)
     # set up the data object
     # grooms path names or uses default location if unset
     logger.debug("checking focusDB data directory")
@@ -1353,37 +1358,55 @@ def main():
     all_assemblies = []  # [contigs, tax{}]
     ribo_cmds = [x[1] for x in riboSeed_jobs if x[1] is not None]
     n_assemblies_to_run = sum([1 for x in riboSeed_jobs if x[1] is not None])
+    error_during_assembly = False
     if n_assemblies_to_run > 0:
         if args.sge:
             script_path = os.path.join(args.output_dir, "run_assemblies.sh")
             write_sge_script(args, n_assemblies_to_run,
                              riboSeed_jobs, script_path)
             logger.info(str(
-                "Constucted sge script %s for the %i riboSeed runs; " +
+                "Constucted sge script %s for the %i riboSeed runs, and " +
+                "submitting with qsub; if something goes wrong, " +
+                "cmds are written out as a file as well;" +
                 "qsub this, and when it is finished, rerun focusDB with the "+
                 "same command; if all runs finish, it will proceeed to " +
                 "parsing the results. Exiting...") % (
                     script_path, n_assemblies_to_run))
-            sys.exit()
-        # else
-        logger.info("Processing %i riboSeed runs; this can take a while",
-                    n_assemblies_to_run)
+            logger.info("starting array job named 'focusdB_%s'", args.organism_name.split(" ")[0])
+            logger.info("This can take a while...")
+            # the -sync arg makes qsub wait for a return code till
+            # the last array job has run.
+            array_res = subprocess.run("qsub -sync " + script_path,
+                                       shell=sys.platform != "win32",
+                                       check=False)
+            if array_res.returncode != 0:
+                error_during_assembly = True
+            logger.info("Done running job array, " +
+                        "which exited with return code %i",
+                        array_res.returncode)
 
-        pool = multiprocessing.Pool(processes=args.njobs)
-        logger.debug("running the following commands:")
-        logger.debug("\n".join(ribo_cmds))
-        riboSeed_pool_results = [
-            pool.apply_async(run_riboSeed_catch_errors,
-                             (cmd,),
-                             {"args": args,
-                              "acc": acc,
-                              "status_file": sfile,
-                              "riboSeed_jobs": riboSeed_jobs})
-            for acc, cmd, contigs, sfile, tax_d, _ in riboSeed_jobs]
-        pool.close()
-        pool.join()
-        ribo_results_sum = sum([r.get() for r in riboSeed_pool_results])
-        logger.debug("Sum of return codes (should be 0): %i", ribo_results_sum)
+
+        else:
+            logger.info("Processing %i riboSeed runs; this can take a while",
+                        n_assemblies_to_run)
+
+            pool = multiprocessing.Pool(processes=args.njobs)
+            logger.debug("running the following commands:")
+            logger.debug("\n".join(ribo_cmds))
+            riboSeed_pool_results = [
+                pool.apply_async(run_riboSeed_catch_errors,
+                                 (cmd,),
+                                 {"args": args,
+                                  "acc": acc,
+                                  "status_file": sfile,
+                                  "riboSeed_jobs": riboSeed_jobs})
+                for acc, cmd, contigs, sfile, tax_d, _ in riboSeed_jobs]
+            pool.close()
+            pool.join()
+            ribo_results_sum = sum([r.get() for r in riboSeed_pool_results])
+            logger.debug("Sum of return codes (should be 0): %i", ribo_results_sum)
+            if ribo_results_sum != 0:
+                error_during_assembly = True
     else:
         logger.info("No assemblies need to be run")
     for v in riboSeed_jobs:
@@ -1438,6 +1461,8 @@ def main():
                             note="Error running barrnap")
 
     ###########################################################################
+    if error_during_assembly:
+        logger.warning("Warning: 1 or more errors occured during assembly")
     logger.info("Wrote out %i sequences", n_extracted_seqs)
     if len(n_errors) != 0:
         logger.warning("Errors during run:")
