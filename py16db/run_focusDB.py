@@ -942,15 +942,15 @@ def extract_16s_from_assembly(assembly, gff, sra, output, output_summary,
                             **locals())
                         # Need to disable linewrapping for use with SILVA, etc
                         if singleline:
-                            seqstr = str(seq)
+                            seqstr = str(seq.transcribe())
                             outf.write(
-                                str(">{thisidcoords} {tax_string}\n" +
+                                str(">{thisidcoords} {big_tax_string}\n" +
                                     "{seqstr}\n").format(**locals()))
                         else:
                             SeqIO.write(
                                 SeqRecord(
-                                    seq, id=thisidcoords,
-                                    description=tax_string),
+                                    seq.transcribe(), id=thisidcoords,
+                                    description=big_tax_string),
                                 outf,  "fasta")
                         outsum.write(
                             str(
@@ -1273,6 +1273,7 @@ def main():
                 args, status="ERROR", stage=accession, note=message)
             logger.error(message)
             add_key_or_increment(n_errors, "Downloading")
+            continue
         if download_error_message != "":
             write_pass_fail(args, status="ERROR", stage=accession,
                             note=download_error_message)
@@ -1280,7 +1281,9 @@ def main():
                 "Error either downloading or parsing the file " +
                 "name for this accession.")
             logger.error(download_error_message)
+            add_key_or_increment(n_errors, "Downloading")
             continue
+        logger.debug("Checking read length")
         read_len_status = check_read_len(
             read_len=read_length,
             minlen=args.minreadlen,
@@ -1298,6 +1301,7 @@ def main():
             continue
         #  heres the meat of the main, catching errors for
         #  anything but the riboSeed step
+        logger.debug("preparing for re-assembly")
         try:
             riboSeed_cmd, contigs_path, taxonomy_d = process_strain(
                 rawreadsf, rawreadsr, read_length, fDB.refdir,
@@ -1421,7 +1425,6 @@ def main():
                             stage=v[0],
                             note="riboSeed Error")
             logger.error(e)
-            sys.exit(1)
         except riboSeedUnsuccessfulError as e:
             # assert v[4] == 1, "unknown error running riboSeed found by focusDB"
             update_status_file(v[3], message="RIBOSEED COMPLETE")
