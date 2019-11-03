@@ -755,8 +755,8 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
                              "database possibly outdated")
     else:
         approx_length = args.approx_length
-    if "TRIMMED" not in parse_status_file(status_file) and \
-       os.path.exists(os.path.join(sickle_out, "fastp.html")):
+    if "TRIMMED" not in parse_status_file(status_file) or \
+       not os.path.exists(os.path.join(sickle_out, "fastp.html")):
         logger.info('Quality trimming reads')
         update_status_file(status_file,
                            to_remove=["DOWNSAMPLED", "RIBOSEED COMPLETE"])
@@ -766,7 +766,8 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
         fastq1=rawreadsf,
         fastq2=rawreadsr,
         output_dir=sickle_out,
-        run="TRIMMED" not in parse_status_file(status_file))
+        run="TRIMMED" not in parse_status_file(status_file),
+        logger=logger)
     update_status_file(status_file, message="TRIMMED")
     logger.debug('Quality trimmed f reads: %s', trimmed_fastq1)
     logger.debug('Quality trimmed r reads: %s', trimmed_fastq2)
@@ -1079,12 +1080,14 @@ def write_sge_script(args, ntorun, riboSeed_jobs, script_path):
             outf.write(l + "\n")
         # outf.write("echo '" + end_message + "'\n" )
 
-def run_trimmer(fastq1, fastq2, output_dir, run):
+def run_trimmer(fastq1, fastq2, output_dir, run, logger):
     """ run sickle for read trimming, and then fastp for adapter trimmming/QC,
     return paths to trimmed reads
     """
     if shutil.which("sickle") is None:
         raise ValueError("sickle not found in PATH!")
+    if shutil.which("fastp") is None:
+        raise ValueError("fastq not found in PATH!")
     sickle_fastq1 = os.path.join(output_dir, "fastq1_trimmed.fastq")
     sickle_fastq2 = os.path.join(output_dir, "fastq2_trimmed.fastq")
     new_fastq1 = os.path.join(output_dir, "fastq1_trimmed_noadapt.fastq")
@@ -1110,9 +1113,12 @@ def run_trimmer(fastq1, fastq2, output_dir, run):
             "--cut_front --cut_tail " +
             "--in1 {sickle_fastq1} --in2 {sickle_fastq2}  " +
             "--out1 {new_fastq1} --out2 {new_fastq2}").format(**locals())
-    if run:
+    if run or not os.path.exists(new_fastq1):
+        if run:
+            logger.debug("re-running filtering")
         os.makedirs(output_dir)
         try:
+            logger.debug(cmd)
             subprocess.run(cmd,
                            shell=sys.platform !="win32",
                            stdout=subprocess.PIPE,
@@ -1121,6 +1127,7 @@ def run_trimmer(fastq1, fastq2, output_dir, run):
         except:
             cmd = cmd.replace("sanger", "solexa")
             try:
+                logger.debug(cmd)
                 subprocess.run(cmd,
                                shell=sys.platform !="win32",
                                stdout=subprocess.PIPE,
@@ -1130,6 +1137,7 @@ def run_trimmer(fastq1, fastq2, output_dir, run):
                 raise ValueError("Error executing sickle cmd!")
         # run fastp to trim adapters
         try:
+            logger.debug(fastpcmd)
             subprocess.run(fastpcmd,
                            shell=sys.platform !="win32",
                            stdout=subprocess.PIPE,
