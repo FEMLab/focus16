@@ -14,7 +14,6 @@ import multiprocessing
 from pathlib import Path
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
-from py16db.run_sickle import run_sickle
 
 from . import __version__
 from py16db.FocusDBData import FocusDBData, fasterqdumpError
@@ -395,6 +394,7 @@ def check_programs(args, logger):
         args.fastqtool,
         args.subassembler, "spades.py",
         "ribo", "barrnap", "fasterq-dump", "mash",
+        "sickle", "fastp",
         "skesa", "plentyofbugs", "seqtk",
         "kraken2"]
     if args.sge:
@@ -755,13 +755,14 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
                              "database possibly outdated")
     else:
         approx_length = args.approx_length
-    if "TRIMMED" not in parse_status_file(status_file):
+    if "TRIMMED" not in parse_status_file(status_file) and \
+       os.path.exists(os.path.join(sickle_out, "fastp.html")):
         logger.info('Quality trimming reads')
         update_status_file(status_file,
                            to_remove=["DOWNSAMPLED", "RIBOSEED COMPLETE"])
         if os.path.exists(sickle_out):
             shutil.rmtree(sickle_out)
-    trimmed_fastq1, trimmed_fastq2 = run_sickle(
+    trimmed_fastq1, trimmed_fastq2 = run_trimmer(
         fastq1=rawreadsf,
         fastq2=rawreadsr,
         output_dir=sickle_out,
@@ -1078,6 +1079,67 @@ def write_sge_script(args, ntorun, riboSeed_jobs, script_path):
             outf.write(l + "\n")
         # outf.write("echo '" + end_message + "'\n" )
 
+def run_trimmer(fastq1, fastq2, output_dir, run):
+    """ run sickle for read trimming, and then fastp for adapter trimmming/QC,
+    return paths to trimmed reads
+    """
+    if shutil.which("sickle") is None:
+        raise ValueError("sickle not found in PATH!")
+    sickle_fastq1 = os.path.join(output_dir, "fastq1_trimmed.fastq")
+    sickle_fastq2 = os.path.join(output_dir, "fastq2_trimmed.fastq")
+    new_fastq1 = os.path.join(output_dir, "fastq1_trimmed_noadapt.fastq")
+    new_fastq2 = os.path.join(output_dir, "fastq2_trimmed_noadapt.fastq")
+    sickle_fastqs = os.path.join(output_dir, "singles_from_trimming.fastq")
+    report_pre = os.path.join(output_dir, "fastp")
+    if fastq2 is None:
+        ##since illumina 1.8, quality scores returned to sanger.
+        cmd = str("sickle se -f {fastq1} " +
+                  "-t sanger -o {sickle_fastq1}").format(**locals())
+        # defaults to adapter trimming
+        fastpcmd = str(
+            "fastp --json {report_pre}.json --html {report_pre}.html " +
+            "--cut_front --cut_tail " +
+            "--in1 {sickle_fastq1}  --out1 {new_fastq1}").format(**locals())
+        new_fastq2 = None
+    else:
+        cmd = str("sickle pe -f {fastq1} -r {fastq2} -t sanger " +
+                  "-o {sickle_fastq1} -p {sickle_fastq2} " +
+                  "-s {sickle_fastqs}").format(**locals())
+        fastpcmd = str(
+            "fastp --json {report_pre}.json --html {report_pre}.html " +
+            "--cut_front --cut_tail " +
+            "--in1 {sickle_fastq1} --in2 {sickle_fastq2}  " +
+            "--out1 {new_fastq1} --out2 {new_fastq2}").format(**locals())
+    if run:
+        os.makedirs(output_dir)
+        try:
+            subprocess.run(cmd,
+                           shell=sys.platform !="win32",
+                           stdout=subprocess.PIPE,
+                           stderr=subprocess.PIPE,
+                           check=True)
+        except:
+            cmd = cmd.replace("sanger", "solexa")
+            try:
+                subprocess.run(cmd,
+                               shell=sys.platform !="win32",
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE,
+                               check=True)
+            except:
+                raise ValueError("Error executing sickle cmd!")
+        # run fastp to trim adapters
+        try:
+            subprocess.run(fastpcmd,
+                           shell=sys.platform !="win32",
+                           stdout=subprocess.PIPE,
+                           stderr=subprocess.PIPE,
+                           check=True)
+        except:
+            raise ValueError("Error executing fastp cmd!")
+    return (new_fastq1, new_fastq2)
+
+
 
 def main():
     args = get_args()
@@ -1380,7 +1442,7 @@ def main():
             logger.info("This can take a while...")
             # the -sync arg makes qsub wait for a return code till
             # the last array job has run.
-            array_res = subprocess.run("qsub -sync " + script_path,
+            array_res = subprocess.run("qsub -sync y " + script_path,
                                        shell=sys.platform != "win32",
                                        check=False)
             if array_res.returncode != 0:

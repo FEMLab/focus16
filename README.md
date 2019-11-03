@@ -27,7 +27,8 @@ Given an organism, focusDB does the following:
 focusDB available via pypi. We recommend installing within a python environment.
 
 ```
-conda create --name focusDBenv python=3.5 seqtk sickle-trim sra-tools riboseed mash skesa barrnap parallel-fastq-dump iqtree mafft kraken2
+conda create --name focusDBenv python=3.5 seqtk sickle-trim sra-tools riboseed mash skesa barrnap iqtree mafft kraken2  fastp
+
 conda activate focusDBenv
 pip install focusDB
 
