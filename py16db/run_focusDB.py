@@ -708,11 +708,13 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
     # downsampling and assembly will be run. This is to protect against
     # files sticking around when they shouldn't
     if not os.path.exists(best_reference):
+        logger.debug("Preparing to run plentyofbugs")
         if os.path.exists(pob_dir):
             shutil.rmtree(pob_dir)
         pob(genomes_dir=genomes_dir, readsf=rawreadsf,
             output_dir=pob_dir, maxdist=args.maxdist, logger=logger)
 
+    logger.debug("Parsing closestt reference")
     with open(best_reference, "r") as infile:
         for line in infile:
             best_ref_fasta = line.split('\t')[0]
@@ -738,6 +740,9 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
             update_status_file(status_file, message="TAXONOMY")
         except Exception as e:
             raise kraken2Error(e)
+    else:
+        logger.debug("usingg existing kraken results")
+
     if os.path.getsize(report_output) == 0:
         raise kraken2Error("Kraken output file  exists but is empty")
     tax_dict = parse_kraken_report(kraken2_report=report_output)
@@ -762,6 +767,9 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
                            to_remove=["DOWNSAMPLED", "RIBOSEED COMPLETE"])
         if os.path.exists(sickle_out):
             shutil.rmtree(sickle_out)
+    else:
+        logger.debug('Skipping trimming, parsing existing results')
+
     trimmed_fastq1, trimmed_fastq2 = run_trimmer(
         fastq1=rawreadsf,
         fastq2=rawreadsr,
@@ -782,6 +790,8 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
         update_status_file(status_file, to_remove=["RIBOSEED COMPLETE"])
         if os.path.exists(os.path.join(this_output, "downsampled")):
             shutil.rmtree(os.path.join(this_output, "downsampled"))
+    else:
+        logger.debug('Skipping downsampling, parsing existing results')
     downsampledf, downsampledr = downsample(
         approx_length=approx_length,
         fastq1=trimmed_fastq1,
@@ -795,6 +805,7 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
     update_status_file(status_file, message="DOWNSAMPLED")
     logger.debug('Downsampled f reads: %s', downsampledf)
     logger.debug('Downsampled r reads: %s', downsampledr)
+    logger.debug("creating riboSeed command")
     riboseed_cmd = make_riboseed_cmd(sra=best_ref_fasta, readsf=downsampledf,
                                      readsr=downsampledr, cores=args.cores,
                                      memory=args.memory,
@@ -805,8 +816,10 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
                                      logger=logger)
     # do we want to redo the assembly?
     if args.redo_assembly:
+        logger.debug("preparing to redo riboSeed")
         update_status_file(status_file, to_remove=["RIBOSEED COMPLETE"])
         if os.path.exists(ribo_dir):
+            logger.debug("removing previous riboSeed results")
             shutil.rmtree(ribo_dir)
     # file that will contain riboseed contigs
     if args.just_seed:
@@ -1113,7 +1126,7 @@ def run_trimmer(fastq1, fastq2, output_dir, run, logger):
             "--cut_front --cut_tail " +
             "--in1 {sickle_fastq1} --in2 {sickle_fastq2}  " +
             "--out1 {new_fastq1} --out2 {new_fastq2}").format(**locals())
-    if run or not os.path.exists(new_fastq1):
+    if run: # or not os.path.exists(new_fastq1):
         if run:
             logger.debug("re-running filtering")
         os.makedirs(output_dir)
@@ -1446,7 +1459,7 @@ def main():
                 "same command; if all runs finish, it will proceeed to " +
                 "parsing the results. Exiting...") % (
                     script_path, n_assemblies_to_run))
-            logger.info("starting array job named 'focusdB_%s'", args.organism_name.split(" ")[0])
+            logger.info("starting array job named 'focusDB_%s'", args.organism_name.split(" ")[0])
             logger.info("This can take a while...")
             # the -sync arg makes qsub wait for a return code till
             # the last array job has run.
