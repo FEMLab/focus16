@@ -898,6 +898,7 @@ def run_barrnap(assembly,  results, logger):
 
 def extract_16s_from_assembly(assembly, gff, sra, output, output_summary,
                               args, singleline, tax_d, min_length, logger):
+    logger.debug("processing %s", assembly)
     tax_string = tax_d["S"][2]
     # if no label at some level, give the next one
     if len(tax_string.replace(" ", "")) == 0:  # if genus only
@@ -928,7 +929,7 @@ def extract_16s_from_assembly(assembly, gff, sra, output, output_summary,
         rrn_num = 0
         for rawline in rrn:
             line = rawline.strip().split('\t')
-            # need this: catches index errors
+            # need this: catches index errors from the comment lines
             if line[0].startswith("##"):
                 pass
             elif line[8].startswith("Name=16S"):
@@ -949,6 +950,7 @@ def extract_16s_from_assembly(assembly, gff, sra, output, output_summary,
                 results16s[thisid] = [chrom, start, end, line[6]]
                 with open(assembly, "r") as asmb:
                     for rec in SeqIO.parse(asmb, "fasta"):
+                        #logger.debug("%s\t%s", chrom, rec.id)
                         if rec.id != chrom:
                             continue
                         seq = rec.seq[start + 1: end + 1]
@@ -1572,7 +1574,7 @@ def main():
     #  this is to prevent issues running from head node on a cluster
     logger.info("Running %i barnap cmds", len(barrnap_cmds))
     if args.sge:
-        for cmd in barnapp_cmds:
+        for cmd in barrnap_cmds:
             logger.debug(cmd)
             try:
                 subprocess.run(cmd,
@@ -1587,7 +1589,7 @@ def main():
     else:
         pool = multiprocessing.Pool(processes=args.njobs)
         logger.debug("running the following commands:")
-        logger.debug("\n".join(ribo_cmds))
+        logger.debug("\n".join(barrnap_cmds))
         barrnap_pool_results = [
             pool.apply_async(
                 subprocess.run,
@@ -1606,7 +1608,11 @@ def main():
                            "not refected in summary due to multiprocessing")
 
     for full_assembly, fast_assembly, tax_d in all_assemblies:
+        # TODO something more elegant than these three lines again. Namespaces?
         sra = str(Path(fast_assembly).parents[4].name)
+        full_barr_gff = os.path.join(args.output_dir, sra, "barrnap_full.gff")
+        fast_barr_gff = os.path.join(args.output_dir, sra, "barrnap_fast.gff")
+
         try:
             if full_assembly is not None:
                 this_extracted_seqs = extract_16s_from_assembly(

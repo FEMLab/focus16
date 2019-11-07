@@ -1,11 +1,14 @@
 from .run_focusDB import get_coverage, downsample, make_riboseed_cmd, sralist,\
-    pob, referenceNotGoodEnoughError
+    pob, referenceNotGoodEnoughError, check_riboSeed_outcome, riboSeedError, \
+    riboSeedUnsuccessfulError
+
 import os
 import shutil
 import unittest
 import subprocess
 import sys
 import logging as logger
+from pathlib import Path
 from nose.tools.nontrivial import with_setup
 
 
@@ -180,3 +183,58 @@ class bestrefTest(unittest.TestCase):
         test_result = pob(genomes_dir=plasmids, readsf=reads, output_dir=output_dir + "2", maxdist=.3, logger=logger)
         print(test_result)
         assert round(0.295981, 2) == round(test_result[1], 2)
+
+
+class parseRiboSeedTest(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = os.path.join(os.path.dirname(__file__),
+                                     "test_parse_riboSeed", "")
+        self.status_file = os.path.join(self.test_dir, "tmp_status")
+        # make test directories for all (common) possible outcomes:
+        for d  in [os.path.join(self.test_dir, x) for x in
+                   ["fast_pass", "fast_fail", "full_pass", "full_fail"]]:
+            for sd in [os.path.join(d, "seed",  y) for y in
+                       ["final_long_reads", "final_de_fere_novo_assembly"]]:
+                if not os.path.exists(sd):
+                    os.makedirs(sd)
+        # "fast_pass", "final_long_reads", "riboSeedContigs.fasta""
+        #  these lines are long, deal with it
+        Path(os.path.join(self.test_dir, "fast_pass", "seed", "final_long_reads", "riboSeedContigs.fasta")).touch()
+        # dont write one for fail
+        Path(os.path.join(self.test_dir, "full_pass", "seed", "final_long_reads", "riboSeedContigs.fasta")).touch()
+        Path(os.path.join(self.test_dir, "full_pass", "seed", "final_de_fere_novo_assembly", "contigs.fasta")).touch()
+        Path(os.path.join(self.test_dir, "full_fail", "seed",  "final_long_reads", "riboSeedContigs.fasta")).touch()
+        # dont write final contigs for fail
+
+    def test_check_riboSeed_outcome_baderror(self):
+        with self.assertRaises(riboSeedError):
+            contigs = check_riboSeed_outcome(
+                ribodir=os.path.join(
+                    self.test_dir, "thisdirdoesntevenlikeexistyouknow?"),
+                status_file=self.status_file)
+
+    def test_check_riboSeed_outcome_fast_nosuccess(self):
+        with self.assertRaises(riboSeedUnsuccessfulError):
+            contigs = check_riboSeed_outcome(
+                ribodir=os.path.join(self.test_dir, "fast_fail"),
+                status_file=self.status_file)
+
+    def test_check_riboSeed_outcome_full_nosuccess(self):
+        contigs = check_riboSeed_outcome(
+            ribodir=os.path.join(self.test_dir, "full_fail"),
+            status_file=self.status_file)
+        self.assertEquals(contigs["full"], None)
+
+    def test_check_riboSeed_outcome_contigs(self):
+        contigs = check_riboSeed_outcome(
+            ribodir=os.path.join(self.test_dir, "fast_pass"),
+            status_file=self.status_file)
+        self.assertEquals(contigs["full"], None)
+        self.assertTrue(contigs["fast"] is not None)
+
+    def test_check_riboSeed_outcome_full_fail(self):
+        contigs = check_riboSeed_outcome(
+            ribodir=os.path.join(self.test_dir, "full_fail"),
+            status_file=self.status_file)
+        self.assertEquals(contigs["full"], None)
+        self.assertTrue(contigs["fast"] is not None)
