@@ -862,7 +862,7 @@ def check_riboSeed_outcome(status_file, ribodir):
             "running 'ribo --help' to ensure that the installation is " +
             "functioning, then try rerunning the 'ribo run...'  command " +
             " from the focusDB log file. If running with SGE, " +
-            "check the log files") % this_output )
+            "check the log files") % ribodir )
     # Now, return paths or Nones to contigs.
     paths = {"fast": None, "full": None}
     fast = os.path.join(
@@ -1324,11 +1324,18 @@ def main():
                     ribodir=os.path.join(this_results, "riboSeed"),
                     status_file=status_file)
             except riboSeedUnsuccessfulError as e:
-                # assert v[4] == 1, "unknown error running riboSeed found by focusDB"
                 update_status_file(accession, message="RIBOSEED COMPLETE")
                 write_pass_fail(args, status="FAIL",
                                 stage=accession,
                                 note="riboSeed unsuccessful")
+                logger.error(e)
+                continue
+            # we decide to keep calm and carry on in this case; if you
+            # want to try again, use --redo_assembly
+            except riboSeedError as e:
+                write_pass_fail(args, status="ERROR",
+                                stage=accession,
+                                note="riboSeed Error")
                 logger.error(e)
                 continue
             # fast_ribo_contigs = os.path.join(
