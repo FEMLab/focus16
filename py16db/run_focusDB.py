@@ -875,7 +875,7 @@ def check_riboSeed_outcome(status_file, ribodir):
         raise riboSeedUnsuccessfulError(str(
             "riboSeed completed but was not successful; " +
             "for details, see log file at %s") %
-                os.path.join(this_output, "run_riboSeed.log"))
+                os.path.join(ribodir, "run_riboSeed.log"))
     if os.path.exists(full):
         paths["full"] = full
     return paths
@@ -1319,10 +1319,18 @@ def main():
         if "RIBOSEED COMPLETE" in parse_status_file(status_file) and \
            not args.redo_assembly:
             logger.info("using existing results")
-            contigs = check_riboSeed_outcome(
-                ribodir=os.path.join(this_results, "riboSeed"),
-                status_file=status_file)
-
+            try:
+                contigs = check_riboSeed_outcome(
+                    ribodir=os.path.join(this_results, "riboSeed"),
+                    status_file=status_file)
+            except riboSeedUnsuccessfulError as e:
+                # assert v[4] == 1, "unknown error running riboSeed found by focusDB"
+                update_status_file(accession, message="RIBOSEED COMPLETE")
+                write_pass_fail(args, status="FAIL",
+                                stage=accession,
+                                note="riboSeed unsuccessful")
+                logger.error(e)
+                continue
             # fast_ribo_contigs = os.path.join(
             #     this_results, "riboSeed", "seed",
             #     "final_long_reads", "riboSeedContigs.fasta")
