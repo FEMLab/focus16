@@ -157,8 +157,9 @@ def get_args():  # pragma: nocover
         default=303,
         required=False, type=int)
     parargs.add_argument(
-        "--just_seed", action="store_true",
-        help="run just the subassemblies; " +
+        "--fast", action="store_true",
+        help="run riboSeed with --just_seed -- not final assembly" +
+        "is done, just the subassemblies; " +
         "shorter execution time",
         required=False)
     configargs.add_argument(
@@ -811,7 +812,7 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
                                      memory=args.memory,
                                      subassembler=args.subassembler,
                                      threads=args.threads, output=ribo_dir,
-                                     just_seed=args.just_seed,
+                                     just_seed=args.fast,
                                      sge=args.sge,
                                      logger=logger)
     # do we want to redo the assembly?
@@ -821,63 +822,63 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
         if os.path.exists(ribo_dir):
             logger.debug("removing previous riboSeed results")
             shutil.rmtree(ribo_dir)
-    # file that will contain riboseed contigs
-    if args.just_seed:
-        ribo_contigs = os.path.join(
-            this_output, "riboSeed", "seed",
-            "final_long_reads", "riboSeedContigs.fasta")
-    else:
-        ribo_contigs = os.path.join(
-            this_output, "riboSeed", "seed",
-            "final_de_fere_novo_assembly", "contigs.fasta")
+    # file that will contain riboseed contigs even if final assembly fails
+    ribo_contigs = os.path.join(
+        this_output, "riboSeed", "seed",
+        "final_long_reads", "riboSeedContigs.fasta")
     donef = os.path.join(os.path.basename(this_output), "SGE_COMPLETE")
     if "RIBOSEED COMPLETE" not in parse_status_file(status_file):
         if os.path.exists(ribo_contigs) or os.path.exists(donef) :
             # after sge run
             update_status_file(status_file, message="RIBOSEED COMPLETE")
-            return (None, ribo_contigs, tax_dict)
+            return (None, tax_dict)
         else:
             # print(ribo_dir)
             # sys.exit(1)
             if os.path.exists(ribo_dir):
                 shutil.rmtree(ribo_dir)
-            return(riboseed_cmd, ribo_contigs, tax_dict)
+            return(riboseed_cmd, tax_dict)
     else:
         logger.info("Skipping riboSeed")
-        return (None, ribo_contigs, tax_dict)
+        return (None, tax_dict)
 
 
-def check_riboSeed_outcome(status_file, contigs):
-    # check for the files to see if riboSeed completed
-    if os.path.exists(contigs):
-        update_status_file(status_file, message="RIBOSEED COMPLETE")
+def check_riboSeed_outcome(status_file, ribodir):
+    bad_error_occurred = False
+    # handle cases where no output dir was made or an empty outtput dir:
+    # these are bad, user will need to try running the command to see why
+    # it failed
+    if os.path.exists(ribodir):
+        if not os.listdir(ribodir):
+            bad_error_occurred = True
+        else:
+            pass
     else:
-        this_output = os.path.dirname(
-            os.path.dirname(os.path.dirname(contigs)))
-        bad_error_occurred = False
-        # handle cases where no output dir was made or an empty outtput dir:
-        # these are bad, user will need to try running the command to see why
-        # it failed
-        if os.path.exists(this_output):
-            if not os.listdir(this_output):
-                bad_error_occurred = True
-            else:
-                pass
-        else:
-                bad_error_occurred = True
-        if bad_error_occurred:
-            raise riboSeedError(str(
-                "riboSeed output folder %s is empty or missing. " +
-                "A fatal error occurred during final assemblies.. Try " +
-                "running 'ribo --help' to ensure that the installation is " +
-                "functioning, then try rerunning the 'ribo run...'  command " +
-                " from the focusDB log file. If running with SGE, " +
-                "check the log files") % this_output )
-        else:
-            raise riboSeedUnsuccessfulError(str(
-                "riboSeed completed but was not successful; " +
-                "for details, see log file at %s") %
-                    os.path.join(this_output, "run_riboSeed.log"))
+        bad_error_occurred = True
+    if bad_error_occurred:
+        raise riboSeedError(str(
+            "riboSeed output folder %s is empty or missing. " +
+            "A fatal error occurred during final assemblies.. Try " +
+            "running 'ribo --help' to ensure that the installation is " +
+            "functioning, then try rerunning the 'ribo run...'  command " +
+            " from the focusDB log file. If running with SGE, " +
+            "check the log files") % this_output )
+    # Now, return paths or Nones to contigs.
+    paths = {"fast": None, "full": None}
+    fast = os.path.join(
+         ribodir, "seed","final_long_reads", "riboSeedContigs.fasta")
+    full = os.path.join(
+         ribodir, "seed", "final_de_fere_novo_assembly", "contigs.fasta")
+    if os.path.exists(fast):
+        paths["fast"] = fast
+    else:
+        raise riboSeedUnsuccessfulError(str(
+            "riboSeed completed but was not successful; " +
+            "for details, see log file at %s") %
+                os.path.join(this_output, "run_riboSeed.log"))
+    if os.path.exists(full):
+        paths["full"] = full
+    return paths
 
 
 def run_barrnap(assembly,  results, logger):
@@ -898,7 +899,7 @@ def run_barrnap(assembly,  results, logger):
 def extract_16s_from_assembly(assembly, gff, sra, output, output_summary,
                               args, singleline, tax_d, min_length, logger):
     tax_string = tax_d["S"][2]
-    # if no label, gibe the next one
+    # if no label at some level, give the next one
     if len(tax_string.replace(" ", "")) == 0:  # if genus only
         tax_string = tax_d["G"][2] + "sp."
         if len(tax_string.replace(" ", "").replace(".sp", "")) == 0:
@@ -1020,7 +1021,7 @@ def run_riboSeed_catch_errors(cmd, acc=None, args=None, status_file=None,
 
 
 def write_this_config(args, this_config_file):
-    args_to_write = ["maxdist", "subassembler", "maxcov", "just_seed"]
+    args_to_write = ["maxdist", "subassembler", "maxcov"]
     argd = vars(args)
     with open(this_config_file, "w") as outf:
         for arg in args_to_write:
@@ -1031,7 +1032,7 @@ def different_args(args, this_config_file, logger):
     """ Returns empty list if no args differ
     """
     diff_args = []
-    args_to_write = ["maxdist", "subassembler", "maxcov", "just_seed"]
+    args_to_write = ["maxdist", "subassembler", "maxcov"]
     old_config_dict = {}
     this_config_dict = vars(args)
     if not os.path.exists(this_config_file):
@@ -1054,7 +1055,7 @@ def different_args(args, this_config_file, logger):
                         arg, this_config_dict[arg], old_config_dict[arg]))
                 diff_args.append(arg)
         except KeyError:
-            logger.info("New parameter value for --just_seed")
+            logger.info("parameter %s not found in old config", arg)
             # this can happen after updates -- play it safe and redo it
             diff_args.append(arg)
     return diff_args
@@ -1255,7 +1256,7 @@ def main():
     except ValueError as e:
         logger.warning(e)
         # if we have any issues finding or reading the config, rerun it all
-        updated_args = ["maxdist", "subassembler", "maxcov", "just_seed"]
+        updated_args = ["maxdist", "subassembler", "maxcov"]
     # if "n_references" in updated_args:
     #     if os.path.exists(genome_check_file):
     #         os.remove(genome_check_file)
@@ -1284,7 +1285,7 @@ def main():
                         note="No references had more than 1 rDNA")
         sys.exit(0)
 
-    riboSeed_jobs = []  # [accession, cmd, contigs, status_file, return_code]
+    riboSeed_jobs = []  # [accession, cmd, depreciated, status_file, return_code]
     nsras = len(filtered_sras)
     n_errors = {}
     for i, accession in enumerate(filtered_sras):
@@ -1313,30 +1314,38 @@ def main():
                                to_remove=["DOWNSAMPLED", "RIBOSEED COMPLETE"])
         if "subassembler" in updated_args:
             update_status_file(status_file, to_remove=["RIBOSEED COMPLETE"])
-        if "just_seed" in updated_args:
-            update_status_file(status_file, to_remove=["RIBOSEED COMPLETE"])
 
         ################
         if "RIBOSEED COMPLETE" in parse_status_file(status_file) and \
            not args.redo_assembly:
             logger.info("using existing results")
-            if args.just_seed:
-                ribo_contigs = os.path.join(
-                    this_results, "riboSeed", "seed",
-                    "final_long_reads", "riboSeedContigs.fasta")
-            else:
-                ribo_contigs = os.path.join(
-                    this_results, "riboSeed", "seed",
-                    "final_de_fere_novo_assembly", "contigs.fasta")
+            contigs = check_riboSeed_outcome(
+                ribodir=os.path.join(this_results, "riboSeed"),
+                status_file=status_file)
+
+            # fast_ribo_contigs = os.path.join(
+            #     this_results, "riboSeed", "seed",
+            #     "final_long_reads", "riboSeedContigs.fasta")
+            # full_ribo_contigs = os.path.join(
+            #     this_results, "riboSeed", "seed",
+            #     "final_de_fere_novo_assembly", "contigs.fasta")
             kraken2_report_output = os.path.join(
                 this_results, "kraken2", "kraken2.report")
             # double check files exist before we skip this one
-            if all([os.path.exists(p) and os.path.getsize(p) != 0
-                    for p in [ribo_contigs, kraken2_report_output]]):
+            # Note that if user first ran in --fast mode, this should
+            # catch the lack of final assembly
+            if not os.path.exists(kraken2_report_output):
+                logger.warning("Kraken2 results not found")
+            elif contigs["full"] is None and not args.fast:
+                logger.warning("Full riboSeed output contigs not found")
+            elif not os.path.exists(contigs["fast"]):
+                logger.warning("Fast riboSeed output contigs not found")
+            else:
                 riboSeed_jobs.append(
-                    [accession, None, ribo_contigs,  status_file,
+                    [accession, None, contigs,  status_file,
                      parse_kraken_report(kraken2_report_output), 0])
                 continue
+            logger.info("Reprocessing SRA")
 
         try:
             rawreadsf, rawreadsr, read_length, download_error_message = \
@@ -1386,12 +1395,12 @@ def main():
         #  anything but the riboSeed step
         logger.debug("preparing for re-assembly")
         try:
-            riboSeed_cmd, contigs_path, taxonomy_d = process_strain(
+            riboSeed_cmd, taxonomy_d = process_strain(
                 rawreadsf, rawreadsr, read_length, fDB.refdir,
                 this_results, args, logger, status_file, fDB.krakendir)
             riboSeed_jobs.append(
                 [accession, riboSeed_cmd,
-                 contigs_path,  status_file, taxonomy_d, None])
+                 None,  status_file, taxonomy_d, None])
         except coverageError as e:
             write_pass_fail(args, status="FAIL",
                             stage=accession,
@@ -1497,11 +1506,15 @@ def main():
     else:
         logger.info("No assemblies need to be run")
     for v in riboSeed_jobs:
+        riboSeed_dir = os.path.join(args.output_dir, v[0],
+                                    "results", "riboSeed")
         try:
-            check_riboSeed_outcome(status_file, v[2])
+            contigs = check_riboSeed_outcome(
+                ribodir=riboSeed_dir,
+                status_file=status_file)
             update_status_file(v[3], message="RIBOSEED COMPLETE")
             write_pass_fail(args, status="PASS", stage=v[0], note="")
-            all_assemblies.append([v[2], v[4]])
+            all_assemblies.append([contigs["full"], contigs["fast"], v[4]])
         except riboSeedError as e:
             #  assert v[4] == 1, "unknown error running riboSeed found by focusDB"
             write_pass_fail(args, status="ERROR",
@@ -1517,44 +1530,97 @@ def main():
             logger.error(e)
 
     #######################################################################
-    extract16soutput = os.path.join(
+    extract16soutput_full = os.path.join(
         args.output_dir,
-        "{}_ribo16s.fasta".format(args.organism_name.replace(" ", "_")))
+        "{}_full_ribo16s.fasta".format(args.organism_name.replace(" ", "_")))
+    extract16soutput_fast = os.path.join(
+        args.output_dir,
+        "{}_fast_ribo16s.fasta".format(args.organism_name.replace(" ", "_")))
     out_summary = os.path.join(args.output_dir, "sequence_summary.tab")
-    for outf in [extract16soutput, out_summary]:
+    for outf in [extract16soutput_fast, extract16soutput_full, out_summary]:
         if os.path.exists(outf):
             os.remove(outf)
     logger.info("attempting to extract 16S sequences for re-assemblies")
-    n_extracted_seqs = 0
+    n_extracted_seqs_full = 0
+    n_extracted_seqs_fast = 0
     singleline = True
     min_length = 1000  # minimum length seqeunce to extract
-    for assembly, tax_d in all_assemblies:
-        sra = str(Path(assembly).parents[4].name)
-        barr_gff = os.path.join(args.output_dir, sra, "barrnap.gff")
+    barrnap_cmds = []
+    for full_assembly, fast_assembly, tax_d in all_assemblies:
+        sra = str(Path(fast_assembly).parents[4].name)
+        full_barr_gff = os.path.join(args.output_dir, sra, "barrnap_full.gff")
+        fast_barr_gff = os.path.join(args.output_dir, sra, "barrnap_fast.gff")
+        if full_assembly is not None:
+            barrnap_cmds.append("barrnap {} > {}".format(full_assembly, full_barr_gff))
+        barrnap_cmds.append("barrnap {} > {}".format(fast_assembly, fast_barr_gff))
+    #  run with multiprocessing if not SGE, otherwise, deal with single-threads
+    #  this is to prevent issues running from head node on a cluster
+    logger.info("Running %i barnap cmds", len(barrnap_cmds))
+    if args.sge:
+        for cmd in barnapp_cmds:
+            logger.debug(cmd)
+            try:
+                subprocess.run(cmd,
+                               shell=sys.platform !="win32",
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE,
+                               check=True)
+            except Exception as e:
+                logger.error(e)
+                write_pass_fail(args, status="ERROR", stage=sra,
+                                note="Error running barrnap")
+    else:
+        pool = multiprocessing.Pool(processes=args.njobs)
+        logger.debug("running the following commands:")
+        logger.debug("\n".join(ribo_cmds))
+        barrnap_pool_results = [
+            pool.apply_async(
+                subprocess.run,
+                (cmd,),
+                {"shell": sys.platform !="win32",
+                 "stdout":subprocess.PIPE,
+                 "stderr": subprocess.PIPE,
+                 "check": True}
+            ) for  cmd in barrnap_cmds]
+        pool.close()
+        pool.join()
+        barrnap_results_sum = sum([r.get().returncode for r in barrnap_pool_results])
+        logger.debug("Sum of return codes (should be 0): %i", barrnap_results_sum)
+        if barrnap_results_sum != 0:
+            logger.warning("Error with one or more barrnap runs which is " +
+                           "not refected in summary due to multiprocessing")
+
+    for full_assembly, fast_assembly, tax_d in all_assemblies:
+        sra = str(Path(fast_assembly).parents[4].name)
         try:
-            run_barrnap(assembly, barr_gff, logger)
+            if full_assembly is not None:
+                this_extracted_seqs = extract_16s_from_assembly(
+                    full_assembly, full_barr_gff, sra,
+                    extract16soutput_full, out_summary, args,
+                    singleline, tax_d, min_length, logger)
+                n_extracted_seqs_full = n_extracted_seqs_full + this_extracted_seqs
             this_extracted_seqs = extract_16s_from_assembly(
-                assembly, barr_gff, sra, extract16soutput, out_summary, args,
+                fast_assembly, fast_barr_gff, sra,
+                extract16soutput_fast, out_summary, args,
                 singleline, tax_d, min_length, logger)
-            n_extracted_seqs = n_extracted_seqs + this_extracted_seqs
+            n_extracted_seqs_fast = n_extracted_seqs_fast + this_extracted_seqs
         except extracting16sError as e:
             logger.error(e)
             write_pass_fail(args, status="ERROR", stage=sra,
                             note="unknown error extracting 16S")
-        except barrnapError as e:
-            logger.error(e)
-            write_pass_fail(args, status="ERROR", stage=sra,
-                            note="Error running barrnap")
 
     ###########################################################################
     if error_during_assembly:
         logger.warning("Warning: 1 or more errors occured during assembly")
-    logger.info("Wrote out %i sequences", n_extracted_seqs)
+    logger.info("Wrote out %i sequences from full riboSeed run",
+                n_extracted_seqs_full)
+    logger.info("Wrote out %i sequences from fast riboSeed run",
+                n_extracted_seqs_fast)
     if len(n_errors) != 0:
         logger.warning("Errors during run:")
         for k, v in n_errors.items():
             logger.warning("   " + k + " errors: " + str(v))
-    if n_extracted_seqs == 0:
+    if n_extracted_seqs_fast == 0:
         write_pass_fail(args, status="FAIL", stage="global",
                         note="No 16s sequences detected in re-assemblies")
         logger.warning("No 16s sequences recovered. exiting")
