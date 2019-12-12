@@ -17,7 +17,8 @@ from Bio.SeqRecord import SeqRecord
 
 from . import __version__
 from py16db.FocusDBData import FocusDBData, fasterqdumpError
-from py16db.shared_methods import filter_sraFind
+from py16db.shared_methods import filter_sraFind, \
+    extract_16s_from_assembly, run_barrnap, parse_kraken_report, run_kraken2
 
 
 class bestreferenceError(Exception):
@@ -641,57 +642,6 @@ def make_riboseed_cmd(sra, readsf, readsr, cores, subassembler, threads,
     return(cmd)
 
 
-def run_kraken2(args, contigs, dest_prefix, db, logger):
-    out = dest_prefix + ".output"
-    report = dest_prefix + ".report"
-    if args.memory < 20 or args.kraken_mem_mapping:
-        memstring = "--memory-mapping "
-    else:
-        memstring = ""
-    cmd = str(
-        "kraken2 {memstring}--db {db} --threads {args.cores} " +
-        "--use-names --output {out} " +
-        "--report {report} {contigs}").format(**locals())
-    if not os.path.exists(report):
-        logger.debug(cmd)
-        subprocess.run(cmd,
-                       shell=sys.platform != "win32",
-                       stdout=subprocess.PIPE,
-                       stderr=subprocess.PIPE,
-                       check=True)
-    return report
-
-
-def parse_kraken_report(kraken2_report):
-    """column data:
-    https://ccb.jhu.edu/software/kraken2/index.shtml?t=manual
-    #standard-kraken-output-format
-    """
-    empty = [0, "-", ""]
-    tax = {'R': empty,
-           'D': empty,
-           'P': empty,
-           'C': empty,
-           'O': empty,
-           'F': empty,
-           'G': empty,
-           'S': empty}
-    with open(kraken2_report, "r") as inf:
-        for line in inf:
-            # print(line)
-            sline = line.split("\t")
-            if len(sline) != 6:
-                raise ValueError(
-                    "Malformed kraken2 report; should be 6 columns: %s" % line)
-            perc, n_in, n_at, lev, taxid, label = sline
-            if lev in tax.keys():
-                # only report the top hit
-                this = float(perc.strip()), taxid, label.strip()
-                if tax[lev][0] < this[0]:
-                    tax[lev] = float(perc.strip()), taxid, label.strip()
-    return tax
-
-
 def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
                    this_output, args, logger, status_file, kdir):
     """return a tuple of the riboSeed cmd and the path to contigs,
@@ -715,7 +665,7 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
         pob(genomes_dir=genomes_dir, readsf=rawreadsf,
             output_dir=pob_dir, maxdist=args.maxdist, logger=logger)
 
-    logger.debug("Parsing closestt reference")
+    logger.debug("Parsing closest reference")
     with open(best_reference, "r") as infile:
         for line in infile:
             best_ref_fasta = line.split('\t')[0]
@@ -845,7 +795,7 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
 
 def check_riboSeed_outcome(status_file, ribodir):
     bad_error_occurred = False
-    # handle cases where no output dir was made or an empty outtput dir:
+    # handle cases where no output dir was made or an empty output dir:
     # these are bad, user will need to try running the command to see why
     # it failed
     if os.path.exists(ribodir):
@@ -879,106 +829,6 @@ def check_riboSeed_outcome(status_file, ribodir):
     if os.path.exists(full):
         paths["full"] = full
     return paths
-
-
-def run_barrnap(assembly,  results, logger):
-    barrnap = "barrnap {assembly} > {results}".format(**locals())
-    logger.debug('Identifying 16S sequences with barnap: %s', barrnap)
-    try:
-        subprocess.run(barrnap,
-                       shell=sys.platform != "win32",
-                       stdout=subprocess.PIPE,
-                       stderr=subprocess.PIPE,
-                       check=True)
-    except Exception as e:
-        logger.error(e)
-        raise barrnapError(
-            "Error running the following command %s" % barrnap)
-
-
-def extract_16s_from_assembly(assembly, gff, sra, output, output_summary,
-                              args, singleline, tax_d, min_length, logger):
-    logger.debug("processing %s", assembly)
-    tax_string = tax_d["S"][2]
-    # if no label at some level, give the next one
-    if len(tax_string.replace(" ", "")) == 0:  # if genus only
-        tax_string = tax_d["G"][2] + "sp."
-        if len(tax_string.replace(" ", "").replace(".sp", "")) == 0:
-            tax_string = tax_d["F"][2]
-            if len(tax_string.replace(" ", "")) == 0:
-                tax_string = tax_d["O"][2]
-                if len(tax_string.replace(" ", "")) == 0:
-                    tax_string = tax_d["C"][2]
-                    if len(tax_string.replace(" ", "")) == 0:
-                        tax_string = tax_d["P"][2]
-    score_string = str(tax_d["D"][0])
-    taxid_string = tax_d["D"][1]
-    big_tax_string = tax_d["D"][2]
-    for lev in ["P", "C", "O", "F", "G", "S"]:
-        score_string = score_string + ";" + str(tax_d[lev][0])
-        taxid_string = taxid_string + ";" + tax_d[lev][1]
-        big_tax_string = big_tax_string + ";" + tax_d[lev][2]
-
-    # struction of results16s:
-    # [sra_#, chromosome, start, end, reverse complimented,
-    #  big_tax_string, score_string, taxid_string, tax_string]
-    results16s = {}
-    nseqs = 0
-    with open(gff, "r") as rrn, open(output, "a") as outf, \
-         open(output_summary, "a") as outsum:
-        rrn_num = 0
-        for rawline in rrn:
-            line = rawline.strip().split('\t')
-            # need this: catches index errors from the comment lines
-            if line[0].startswith("##"):
-                pass
-            elif line[8].startswith("Name=16S"):
-                rrn_num = rrn_num + 1
-                if line[6] == "-":
-                    suffix = 'chromosome-RC@'
-                else:
-                    suffix = ''
-                chrom = line[0]
-                ori = line[6]
-                start = int(line[3])
-                end = int(line[4])
-                if (end - start) < 1000:
-                    logger.info("ignoring short rRNA:")
-                    logger.info(line)
-                    continue
-                thisid = "{}_{}".format(sra, rrn_num)
-                results16s[thisid] = [chrom, start, end, line[6]]
-                with open(assembly, "r") as asmb:
-                    for rec in SeqIO.parse(asmb, "fasta"):
-                        #logger.debug("%s\t%s", chrom, rec.id)
-                        if rec.id != chrom:
-                            continue
-                        seq = rec.seq[start + 1: end + 1]
-                        if ori == "-":
-                            seq = seq.reverse_complement()
-                        thisidcoords = "{thisid}.{start}.{end}".format(
-                            **locals())
-                        # Need to disable linewrapping for use with SILVA, etc
-                        if singleline:
-                            seqstr = str(seq.transcribe())
-                            outf.write(
-                                str(">{thisidcoords} {big_tax_string}\n" +
-                                    "{seqstr}\n").format(**locals()))
-                        else:
-                            SeqIO.write(
-                                SeqRecord(
-                                    seq.transcribe(), id=thisidcoords,
-                                    description=big_tax_string),
-                                outf,  "fasta")
-                        outsum.write(
-                            str(
-                                "{thisid}\t{assembly}\t" +
-                                "{chrom}\t{start}\t{end}\t{big_tax_string}\t" +
-                                "{score_string}\t{taxid_string}\t" +
-                                "{tax_string}\n"
-                            ).format(**locals()))
-                        nseqs = nseqs + 1
-    return nseqs
 
 
 def write_pass_fail(args, stage, status, note):
@@ -1069,6 +919,7 @@ def add_key_or_increment(d, k):
     else:
         d[k] = 1
 
+
 def write_sge_script(args, ntorun, riboSeed_jobs, script_path):
     end_message = "Done running assemblies. Rerun focusDB as before to " + \
         "will detect the assemblies and finish processing them.  Exiting.."
@@ -1095,6 +946,7 @@ def write_sge_script(args, ntorun, riboSeed_jobs, script_path):
         for l in lines:
             outf.write(l + "\n")
         # outf.write("echo '" + end_message + "'\n" )
+
 
 def run_trimmer(fastq1, fastq2, output_dir, run, logger):
     """ run sickle for read trimming, and then fastp for adapter trimmming/QC,
@@ -1326,7 +1178,7 @@ def main():
                     ribodir=os.path.join(this_results, "riboSeed"),
                     status_file=status_file)
             except riboSeedUnsuccessfulError as e:
-                update_status_file(accession, message="RIBOSEED COMPLETE")
+                update_status_file(status_file, message="RIBOSEED COMPLETE")
                 write_pass_fail(args, status="FAIL",
                                 stage=accession,
                                 note="riboSeed unsuccessful")
@@ -1561,7 +1413,13 @@ def main():
     n_extracted_seqs_full = 0
     n_extracted_seqs_fast = 0
     singleline = True
-    min_length = 1000  # minimum length seqeunce to extract
+    ##  we set the minimum length to being less than the 1st quartile of silva:
+    # silva <- readRNAStringSet("~/Downloads/SILVA_132_SSURef_tax_silva.fasta.gz")
+    # hist(silva@ranges@width)
+    # summary(silva@ranges@width)
+    #  > Min. 1st Qu.  Median    Mean 3rd Qu.    Max.
+    #   900    1358    1403    1428    1484    4000
+    min_length = 1358  # minimum length seqeunce to extract
     barrnap_cmds = []
     for full_assembly, fast_assembly, tax_d in all_assemblies:
         sra = str(Path(fast_assembly).parents[4].name)

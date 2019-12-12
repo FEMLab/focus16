@@ -48,8 +48,6 @@ class FocusDBData(object):
                 conn = sqlite3.connect(self.db)
                 c = conn.cursor()
                 c.execute("CREATE TABLE IF NOT EXISTS SRAs (accession text PRIMARY KEY, status text, genus text, species text, readlen integer )")
-                # c.execute("CREATE TABLE IF NOT EXISTS SRAs (accession text PRIMARY KEY, status text, genus text, species text )")
-                # c.execute("CREATE TABLE IF NOT EXISTS Genomes (accssions text PRIMARY KEY, status text, genus text, species text)")
                 conn.commit()
                 conn.close()
                 done_and_dusted = True
