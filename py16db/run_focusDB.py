@@ -208,6 +208,11 @@ def get_args():  # pragma: nocover
         "download the first only.  Use --get_all to " +
         "analyse each library",
         action="store_true", required=False)
+    expargs.add_argument(
+        "--run_de_novo_control",
+        help="in 'full' mode, run a de novo assembly with SPAdes in addition " +
+        "to riboSeed de fere novo assembly",
+        action="store_true", required=False)
     parargs.add_argument(
         "--maxdist",
         help="maximum mash distance allowed for reference " +
@@ -616,27 +621,24 @@ def downsample(read_length, approx_length, fastq1, fastq2,
 
 
 def make_riboseed_cmd(sra, readsf, readsr, cores, subassembler, threads,
-                      output, memory, just_seed, sge,  logger):
+                      output, memory, just_seed, sge, skip_control,  logger):
     """Runs riboSeed to reassemble reads """
     # sge keeps from running mmulitprocessing:
-    if memory < 10 or sge:
-        serialize = "--serialize "
-    else:
-        serialize = ""
-    if just_seed:
-        seed_str = "--just_seed "
-    else:
-        seed_str = ""
+    serialize = "--serialize " if (memory < 10 or sge) else ""
+    seed_str = "--just_seed " if just_seed else ""
+    skip_control_str = "--skip_control " if skip_control else ""
+
+
     cmd = str("ribo run -r {sra} -F {readsf} -R {readsr} --cores {cores} " +
               "--threads {threads} -v 1 -o {output} {serialize}" +
-              "--subassembler {subassembler} {seed_str}--skip_control " +
+              "--subassembler {subassembler} {seed_str}{skip_control_str}" +
               "--stages none " +
               "--memory {memory}").format(**locals())
 
     if readsr is None:
         cmd = str("ribo run -r {sra} -S1 {readsf} --cores {cores} " +
                   "--threads {threads} -v 1 -o {output} {serialize}" +
-                  "--subassembler {subassembler} {seed_str}--skip_control " +
+                  "--subassembler {subassembler} {seed_str}{skip_control_str}" +
                   "--stages none " +
                   "--memory {memory}").format(**locals())
     return(cmd)
@@ -763,6 +765,7 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
                                      subassembler=args.subassembler,
                                      threads=args.threads, output=ribo_dir,
                                      just_seed=args.fast,
+                                     skip_control= not args.run_de_novo_control,
                                      sge=args.sge,
                                      logger=logger)
     # do we want to redo the assembly?

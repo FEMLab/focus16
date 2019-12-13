@@ -138,6 +138,7 @@ class coverageTests(unittest.TestCase):
                                         subassembler="spades",
                                         memory=8, just_seed=True,
                                         sge=False,
+                                        skip_control=True,
                                         output=output_dir, logger=logger)
         target_cmd = "ribo run -r /Users/alexandranolan/Desktop/16db/py16db/test_data/ecoli/NC_011750.1.fna -F /Users/alexandranolan/Desktop/16db/py16db/test_data/test_reads1.fq -R /Users/alexandranolan/Desktop/16db/py16db/test_data/test_reads2.fq --cores 4 --threads 1 -v 1 -o /Users/alexandranolan/Desktop/16db/py16db/riboSeed --serialize --subassembler spades --just_seed --skip_control --stages none --memory 8"
         for part in range(len(target_cmd.split(" "))):
