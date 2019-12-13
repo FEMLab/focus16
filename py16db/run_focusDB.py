@@ -759,15 +759,16 @@ def process_strain(rawreadsf, rawreadsr, read_length, genomes_dir,
     logger.debug('Downsampled f reads: %s', downsampledf)
     logger.debug('Downsampled r reads: %s', downsampledr)
     logger.debug("creating riboSeed command")
-    riboseed_cmd = make_riboseed_cmd(sra=best_ref_fasta, readsf=downsampledf,
-                                     readsr=downsampledr, cores=args.cores,
-                                     memory=args.memory,
-                                     subassembler=args.subassembler,
-                                     threads=args.threads, output=ribo_dir,
-                                     just_seed=args.fast,
-                                     skip_control= not args.run_de_novo_control,
-                                     sge=args.sge,
-                                     logger=logger)
+    riboseed_cmd = make_riboseed_cmd(
+        sra=best_ref_fasta, readsf=downsampledf,
+        readsr=downsampledr, cores=args.cores,
+        memory=args.memory,
+        subassembler=args.subassembler,
+        threads=args.threads, output=ribo_dir,
+        just_seed=args.fast,
+        skip_control= not args.run_de_novo_control and not args.fast,
+        sge=args.sge,
+        logger=logger)
     # do we want to redo the assembly?
     if args.redo_assembly:
         logger.debug("preparing to redo riboSeed")
